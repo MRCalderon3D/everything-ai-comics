@@ -188,8 +188,19 @@ export function docEditor(ctx, doc, { key, title, form = true, readonly, onSaved
       }
       s.mode = s.mode === 'form' ? 'file' : 'form';
       paint();
+      syncPath();
     },
   }, t('editor.show_file')) : null;
+  // The file's name is shown with the file itself, not over the friendly form.
+  const pathEl = h('div', { class: 'doc-path faint small' });
+  function syncPath() {
+    const parts = [];
+    if (s.mode === 'file' && canForm) parts.push(doc.path);
+    if (!doc.exists) parts.push(t('editor.not_written'));
+    pathEl.textContent = parts.join(' · ');
+    pathEl.hidden = !parts.length;
+  }
+  syncPath();
 
   setDirty(false);
   paint();
@@ -199,7 +210,7 @@ export function docEditor(ctx, doc, { key, title, form = true, readonly, onSaved
     h('div', { class: 'doc-head' },
       h('div', { class: 'grow' },
         title ? h('h3', null, title) : null,
-        h('div', { class: 'doc-path faint small' }, doc.path, doc.exists ? '' : ` · ${t('editor.not_written')}`)),
+        pathEl),
       toggle),
     readonly ? notice('info', readonly) : null,
     body,

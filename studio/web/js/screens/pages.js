@@ -5,7 +5,7 @@
 import { h, nextId } from '/js/dom.js';
 import { t, tn } from '/js/i18n.js';
 import { api } from '/js/api.js';
-import { state } from '/js/store.js';
+import { state, findJob } from '/js/store.js';
 import { screenHead, bench } from '/js/components/bench.js';
 import { panel, actionButton, button, textField, notice, emptyState, disclosure, caption } from '/js/components/ui.js';
 import { docEditor, continuityList } from '/js/components/editor.js';
@@ -113,6 +113,26 @@ function planForm(ctx, data) {
       h('span', { class: 'small muted' }, t('pages.plan_time'))));
 }
 
+/** What the last planning filled in that the person's text did not say, per page. */
+function plannedAssumptions(ctx, data) {
+  const job = findJob((j) => j.op === 'pages.plan' && j.status === 'done' && j.result && Array.isArray(j.result.assumptions) && j.result.assumptions.length
+    && (!j.params || !j.params.issue || j.params.issue === data.id));
+  if (!job) return null;
+  const base = `/p/${encodeURIComponent(ctx.projectId)}`;
+  const byPage = new Map();
+  for (const a of job.result.assumptions) {
+    if (!byPage.has(a.page)) byPage.set(a.page, []);
+    byPage.get(a.page).push(a);
+  }
+  return h('section', { class: 'panel' },
+    h('h2', { class: 'panel-title' }, tn('assume.title', job.result.assumptions.length)),
+    h('p', { class: 'muted small' }, t('assume.intro_pages')),
+    h('ul', { class: 'assumptions' }, [...byPage].map(([page, list]) => h('li', { class: 'assumption' },
+      h('span', { class: 'assumption-where' }, pageName(page)),
+      h('ul', { class: 'bullets small' }, list.map((a) => h('li', null, a.text))),
+      h('a', { class: 'small', href: `${base}/pages/${page}` }, t('assume.open_page', { name: pageName(page) }))))));
+}
+
 export function view(ctx, data) {
   ctx.title = t('screen.pages');
   const base = `/p/${encodeURIComponent(ctx.projectId)}`;
@@ -186,6 +206,7 @@ export function view(ctx, data) {
 
   const text = h('div', { class: 'stack' },
     jobsFor((j) => j.op === 'pages.plan' || j.op === 'pages.generate'),
+    plannedAssumptions(ctx, data),
     issues.length > 1 ? h('div', { class: 'field' },
       h('label', { for: 'issue-pick' }, t('pages.issue')),
       h('select', { id: 'issue-pick', onchange: (e) => { state.issue = e.target.value; ctx.refresh(); } },

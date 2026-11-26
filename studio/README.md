@@ -12,7 +12,9 @@ the browser app (`web/`).
 
 ## Requirements
 
-- Node.js 18 or later. The studio has no dependencies to install.
+- Node.js 18 or later. The studio has no dependencies to install. The one
+  library the browser app uses, three.js, ships as a file inside
+  `web/vendor/three/` (see [The browser app](#the-browser-app)).
 - git, for the history. Without it everything works except going back to an
   earlier state.
 - At least one of the two command-line tools, installed and signed in:
@@ -204,6 +206,77 @@ summary of the last messages, and the transcript says so. A chat never
 writes the story bible: story text comes back as a proposal, and a reply
 that wrote the file anyway is undone. The person can start a fresh
 conversation; the earlier ones stay readable.
+
+## The browser app
+
+`web/` is plain ES modules, CSS and one HTML file, with no build step. It
+runs under the server's Content-Security-Policy (`default-src 'self'`), so
+nothing loads from another host and there are no inline scripts.
+
+The frame has three parts. The path of the comic runs down the left as a
+strip of numbered panels: inked when a step is done, yellow for the next one.
+The screen sits in the middle, with the artwork given the larger share. The
+conversation is docked on the right and keeps its messages while the person
+moves between screens; each message shows the screen it came from, links in
+replies open the screen they name, and "New" starts a fresh conversation
+while the earlier ones stay readable. Below 1240 px the conversation floats
+over the screen and opens only when asked.
+
+The person can arrange the frame. A handle between each side and the
+screen changes its width within limits; arrow keys move a focused handle,
+and a double click or Enter puts it back. Each side collapses to a thin
+rail: the path keeps its step numbers, the conversation keeps one button
+that shows a marker when a reply arrives. Focus mode (the button in the top
+bar, or Ctrl+Shift+F) hides both sides at once. Below 760 px the path
+becomes a drawer opened from the top bar. The layout is kept in this
+browser for the person, not per project, and survives a reload.
+
+What each screen asks of the person:
+
+- Projects: the comics as covers, a new comic, the tools found on this
+  machine. Creating a comic asks for a title, a description and a few
+  options, and starts no AI job.
+- Story: the person's own text and the story bible to fill in. The AI writes
+  only through four explicit actions (draft from my text, complete what is
+  missing, suggest something, apply my change) or the conversation, and what
+  it proposes opens in a review where each part is accepted, edited and
+  accepted, or rejected.
+- Style: every preset as a large card with its sample page, grouped as in
+  `templates/looks/README.md`, a comparison of up to four side by side, and
+  what tends to drift under "details". Words and reference images can be
+  mixed in.
+- Pages: the plan of each page, what the planner filled in that the text did
+  not say (each item can be changed through the conversation), the drawing,
+  and while a page is drawn, a waiting state that says what is happening and
+  how long a page usually takes in this comic.
+- Settings: per kind of work (planning, checking, drawing) the tool, then a
+  model from the list the installed tool reports, the default marked, a name
+  typed by hand when needed, and the time measured with each model. Without
+  Codex, drawing says the pages are uploaded by hand.
+
+Both languages (English and Spanish) have the same keys in
+`web/js/i18n/en.js` and `es.js`; the text the server writes arrives in the
+interface language and is shown as it comes. Light and dark themes follow
+the system unless the person picks one.
+
+### 3D and motion
+
+Four places use three.js: the shelf of covers on the Projects screen, the
+ring of sample pages on the Style screen, the drawn page as a sheet that
+leans toward the pointer, and the waiting scene in which a blank page is
+inked while Codex draws. Moving along the path turns the screen like a page,
+with CSS only.
+
+three.js r170 is vendored as one file, `web/vendor/three/three.module.min.js`,
+taken from the npm package `three@0.170.0`, with its MIT license beside it in
+`web/vendor/three/LICENSE`. It is not a `package.json` dependency. Only
+`web/js/gl/stage.js` loads it, with a dynamic `import()`, when a screen
+mounts a 3D stage, so screens without 3D never download it. A stage draws
+only while it is on screen and the tab is visible, scales sample images down
+before they reach the graphics card, and keeps a flat version of the same
+content underneath. Without WebGL the flat version stays and three.js is not
+fetched. With reduced motion the scenes draw still frames when something
+changes, and no transition runs.
 
 ## What a page goes through
 

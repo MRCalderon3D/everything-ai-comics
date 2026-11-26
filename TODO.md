@@ -132,6 +132,23 @@ person wants to write the story. The AI helps when asked.
   resolving open questions with additions on its own and show them to the
   person as questions instead (the `needs_decision` path exists for this).
 
+### 7. Resizable and collapsible side columns
+
+The studio has three vertical columns: the step navigation on the left, the
+work in the middle, and the chat on the right. The person wants to resize
+them and to hide the two side columns, to focus on what they are doing.
+
+- Drag handles between the columns to change their width, with sensible
+  minimum and maximum widths, and a double click on a handle to reset it.
+- A control on each side column to collapse it to a thin rail and bring it
+  back; a collapsed navigation keeps its step numbers as icons, and a
+  collapsed chat shows an unread marker when a reply arrives.
+- A focus mode (one shortcut or one button) that hides both sides at once.
+- Keyboard access: the handles can be moved with the arrow keys, and every
+  control has a label. Below the tablet width the sides become drawers.
+- The layout is remembered per person in the browser (not per project) and
+  survives a reload.
+
 ## Scaffold
 
 ### 6. More comic styles

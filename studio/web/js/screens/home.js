@@ -4,7 +4,6 @@
 import { h } from '/js/dom.js';
 import { t, tv } from '/js/i18n.js';
 import { state, refreshOverview } from '/js/store.js';
-import { screenHead } from '/js/components/bench.js';
 import { caption, notice } from '/js/components/ui.js';
 import { frame, openViewer } from '/js/components/viewer.js';
 import { jobsFor } from '/js/components/jobs.js';
@@ -46,12 +45,11 @@ export function view(ctx, overview) {
   const next = nextAction(overview);
   const fallbacks = Object.entries(overview.tools || {}).filter(([, v]) => v.fallback || !v.available);
   return h('div', { class: 'screen home' },
-    screenHead({
-      title: project.title,
-      lede: project.logline || project.description || t('home.no_description'),
-    }),
-    h('div', { class: 'home-top' },
+    h('div', { class: 'home-hero' },
       h('div', { class: 'stack' },
+        h('div', null,
+          h('h1', null, project.title),
+          h('p', { class: 'lede' }, project.logline || project.description || t('home.no_description'))),
         caption(
           h('p', { class: 'caption-label' }, t('home.next_title')),
           h('p', { class: 'caption-text' }, next.text),
@@ -67,6 +65,7 @@ export function view(ctx, overview) {
           onclick: () => openViewer([{ id: 'p', label: project.title, image: project.image }], 'p'),
         }))
         : null),
+    h('h2', { class: 'sr-only' }, t('nav.path')),
     h('section', { 'aria-label': t('nav.path') },
       h('ol', { class: 'path' }, SCREENS.map((key, index) => {
         const s = byKey.get(key) || { key, status: 'todo', blockers: [] };
@@ -82,5 +81,6 @@ export function view(ctx, overview) {
                 s.blockers.map((b) => blockerText(b)).join(' '))
               : null));
       }))),
-    h('p', { class: 'small faint' }, t('home.folder', { path: project.path })));
+    h('details', { class: 'details-box home-path' }, h('summary', null, t('home.where_files')),
+      h('p', { class: 'small' }, t('home.folder', { path: project.path }))));
 }

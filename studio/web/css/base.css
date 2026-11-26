@@ -1,92 +1,149 @@
-/* Tokens, reset and type. The palette comes from the drawing board: paper,
-   ink, non-photo blue for guides and anything interactive, and the yellow of
-   a caption box for the one thing to do next. */
+/* Tokens, reset and type: the one place colours, type, spacing and motion
+   are set. Every other stylesheet uses these names.
+
+   The palette comes from a printed comic: the cool white of bristol board,
+   India ink, non-photo blue for anything you can click, process yellow for
+   the one thing to do next, and process magenta for work that is running
+   (the AI drawing or writing). Dark mode is the same desk on a lightbox. */
 
 :root {
-  --paper: #eceff2;
-  --surface: #ffffff;
-  --surface-2: #f5f6f8;
-  --ink: #14171c;
-  --ink-2: #434956;
-  --ink-3: #626a78;
-  --line: #c7ccd5;
-  --rule: #14171c;
-  --blue: #1a659b;
-  --blue-wash: #dcedf8;
-  --caption: #ffd84a;
-  --caption-ink: #14171c;
-  --bad: #ae241c;
-  --bad-wash: #fbe8e6;
-  --ok: #19654a;
-  --ok-wash: #e2f1ea;
-  --warn: #7d5200;
-  --warn-wash: #fff2cc;
-  --shade: rgba(20, 23, 28, 0.55);
-  --art-bg: #dfe3e8;
-  --gutter-ink: #14171c;
+  /* surfaces */
+  --board: #eceef2;
+  --sheet: #ffffff;
+  --sheet-2: #f5f6f8;
+  --sheet-3: #e7e9ee;
+  /* ink */
+  --ink: #1b1a22;
+  --ink-2: #4a4956;
+  --ink-3: #696876;
+  --line: #d8dae1;
+  --line-2: #c3c6cf;
+  --panel-ink: #1b1a22;
+  /* colour with a job */
+  --accent: #2357c4;
+  --accent-ink: #ffffff;
+  --accent-wash: #e5ecfb;
+  --marker: #ffd23d;
+  --marker-ink: #1b1a22;
+  --live: #c2185f;
+  --live-wash: #fbe5ee;
+  --cyan: #0e9fd4;
+  --ok: #17734c;
+  --ok-wash: #e0f2e9;
+  --bad: #b3261e;
+  --bad-wash: #fbe7e5;
+  --warn: #855600;
+  --warn-wash: #fff1cc;
+  --shade: rgba(27, 26, 34, 0.5);
+  --art-bg: #dfe2e8;
+  --dot: rgba(27, 26, 34, 0.16);
+  --lift: 0 1px 2px rgba(27, 26, 34, 0.06), 0 6px 20px -8px rgba(27, 26, 34, 0.18);
 
+  /* type: a condensed display face for titles, the system's own text face */
   --font-display: "Bahnschrift", "DIN Alternate", "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
-  --font-body: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Noto Sans", sans-serif;
+  --font-body: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", "Noto Sans", sans-serif;
   --font-file: "Cascadia Mono", "Consolas", "SF Mono", "Menlo", "DejaVu Sans Mono", monospace;
 
+  /* a 1.25 scale from 15 px */
   --step--1: 0.8125rem;
   --step-0: 0.9375rem;
-  --step-1: 1.0625rem;
-  --step-2: 1.3125rem;
-  --step-3: 1.75rem;
-  --step-4: 2.375rem;
+  --step-1: 1.125rem;
+  --step-2: 1.375rem;
+  --step-3: 1.875rem;
+  --step-4: 2.5rem;
+  --step-5: 3.25rem;
 
-  --gap: 12px;
-  --gutter: 20px;
-  --radius: 3px;
-  --topbar: 52px;
-  --rail: 212px;
+  /* space on a 4 px grid */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
+  --gap: var(--s3);
+  --gutter: var(--s5);
+
+  /* corners by role: artwork is a panel, chrome is softer, chips are pills */
+  --r-art: 3px;
+  --r-ctl: 8px;
+  --r-box: 12px;
+  --r-pill: 999px;
+  --radius: var(--r-ctl);
+
+  /* the frame */
+  --topbar: 56px;
+  --rail: 216px;
+  --dock: 380px;
+
+  /* motion */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --fast: 140ms;
+  --slow: 320ms;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #13161b;
-    --surface: #1c2027;
-    --surface-2: #242932;
-    --ink: #e9ebee;
-    --ink-2: #bbc0ca;
-    --ink-3: #959ca8;
-    --line: #3b414c;
-    --rule: #aab0bb;
-    --blue: #7cc3f0;
-    --blue-wash: #173146;
-    --bad: #ff948a;
-    --bad-wash: #3b1c19;
-    --ok: #7fd3b0;
-    --ok-wash: #14301f;
-    --warn: #f2c14e;
-    --warn-wash: #3a2e10;
-    --shade: rgba(0, 0, 0, 0.7);
-    --art-bg: #0d0f13;
-    --gutter-ink: #05070a;
+    --board: #15161c;
+    --sheet: #1e2028;
+    --sheet-2: #262832;
+    --sheet-3: #30323e;
+    --ink: #edecf3;
+    --ink-2: #bdbcc9;
+    --ink-3: #9998a8;
+    --line: #353744;
+    --line-2: #484a59;
+    --panel-ink: #d9d8e2;
+    --accent: #8fb2ff;
+    --accent-ink: #10131c;
+    --accent-wash: #1f2a46;
+    --marker: #ffd23d;
+    --marker-ink: #17161c;
+    --live: #ff73ab;
+    --live-wash: #3c1d2b;
+    --cyan: #4cc6f2;
+    --ok: #7fd6ae;
+    --ok-wash: #15301f;
+    --bad: #ff978d;
+    --bad-wash: #3d1d1a;
+    --warn: #f3c44f;
+    --warn-wash: #3a2f10;
+    --shade: rgba(0, 0, 0, 0.66);
+    --art-bg: #0e0f13;
+    --dot: rgba(237, 236, 243, 0.09);
+    --lift: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -10px rgba(0, 0, 0, 0.7);
   }
 }
 
 :root[data-theme="dark"] {
-  --paper: #13161b;
-  --surface: #1c2027;
-  --surface-2: #242932;
-  --ink: #e9ebee;
-  --ink-2: #bbc0ca;
-  --ink-3: #959ca8;
-  --line: #3b414c;
-  --rule: #aab0bb;
-  --blue: #7cc3f0;
-  --blue-wash: #173146;
-  --bad: #ff948a;
-  --bad-wash: #3b1c19;
-  --ok: #7fd3b0;
-  --ok-wash: #14301f;
-  --warn: #f2c14e;
-  --warn-wash: #3a2e10;
-  --shade: rgba(0, 0, 0, 0.7);
-  --art-bg: #0d0f13;
-  --gutter-ink: #05070a;
+  --board: #15161c;
+  --sheet: #1e2028;
+  --sheet-2: #262832;
+  --sheet-3: #30323e;
+  --ink: #edecf3;
+  --ink-2: #bdbcc9;
+  --ink-3: #9998a8;
+  --line: #353744;
+  --line-2: #484a59;
+  --panel-ink: #d9d8e2;
+  --accent: #8fb2ff;
+  --accent-ink: #10131c;
+  --accent-wash: #1f2a46;
+  --marker: #ffd23d;
+  --marker-ink: #17161c;
+  --live: #ff73ab;
+  --live-wash: #3c1d2b;
+  --cyan: #4cc6f2;
+  --ok: #7fd6ae;
+  --ok-wash: #15301f;
+  --bad: #ff978d;
+  --bad-wash: #3d1d1a;
+  --warn: #f3c44f;
+  --warn-wash: #3a2f10;
+  --shade: rgba(0, 0, 0, 0.66);
+  --art-bg: #0e0f13;
+  --dot: rgba(237, 236, 243, 0.09);
+  --lift: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px -10px rgba(0, 0, 0, 0.7);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -97,30 +154,33 @@ html { color-scheme: light dark; }
 
 body {
   margin: 0;
-  background: var(--paper);
+  background: var(--board);
   color: var(--ink);
-  font: var(--step-0)/1.5 var(--font-body);
+  font: var(--step-0)/1.55 var(--font-body);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 h1, h2, h3, h4 {
   font-family: var(--font-display);
-  font-weight: 600;
-  font-stretch: 87%;
-  line-height: 1.15;
+  font-weight: 650;
+  font-stretch: 80%;
+  font-variation-settings: "wdth" 80;
+  line-height: 1.1;
   margin: 0;
-  letter-spacing: 0.005em;
+  letter-spacing: 0;
+  text-wrap: balance;
 }
-h1 { font-size: var(--step-4); }
+h1 { font-size: var(--step-4); font-weight: 700; }
 h2 { font-size: var(--step-3); }
 h3 { font-size: var(--step-2); }
 h4 { font-size: var(--step-1); }
 
-p { margin: 0 0 0.75em; max-width: 72ch; }
+p { margin: 0 0 0.75em; max-width: 72ch; text-wrap: pretty; }
 p:last-child { margin-bottom: 0; }
 ul, ol { margin: 0; padding: 0; list-style: none; }
 img { max-width: 100%; display: block; }
-a { color: var(--blue); text-underline-offset: 0.15em; }
+a { color: var(--accent); text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
 a:hover { text-decoration-thickness: 2px; }
 small, .small { font-size: var(--step--1); }
 code, pre, .file-text { font-family: var(--font-file); font-size: 0.8125rem; }
@@ -129,13 +189,15 @@ hr { border: 0; border-top: 1px solid var(--line); margin: var(--gutter) 0; }
 fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 legend { padding: 0; }
 summary { cursor: pointer; }
+strong { font-weight: 650; }
 
 button, input, select, textarea { font: inherit; color: inherit; }
 
 :focus { outline: none; }
 :focus-visible {
-  outline: 3px solid var(--blue);
+  outline: 3px solid var(--accent);
   outline-offset: 2px;
+  border-radius: 2px;
 }
 
 .muted { color: var(--ink-2); }
@@ -148,12 +210,18 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .skip-link {
   position: absolute; left: 8px; top: -60px; z-index: 100;
-  background: var(--caption); color: var(--caption-ink);
-  padding: 8px 12px; border: 2px solid var(--rule);
+  background: var(--marker); color: var(--marker-ink);
+  padding: 8px 12px; border-radius: var(--r-ctl); font-weight: 650;
 }
 .skip-link:focus { top: 8px; }
 
 .boot { padding: 12vh var(--gutter); max-width: 40rem; margin: 0 auto; color: var(--ink-2); }
+
+/* The halftone of a printed page, used sparingly behind empty art. */
+.halftone {
+  background-image: radial-gradient(var(--dot) 1.2px, transparent 1.4px);
+  background-size: 9px 9px;
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

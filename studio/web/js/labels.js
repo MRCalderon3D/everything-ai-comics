@@ -63,7 +63,11 @@ export function jobLink(job) {
   const base = `/p/${encodeURIComponent(job.project)}`;
   const p = job.params || {};
   switch (job.op) {
+    case 'story.draft':
+    case 'story.complete':
+    case 'story.suggest':
     case 'project.setup':
+      return job.result && job.result.proposal ? `${base}/story?proposal=${encodeURIComponent(job.result.proposal)}` : `${base}/story`;
     case 'story.update': return `${base}/story`;
     case 'style.define':
     case 'style.look': return `${base}/style`;
@@ -135,6 +139,11 @@ export function jobOutcome(job) {
       return withStop(r.passes ? (hasNotes(r) ? t('outcome.review.notes') : t('outcome.review.passes')) : t('outcome.review.flagged'), r);
     case 'publish.build':
       return r.draft ? t('outcome.publish.draft', { edition: r.edition }) : t('outcome.publish.final', { edition: r.edition });
+    case 'story.draft':
+    case 'story.complete':
+    case 'story.suggest':
+    case 'project.setup':
+      return r.proposal ? tn('outcome.proposal', r.parts || 0) : (r.summary || t('job.done_plain'));
     case 'style.look':
       return t('outcome.candidate');
     case 'character.sheet':

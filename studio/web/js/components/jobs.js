@@ -6,12 +6,14 @@
 import { h, icon, mount, clear } from '/js/dom.js';
 import { t, tn, formatDuration, formatTime } from '/js/i18n.js';
 import { api, errorText } from '/js/api.js';
-import { state, bus, jobList, activeJobs, runningJob, waitingJobs, rememberJob, ACTIVE, ENDED } from '/js/store.js';
+import { state, bus, jobList, activeJobs, runningJob, waitingJobs, rememberJob, measured, ACTIVE, ENDED } from '/js/store.js';
 import { jobTitle, stepLabel, stepStatus, jobStatus, jobLink, jobOutcome, toolName, seconds } from '/js/labels.js';
 import { button, actionButton, notice } from '/js/components/ui.js';
 import { confirmDialog } from '/js/components/dialog.js';
 import { toast } from '/js/components/toast.js';
 
+// A note that is only an ID (a render name) says nothing to the person.
+const ID_ONLY = /^[A-Z]{2,}(_[A-Z0-9]+)+$/;
 const DRAW_STEP = /(^|:)(draw|sheet-draw|repair-\d+)$/;
 const REVIEW_STEP = /(^|:)review(-\d+)?$/;
 const openLogs = new Set();
@@ -31,14 +33,15 @@ function waitHint(job, step) {
   if (step.tool !== 'claude' && step.tool !== 'codex') return null;
   if (job.op === 'pages.plan') return t('jobs.wait_plan_pages');
   if (job.op === 'style.define') return t('jobs.wait_style');
-  if (job.op === 'project.setup') return t('jobs.wait_story');
+  if (['project.setup', 'story.draft', 'story.complete', 'story.suggest', 'story.update'].includes(job.op)) return t('jobs.wait_story');
   return t('jobs.wait_ai');
 }
 
 /**
- * How long the rest of a job is likely to take, from the times measured with
- * the real tools: a drawing two to five minutes, its check under a minute,
- * planning about four minutes a page.
+ * How long the rest of a job is likely to take: from the times measured in
+ * this project with the tool and model that do the work now, else from the
+ * times measured with the real tools before the build (a drawing two to five
+ * minutes, its check under a minute, planning about four minutes a page).
  */
 function estimate(job) {
   if (job.status !== 'running' && job.status !== 'queued') return null;
@@ -48,10 +51,19 @@ function estimate(job) {
       const id = String(step.id);
       if (/:draw$/.test(id) && !['done', 'failed', 'skipped', 'cancelled'].includes(step.status)) scopes.add(id.split(':')[0]);
     }
-    return scopes.size ? tn('jobs.estimate_pages', scopes.size, { from: scopes.size * 3, to: scopes.size * 6 }) : null;
+    if (!scopes.size) return null;
+    const draw = measured('draw');
+    const look = measured('look');
+    if (draw && (draw.per_page_ms || draw.average_ms)) {
+      const per = (draw.per_page_ms || draw.average_ms) + ((look && (look.per_page_ms || look.average_ms)) || 0);
+      return tn('jobs.estimate_measured', scopes.size, { time: formatDuration((per * scopes.size) / 1000) });
+    }
+    return tn('jobs.estimate_pages', scopes.size, { from: scopes.size * 3, to: scopes.size * 6 });
   }
   if (job.op === 'pages.plan') {
     const pages = Number(job.params && job.params.pages) || 1;
+    const plan = measured('plan');
+    if (plan && plan.per_page_ms) return t('jobs.estimate_plan_measured', { time: formatDuration((plan.per_page_ms * pages) / 1000) });
     return t('jobs.estimate_plan', { n: pages * 4 });
   }
   return null;
@@ -68,7 +80,7 @@ function stepRow(job, step) {
       h('div', { class: 'step-line' },
         h('span', { class: 'step-label' }, stepLabel(job, step)),
         h('span', { class: 'step-state' }, stepStatus(step.status), step.tool ? ` · ${toolName(step.tool)}` : '')),
-      step.note ? h('div', { class: 'step-note' }, step.note) : null),
+      step.note && !ID_ONLY.test(step.note) ? h('div', { class: 'step-note' }, step.note) : null),
     time ? h('span', { class: 'step-time', dataset: running ? { since: step.started_at } : null }, time) : null);
 }
 

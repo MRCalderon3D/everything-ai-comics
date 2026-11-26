@@ -16,6 +16,9 @@
  *   blockers, errors) are shown as the server sends them, not rebuilt from
  *   their codes with dictionaries of the app's own.
  * - Text from files or from the AI is never parsed as markup.
+ * - three.js is vendored (the ES module and its MIT license), loaded only
+ *   through a dynamic import by the 3D layer, never by a static import, and
+ *   every 3D stage has a flat fallback and respects reduced motion.
  */
 
 const assert = require('assert');
@@ -45,7 +48,10 @@ function code(source) {
 }
 
 const files = walk(WEB);
-const jsFiles = files.filter((f) => f.endsWith('.js'));
+const VENDOR = path.join(WEB, 'vendor');
+// The app's own modules. Vendored libraries are checked on their own below.
+const jsFiles = files.filter((f) => f.endsWith('.js') && !f.startsWith(VENDOR));
+const vendorFiles = files.filter((f) => f.startsWith(VENDOR));
 const cssFiles = files.filter((f) => f.endsWith('.css'));
 const htmlFiles = files.filter((f) => f.endsWith('.html'));
 
@@ -72,8 +78,47 @@ function checkHtml() {
   }
 }
 
+/** The server sends the policy the app lives within: nothing from another host. */
+function checkPolicy() {
+  const http = code(read(path.join(ROOT, 'studio', 'server', 'http.js')) + read(path.join(ROOT, 'studio', 'server', 'security.js')));
+  const m = /"(default-src 'self'[^"]*)"/.exec(http);
+  assert.ok(m, "the server no longer sends a Content-Security-Policy with default-src 'self'");
+  const policy = m[1];
+  assert.ok(!/https?:|\*/.test(policy), 'the Content-Security-Policy allows another host');
+  assert.ok(!/script-src/.test(policy) && !/'unsafe-eval'/.test(policy), 'scripts may come from somewhere other than the server');
+}
+
+/**
+ * three.js: one vendored ES module with its license, imported only with a
+ * dynamic import() from the 3D layer, so screens without 3D never load it.
+ */
+function checkThree() {
+  const dir = path.join(VENDOR, 'three');
+  const module = path.join(dir, 'three.module.min.js');
+  const license = path.join(dir, 'LICENSE');
+  assert.ok(fs.existsSync(module), 'studio/web/vendor/three/three.module.min.js is missing');
+  assert.ok(fs.existsSync(license), 'studio/web/vendor/three/LICENSE is missing');
+  assert.ok(/MIT License/.test(read(license)) && /three\.js authors/i.test(read(license)), 'the three.js LICENSE is not the MIT license of its authors');
+  const lib = read(module);
+  assert.ok(/REVISION\s*=\s*['"]\d+['"]/.test(lib.slice(0, 2000)) || /const \w+=["']\d{3}["']/.test(lib.slice(0, 4000)), 'the vendored file does not look like the three.js module build');
+  assert.ok(!/import\s*[{(*'"]/.test(lib.replace(/import\.meta/g, '')), 'the vendored three.js imports other files; vendor the self-contained module build');
+  assert.deepStrictEqual(vendorFiles.map(rel).sort(), ['studio/web/vendor/three/LICENSE', 'studio/web/vendor/three/three.module.min.js'], 'only three.js and its license are vendored');
+  const users = [];
+  for (const file of jsFiles) {
+    const text = code(read(file));
+    assert.ok(!/import\s[^;]*from\s*'\/vendor\//.test(text), `${rel(file)}: imports three.js statically; load it with import() so other screens never download it`);
+    if (/\/vendor\/three\//.test(text)) users.push(rel(file));
+  }
+  assert.deepStrictEqual(users, ['studio/web/js/gl/stage.js'], 'three.js is loaded from one place, the stage of the 3D layer');
+  const stage = code(read(path.join(WEB, 'js', 'gl', 'stage.js')));
+  assert.ok(/import\(THREE_URL\)/.test(stage), 'stage.js does not load three.js with a dynamic import');
+  assert.ok(/prefers-reduced-motion/.test(stage), 'the 3D layer does not respect reduced motion');
+  assert.ok(/IntersectionObserver/.test(stage) && /visibilitychange/.test(stage), 'the 3D layer does not pause off screen or in a hidden tab');
+  assert.ok(/getContext\('webgl2'\)|getContext\('webgl'\)/.test(stage) && /gl-fallback/.test(stage), 'the 3D layer has no WebGL check or flat fallback');
+}
+
 function checkNoNetwork() {
-  for (const file of [...jsFiles, ...cssFiles, ...htmlFiles]) {
+  for (const file of [...jsFiles, ...vendorFiles.filter((f) => f.endsWith('.js')), ...cssFiles, ...htmlFiles]) {
     const text = code(read(file));
     // The SVG namespace is a name, not a request.
     const stripped = text.replace(/http:\/\/www\.w3\.org\/[A-Za-z0-9/]+/g, '');
@@ -148,6 +193,14 @@ function checkScreens() {
     const names = exportsOf(read(file));
     assert.ok(names.has('view'), `route ${pattern}: ${spec} does not export view()`);
     assert.ok(names.has('load'), `route ${pattern}: ${spec} does not export load()`);
+  }
+  // Every route the server builds for a link in the conversation opens a screen.
+  const { routeOf } = require('../studio/server/screens.js');
+  const patterns = routes.map(([, pattern]) => new RegExp(`^${pattern.replace(/:[a-z]+/g, '[^/]+')}/?$`));
+  for (const key of ['home', 'story', 'style', 'options', 'settings', 'characters', 'character:CHAR_X', 'places', 'location:LOC_X', 'prop:PROP_X',
+    'pages:ISS_001', 'page:PG_001_001', 'cover:ISS_001', 'publish:ISS_001', 'check', 'corrections', 'history']) {
+    const url = routeOf('demo', key);
+    assert.ok(url && patterns.some((re) => re.test(url)), `the server links ${key} to ${url}, which the app does not route`);
   }
   // The screens of the brief each have a route.
   for (const screen of ['story', 'style', 'characters', 'places', 'pages', 'check', 'corrections', 'cover', 'publish', 'history', 'settings', 'decisions']) {
@@ -289,7 +342,7 @@ function checkApiClient() {
       const match = router.match(method, url);
       assert.ok(match && match.route, `api.js calls ${method} ${url}, which the server does not route`);
     }
-    for (const route of ['/diff', '/history', '/approve/page']) {
+    for (const route of ['/diff', '/history', '/approve/page', '/conversation', '/conversation/new', '/conversations', '/proposals', '/decide', '/api/tools/refresh']) {
       assert.ok(calls.some(([, , raw]) => raw.includes(`${route}`)), `api.js does not call ${route}`);
     }
     // The history and the chat show files as they were at a commit through
@@ -336,8 +389,21 @@ function checkThemesAndMotion() {
   assert.ok(/:focus-visible/.test(css), 'no visible focus style');
 }
 
+/** The frame's layout: resizable, collapsible, focus mode, kept per person in the browser. */
+function checkLayout() {
+  const layout = code(read(path.join(WEB, 'js', 'layout.js')));
+  assert.ok(/role:\s*'separator'/.test(layout) && /ArrowLeft/.test(layout) && /dblclick/.test(layout), 'the column handles are not keyboard separators with a double-click reset');
+  assert.ok(/localStorage/.test(layout) && !/projectId/.test(layout), 'the layout is not kept per person in the browser');
+  assert.ok(/focus/.test(layout) && /shiftKey/.test(layout), 'there is no focus mode shortcut');
+  const css = cssFiles.map(read).join('\n');
+  assert.ok(/data-rail="collapsed"/.test(css) && /data-dock="collapsed"/.test(css) && /data-focus="true"/.test(css), 'the layout states have no styles');
+}
+
 function main() {
   checkHtml();
+  checkLayout();
+  checkPolicy();
+  checkThree();
   checkNoNetwork();
   checkImports();
   checkScreens();
@@ -347,7 +413,7 @@ function main() {
   checkEventTypes();
   checkSafety();
   checkThemesAndMotion();
-  console.log(`studio-web-static: ${jsFiles.length} modules, ${cssFiles.length} stylesheets, ${Object.keys(en).length} texts in two languages`);
+  console.log(`studio-web-static: ${jsFiles.length} modules, ${cssFiles.length} stylesheets, ${Object.keys(en).length} texts in two languages, three.js vendored`);
 }
 
 main();

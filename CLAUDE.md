@@ -80,7 +80,9 @@ cross-references, and an example workspace that no longer passes its gates.
   editor (`npm run studio`). `studio/server/` is a zero-dependency HTTP
   server that calls the scripts as modules and runs the Claude Code and Codex
   CLIs for the AI steps; `studio/web/` is the browser app in plain ES
-  modules with no build step; `studio/prompts/` holds the prompt templates;
+  modules with no build step (three.js is vendored as one file in
+  `studio/web/vendor/three/` with its MIT license, loaded only by the
+  screens that use it; there is no package dependency); `studio/prompts/` holds the prompt templates;
   `studio/docs/api.md` is the API contract, with examples recorded from a
   fake-mode run (`node studio/test-support/record-api-examples.js`). Tests
   are `tests/studio-*.test.js` and run with `STUDIO_FAKE_AI=1`, so they

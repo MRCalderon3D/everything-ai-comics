@@ -14,6 +14,8 @@ export function frame(image, { alt, caption, onclick, badge, ratio, placeholder 
   const style = (el) => {
     const r = ratio || (hasImage && image.width && image.height ? `${image.width} / ${image.height}` : '2 / 3');
     el.style.setProperty('aspect-ratio', r);
+    const [w, hgt] = r.split('/').map((x) => Number(x.trim()));
+    if (w && hgt) el.style.setProperty('--ar', String(w / hgt));
     return el;
   };
   const inner = hasImage

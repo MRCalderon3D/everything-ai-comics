@@ -5,6 +5,8 @@ import { applyTheme, loadHealth, bus } from '/js/store.js';
 import { route, start, rerender } from '/js/router.js';
 import { startShell, paintShell } from '/js/shell.js';
 import { startJobs } from '/js/components/jobs.js';
+import { startConversation } from '/js/components/conversation.js';
+import { startLayout } from '/js/layout.js';
 
 applyTheme();
 setLang(localLanguage());
@@ -42,7 +44,9 @@ onLangChange(() => {
   }, 0);
 });
 
+startLayout();
 startShell();
+startConversation();
 startJobs();
 loadHealth().catch(() => {});
 start();

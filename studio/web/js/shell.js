@@ -1,12 +1,15 @@
-// The frame around every screen: the top bar and, inside a project, the path
-// of the comic down the left with what is done, what is next and what waits.
+// The frame around every screen: the top bar, and inside a project the path
+// of the comic down the left (a strip of panels: inked when done, yellow for
+// the next step) and the conversation docked on the right.
 
 import { h, icon, mount } from '/js/dom.js';
 import { t, tv, getLang, LANGUAGES } from '/js/i18n.js';
 import { errorText } from '/js/api.js';
 import { state, bus, getTheme, setTheme, effectiveTheme, changeLanguage } from '/js/store.js';
 import { jobsIndicator } from '/js/components/jobs.js';
+import { toggleDock, dockOpen, unreadCount } from '/js/components/conversation.js';
 import { toast } from '/js/components/toast.js';
+import { layout, setLayout, toggleFocus, resizeHandle, railIsDrawer, transient, setTransient } from '/js/layout.js';
 
 export const SCREENS = ['story', 'style', 'characters', 'places', 'pages', 'check', 'corrections', 'cover', 'publish'];
 
@@ -21,6 +24,16 @@ async function chooseLanguage(lang) {
   }
 }
 
+function dockButton() {
+  const open = dockOpen();
+  const n = unreadCount();
+  const label = open ? t('convo.hide') : (n ? t('convo.show_unread', { n }) : t('convo.show'));
+  return h('button', {
+    type: 'button', class: 'btn quiet dock-toggle', 'aria-pressed': String(open), 'aria-label': label, title: label,
+    onclick: toggleDock,
+  }, icon('chat'), h('span', null, t('convo.title')), n && !open ? h('span', { class: 'chip next' }, String(n)) : null);
+}
+
 function paintTopbar() {
   const bar = document.getElementById('topbar');
   if (!indicator) indicator = jobsIndicator();
@@ -29,12 +42,24 @@ function paintTopbar() {
   const langSelect = h('select', { class: 'lang-select', 'aria-label': t('settings.interface_language'), onchange: (e) => chooseLanguage(e.target.value) },
     LANGUAGES.map((l) => h('option', { value: l, selected: l === getLang() }, tv('language', l, l))));
   mount(bar,
+    project ? h('button', {
+      type: 'button', class: 'btn icon-only quiet steps-toggle', 'aria-expanded': String(!!transient.railDrawer),
+      'aria-label': t('layout.steps'), title: t('layout.steps'),
+      onclick: () => setTransient({ railDrawer: !transient.railDrawer }),
+    }, icon('queue')) : null,
     h('a', { class: 'brand', href: '/' }, h('span', { class: 'mark', 'aria-hidden': 'true' }), t('app.name')),
     project ? h('a', { class: 'crumb', href: `/p/${encodeURIComponent(project.id)}` }, project.title) : null,
     state.health && state.health.fake ? h('span', { class: 'fake-chip', title: t('fake.explain') }, t('fake.chip')) : null,
     h('span', { class: 'spacer' }),
     indicator,
     h('div', { class: 'tools' },
+      project ? h('button', {
+        type: 'button', class: 'btn icon-only quiet focus-toggle', 'aria-pressed': String(!!layout.focus),
+        'aria-label': layout.focus ? t('layout.focus_off') : t('layout.focus_on'),
+        title: `${layout.focus ? t('layout.focus_off') : t('layout.focus_on')} (${t('layout.focus_keys')})`,
+        onclick: toggleFocus,
+      }, icon('focus')) : null,
+      project ? dockButton() : null,
       langSelect,
       h('button', {
         type: 'button', class: 'btn icon-only quiet',
@@ -62,25 +87,47 @@ function paintRail() {
   const byKey = new Map(overview.screens.map((s) => [s.key, s]));
   const current = (key) => (activeScreen === key ? 'page' : null);
   mount(rail,
-    h('div', { class: 'rail-top' }, h('a', { href: base, 'aria-current': current('home') }, t('nav.home'))),
+    resizeHandle('rail'),
+    h('div', { class: 'rail-top' }, h('a', { href: base, 'aria-current': current('home'), title: t('nav.home') }, icon('home'), h('span', null, t('nav.home')))),
+    h('p', { class: 'rail-title', 'aria-hidden': 'true' }, t('nav.path')),
     h('ol', null, SCREENS.map((key, index) => {
       const s = byKey.get(key) || { status: 'todo' };
       const isNext = overview.next && overview.next.screen === key;
+      const stateText = isNext ? t('status.next') : tv('status', s.status);
       return h('li', { dataset: { status: s.status, next: String(!!isNext) } },
-        h('a', { href: `${base}/${key}`, 'aria-current': current(key) },
+        h('a', { href: `${base}/${key}`, 'aria-current': current(key), title: `${t(`screen.${key}`)}: ${stateText}` },
           h('span', { class: 'n', 'aria-hidden': 'true' }, String(index + 1)),
           h('span', { class: 'name' }, t(`screen.${key}`)),
-          h('span', { class: 'state' }, isNext ? t('status.next') : tv('status', s.status))));
+          h('span', { class: 'state' }, stateText)));
     })),
-    h('div', { class: 'rail-foot' }, h('ul', null,
-      h('li', null, h('a', { href: `${base}/history`, 'aria-current': current('history') }, t('nav.history'))),
-      h('li', null, h('a', { href: `${base}/settings`, 'aria-current': current('settings') }, t('nav.settings'))))));
+    h('div', { class: 'rail-foot' },
+      railIsDrawer() ? null : h('button', {
+        type: 'button', class: 'rail-collapse', 'aria-expanded': String(!layout.railCollapsed),
+        'aria-label': layout.railCollapsed ? t('layout.rail_expand') : t('layout.rail_collapse'),
+        title: layout.railCollapsed ? t('layout.rail_expand') : t('layout.rail_collapse'),
+        onclick: () => setLayout({ railCollapsed: !layout.railCollapsed }),
+      }, icon(layout.railCollapsed ? 'right' : 'left'), h('span', null, layout.railCollapsed ? t('layout.rail_expand') : t('layout.rail_collapse'))),
+      h('a', { href: `${base}/history`, 'aria-current': current('history'), title: t('nav.history') }, icon('clock'), h('span', null, t('nav.history'))),
+      h('a', { href: `${base}/settings`, 'aria-current': current('settings'), title: t('nav.settings') }, icon('gear'), h('span', null, t('nav.settings')))));
+}
+
+/** Repaint a part of the frame without losing the keyboard focus inside it. */
+function keepFocus(container, paint) {
+  const active = document.activeElement;
+  const inside = active && container.contains(active);
+  const cls = inside ? active.className : null;
+  const href = inside ? active.getAttribute('href') : null;
+  paint();
+  if (!inside) return;
+  const again = [...container.querySelectorAll('a, button, [role="separator"], select')]
+    .find((el) => el.className === cls && (href === null || el.getAttribute('href') === href));
+  if (again) again.focus({ preventScroll: true });
 }
 
 export function paintShell() {
   document.getElementById('skip-link').textContent = t('nav.skip');
-  paintTopbar();
-  paintRail();
+  keepFocus(document.getElementById('topbar'), paintTopbar);
+  keepFocus(document.getElementById('rail'), paintRail);
 }
 
 export function startShell() {
@@ -88,13 +135,23 @@ export function startShell() {
   bus.on('project', paintShell);
   bus.on('health', paintTopbar);
   bus.on('theme', paintTopbar);
+  bus.on('dock', () => keepFocus(document.getElementById('topbar'), paintTopbar));
+  // A new width needs no repaint (and repainting would drop the handle being
+  // dragged); collapsing, focus mode and the drawer do.
+  let shape = null;
+  bus.on('layout', (l) => {
+    const next = `${l.railCollapsed}|${l.focus}|${transient.railDrawer}|${railIsDrawer()}`;
+    if (next === shape) return;
+    shape = next;
+    paintShell();
+  });
   bus.on('route', (current) => {
     activeScreen = current ? current.route.meta.screen || null : null;
     paintRail();
   });
   if (window.matchMedia) {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    if (mq.addEventListener) mq.addEventListener('change', () => { if (getTheme() === 'auto') paintTopbar(); });
+    if (mq.addEventListener) mq.addEventListener('change', () => { if (getTheme() === 'auto') { paintTopbar(); bus.emit('theme', 'auto'); } });
   }
   paintShell();
 }

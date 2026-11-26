@@ -16,7 +16,48 @@ export const state = {
   issue: null,
   /** A language the person chose that the project has not saved yet. */
   langPending: null,
+  /** The screen in front of the person, as a conversation message carries it: { key, label, route }. */
+  screen: null,
+  /** Example requests the current screen suggests for the conversation. */
+  screenExamples: null,
+  /** How long AI calls took in this project, per tool, model and job (GET .../settings). */
+  timings: [],
 };
+
+/** Load the measured timings of the open project. Quiet on failure. */
+export async function loadTimings() {
+  if (!state.projectId) return;
+  const id = state.projectId;
+  try {
+    const res = await api.settings(id);
+    if (state.projectId === id) state.timings = res.timings || [];
+  } catch (err) { /* the estimates fall back to the times measured before the build */ }
+}
+
+/**
+ * The measured time of a kind of work ('plan', 'look', 'draw') with the tool
+ * and model that do it now, or null when nothing ran yet:
+ * { per_page_ms, average_ms, runs }.
+ */
+export function measured(job) {
+  const list = state.timings || [];
+  const now = state.overview && state.overview.tools ? state.overview.tools[job] : null;
+  const tool = now ? now.tool : null;
+  const model = now ? (now.model || null) : null;
+  const exact = list.find((e) => e.job === job && e.tool === tool && (e.model || null) === model && e.runs > 0);
+  const any = exact || list.find((e) => e.job === job && e.tool === tool && e.runs > 0);
+  if (!any) return null;
+  // A call under five seconds is not a real drawing or plan (the fake tools
+  // answer at once); estimating from it would promise the impossible.
+  if ((any.per_page_ms || any.average_ms || 0) < 5000) return null;
+  return { per_page_ms: any.per_page_ms, average_ms: any.average_ms, runs: any.runs };
+}
+
+/** The screen the next conversation message is sent from. */
+export function setScreen(screen) {
+  state.screen = screen;
+  bus.emit('screen', screen);
+}
 
 const listeners = new Map();
 
@@ -75,6 +116,7 @@ function putJob(job) {
   if (ENDED.includes(job.status) && before && !ENDED.includes(before.status)) {
     bus.emit('job-ended', job);
     scheduleOverview();
+    loadTimings();
   }
   if (job.status === 'needs_decision' && (!before || before.status !== 'needs_decision')) {
     bus.emit('job-waiting', job);
@@ -191,6 +233,7 @@ export async function openProject(id) {
     throw err;
   }
   connect(id);
+  loadTimings();
   await loadJobs().catch(() => {});
   bus.emit('project', id);
   return state.overview;
@@ -209,6 +252,7 @@ export function closeProject() {
   state.jobs = new Map();
   state.logs = new Map();
   state.issue = null;
+  state.timings = [];
   state.connection = 'idle';
   if (had) {
     setLang(localLanguage());

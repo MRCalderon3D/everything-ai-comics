@@ -2,7 +2,7 @@
 // mechanical checks; its drawing and earlier versions. The ledger, the
 // references and the prompt sit behind "advanced".
 
-import { h, nextId } from '/js/dom.js';
+import { h, nextId, mount } from '/js/dom.js';
 import { t, tn, tv } from '/js/i18n.js';
 import { api, errorText } from '/js/api.js';
 import { screenHead, bench } from '/js/components/bench.js';
@@ -17,6 +17,8 @@ import { slotWords } from '/js/components/correction.js';
 import { toast } from '/js/components/toast.js';
 import { pageName, versionName } from '/js/labels.js';
 import { mechanicalBox, drawPages, queueLine } from '/js/screens/pages.js';
+import { pageSheet, drawingWait } from '/js/components/artwork.js';
+import { askInConversation } from '/js/components/conversation.js';
 import { blockerText } from '/js/screens/home.js';
 
 export async function load(ctx) {
@@ -148,6 +150,48 @@ function promptsTab(data) {
     h('div', { class: 'row' }, copyButton(() => p.prompt)))));
 }
 
+/**
+ * What the planner filled in that the person's text did not say. Each one can
+ * be changed: the change goes to the conversation from this page, which
+ * edits the plan.
+ */
+function assumptionsPanel(ctx, data, name) {
+  const list = data.assumptions || [];
+  if (!list.length) return null;
+  const numberOf = new Map((data.plan.panels || []).map((p) => [p.id, p.number]));
+  const where = (a) => (a.panel ? t('page.panel_n', { n: numberOf.get(a.panel) || String(a.panel).slice(-2) }) : t('assume.whole_page'));
+  return h('section', { class: 'panel' },
+    h('h2', { class: 'panel-title' }, tn('assume.title', list.length)),
+    h('p', { class: 'muted small' }, t('assume.intro')),
+    h('ul', { class: 'assumptions' }, list.map((a, i) => {
+      const item = h('li', { class: 'assumption' });
+      const rest = () => mount(item,
+        h('span', { class: 'assumption-where' }, where(a)),
+        h('p', null, a.text),
+        h('div', { class: 'row' }, button(t('assume.change'), { small: true, icon: 'pen', onclick: edit })));
+      function edit() {
+        const id = nextId('as');
+        const area = h('textarea', { id, rows: 2, placeholder: t('assume.placeholder') });
+        mount(item,
+          h('span', { class: 'assumption-where' }, where(a)),
+          h('p', null, a.text),
+          h('label', { for: id, class: 'small' }, t('assume.instead')), area,
+          h('div', { class: 'row' },
+            actionButton(t('assume.send'), async () => {
+              const instead = area.value.trim();
+              if (!instead) { area.focus(); return; }
+              await askInConversation(t('assume.message', { where: where(a).toLowerCase(), page: name, text: a.text, instead }), { send: true });
+              toast(t('assume.sent'), { kind: 'ok' });
+              rest();
+            }, { kind: 'accent', small: true }),
+            button(t('action.cancel'), { kind: 'quiet', small: true, onclick: rest })));
+        area.focus();
+      }
+      rest();
+      return item;
+    })));
+}
+
 export function view(ctx, data) {
   const name = pageName(data.id);
   ctx.title = name;
@@ -197,6 +241,7 @@ export function view(ctx, data) {
           : (approval.stale ? t('page.plan_stale') : t('pages.plan_not_approved')))),
       h('p', { class: 'muted small' }, t('page.approval_meaning')),
       h('div', { class: 'row' }, approveBtn)),
+    assumptionsPanel(ctx, data, name),
     panel(t('mech.title'),
       mechanicalBox(data.findings),
       findingsList(data.findings.schema),
@@ -233,14 +278,17 @@ export function view(ctx, data) {
       h('a', { class: 'btn quiet', href: `${base}/corrections/${data.id}` }, t('pages.link_correct'))));
   }
 
+  const tiers = data.page.data && data.page.data.layout && Array.isArray(data.page.data.layout.tiers) ? data.page.data.layout.tiers : null;
+  const openLarge = () => openViewer(items, shown.id, { title: name });
   const images = h('div', { class: 'stack' },
+    drawingWait(ctx, data.id, { tiers, name }),
     jobsFor(mine),
     shown
       ? h('div', { class: 'stack-s' },
-        frame(shown.lettered || shown.image, { alt: `${name}, ${versionName(shown.id)}`, onclick: () => openViewer(items, shown.id, { title: name }) }),
+        pageSheet(ctx, data.id, shown.lettered || shown.image, { alt: `${name}, ${versionName(shown.id)}`, onOpen: openLarge }),
         h('div', { class: 'row spread' },
           h('span', null, h('strong', null, versionName(shown.id)), shown.current ? ` · ${t('page.current_version')}` : ''),
-          queueLine(data.id)),
+          h('span', { class: 'row' }, queueLine(data.id), button(t('page.view_large'), { kind: 'quiet', small: true, icon: 'zoom', onclick: openLarge }))),
         shown.review ? h('p', null, verdictChip(Object.assign({}, shown.review)), ' ',
           h('a', { href: `${base}/check/${data.id}` }, t('page.see_evidence'))) : h('p', { class: 'muted' }, t('verdict.none')),
         renders.length > 1 ? versionStrip(items, shown.id, (id) => { ctx.ui.version = id; ctx.refresh(); }) : null)

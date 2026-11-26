@@ -116,9 +116,23 @@ export const api = {
   cancelJob: (id, job) => request('POST', `${project(id)}/jobs/${enc(job)}/cancel`, { body: {} }),
   answerJob: (id, job, answers) => request('POST', `${project(id)}/jobs/${enc(job)}/answer`, { body: { answers } }),
 
+  /** The project conversation: one per project, every message tagged with its screen. */
+  conversation: (id) => request('GET', `${project(id)}/conversation`),
+  sendMessage: (id, text, screen) => request('POST', `${project(id)}/conversation`, { body: { text, screen } }),
+  newConversation: (id) => request('POST', `${project(id)}/conversation/new`, { body: {} }),
+  conversations: (id) => request('GET', `${project(id)}/conversations`),
+  conversationById: (id, conv) => request('GET', `${project(id)}/conversations/${enc(conv)}`),
+  /** Deprecated per-screen chats; the server keeps them for older clients. Not used by the screens. */
   chats: (id) => request('GET', `${project(id)}/chats`),
   chat: (id, key) => request('GET', `${project(id)}/chats/${enc(key)}`),
   sendChat: (id, key, text) => request('POST', `${project(id)}/chats/${enc(key)}`, { body: { text } }),
+
+  proposals: (id, status) => request('GET', `${project(id)}/proposals${q({ status })}`),
+  proposal: (id, prop) => request('GET', `${project(id)}/proposals/${enc(prop)}`),
+  decideProposal: (id, prop, decisions) => request('POST', `${project(id)}/proposals/${enc(prop)}/decide`, { body: { decisions } }),
+  discardProposal: (id, prop) => request('DELETE', `${project(id)}/proposals/${enc(prop)}`),
+
+  refreshTools: () => request('POST', '/api/tools/refresh', { body: {} }),
 
   history: (id, query = '') => request('GET', `${project(id)}/history${query}`),
   restore: (id, entry) => request('POST', `${project(id)}/history/restore`, { body: { entry } }),

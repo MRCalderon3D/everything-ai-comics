@@ -6,10 +6,10 @@ import { errorText } from '/js/api.js';
 import { toast } from '/js/components/toast.js';
 
 /** button('Save', { kind: 'primary', icon: 'check', onclick }) */
-export function button(label, { kind = '', icon: iconName, onclick, disabled, title, type = 'button', small, describedBy } = {}) {
+export function button(label, { kind = '', icon: iconName, onclick, disabled, title, type = 'button', small, large, describedBy } = {}) {
   return h('button', {
     type,
-    class: `btn ${kind}${small ? ' small' : ''}`.trim(),
+    class: `btn ${kind}${small ? ' small' : ''}${large ? ' large' : ''}`.trim(),
     onclick,
     disabled: !!disabled,
     title,

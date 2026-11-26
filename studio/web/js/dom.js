@@ -68,6 +68,12 @@ const ICONS = {
   clock: 'M8 2a6 6 0 100 12A6 6 0 008 2zM8 4.5V8l2.5 1.5',
   file: 'M4 1.5h5l3 3v10H4zM9 1.5v3h3',
   copy: 'M5.5 5.5h8v8h-8zM2.5 10.5v-8h8',
+  home: 'M2.5 7.5L8 2.5l5.5 5M4 6.5v7h8v-7M6.5 13.5v-4h3v4',
+  spark: 'M8 1.5v4M8 10.5v4M1.5 8h4M10.5 8h4M3.5 3.5l2 2M10.5 10.5l2 2M3.5 12.5l2-2M10.5 5.5l2-2',
+  compare: 'M2 3h5v10H2zM9 3h5v10H9z',
+  refresh: 'M13 3v3.5H9.5M3 13V9.5h3.5M12.6 6.5A5 5 0 004 5M3.4 9.5A5 5 0 0012 11',
+  pen: 'M10.5 2.5l3 3-8 8H2.5v-3z',
+  focus: 'M2 5.5V2h3.5M10.5 2H14v3.5M14 10.5V14h-3.5M5.5 14H2v-3.5',
 };
 
 /** A 16 px line icon. Decorative unless a label is given. */

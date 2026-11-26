@@ -117,7 +117,7 @@ function editionCard(ed, formatLabel) {
     h('div', { class: 'row spread' },
       h('h3', null, ed.title || ed.id),
       h('span', { class: `edition-state ${ed.status}` }, tv('edition_status', ed.status, ed.status))),
-    h('p', { class: 'small faint' }, `${ed.id} · ${formatDate(ed.created_at)} · ${tn('publish.edition_pages', ed.pages)}${ed.cover ? ` · ${t('publish.with_cover')}` : ''}`),
+    h('p', { class: 'small faint', title: ed.id }, `${formatDate(ed.created_at)}. ${tn('publish.edition_pages', ed.pages)}${ed.cover ? `. ${t('publish.with_cover')}` : ''}`),
     draft ? h('p', { class: 'small' }, t('publish.draft_note')) : null,
     ed.changes && ed.changes.length ? h('ul', { class: 'bullets small' }, ed.changes.map((c) => h('li', null, typeof c === 'string' ? c : JSON.stringify(c)))) : null,
     ed.exports && ed.exports.length

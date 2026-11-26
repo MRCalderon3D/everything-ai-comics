@@ -6,13 +6,17 @@
 import { h, mount } from '/js/dom.js';
 import { t } from '/js/i18n.js';
 import { errorText } from '/js/api.js';
-import { state, bus, openProject, closeProject } from '/js/store.js';
+import { state, bus, openProject, closeProject, setScreen } from '/js/store.js';
+import { motionReduced } from '/js/gl/stage.js';
 
 const routes = [];
 let current = null; // { route, ctx, path }
 let token = 0;
 let refreshTimer = null;
 let firstRender = true;
+let lastScreen = null;
+// The order of the path, so moving along it can turn the page the right way.
+const ORDER = ['projects', 'home', 'story', 'style', 'characters', 'places', 'pages', 'check', 'corrections', 'cover', 'publish', 'history', 'decisions', 'settings'];
 const drafts = new Map();
 const DRAFT_KEY = 'studio.drafts';
 
@@ -124,6 +128,53 @@ function errorView(err) {
       h('a', { class: 'btn quiet', href: '/', dataset: { link: '' } }, t('nav.projects'))));
 }
 
+/** The screen object a response carries, at the top or one level down. */
+function screenOf(data) {
+  if (!data || typeof data !== 'object') return null;
+  if (data.screen && data.screen.key) return data.screen;
+  // A screen that loads an issue and one of its pages is about the page.
+  for (const key of ['page', 'cover']) {
+    if (data[key] && data[key].screen && data[key].screen.key) return data[key].screen;
+  }
+  for (const value of Object.values(data)) {
+    if (value && typeof value === 'object' && value.screen && value.screen.key) return value.screen;
+  }
+  return null;
+}
+
+/**
+ * What a message sent from this screen is about. Screens with files of their
+ * own say so in their response; the others send from the nearest screen that
+ * has files, and the conversation shows which one.
+ */
+function screenFor(ctx, data) {
+  if (!ctx.projectId) return null;
+  const found = ctx.screen || screenOf(data);
+  if (found) return { key: found.key, label: found.label, route: found.route };
+  const base = `/p/${encodeURIComponent(ctx.projectId)}`;
+  const page = ctx.params.page;
+  switch (ctx.meta.screen) {
+    case 'settings': return { key: 'options', label: t('nav.settings'), route: `${base}/settings` };
+    case 'check':
+    case 'corrections':
+      if (page) return { key: `page:${page}`, label: t('page.n', { n: Number(String(page).slice(-3)) }), route: `${base}/pages/${page}` };
+      return { key: `pages:${state.issue || 'ISS_001'}`, label: t('screen.pages'), route: `${base}/pages` };
+    default: return { key: 'story', label: t('screen.story'), route: `${base}/story` };
+  }
+}
+
+/** Turn the page forward or back along the path; a plain fade elsewhere. */
+function turnPage(main, screen) {
+  const root = main.firstElementChild;
+  if (!root || motionReduced()) return;
+  const from = ORDER.indexOf(lastScreen);
+  const to = ORDER.indexOf(screen);
+  let cls = 'turn-fade';
+  if (from >= 0 && to >= 0 && from !== to) cls = to > from ? 'turn-forward' : 'turn-back';
+  root.classList.add(cls);
+  root.addEventListener('animationend', () => root.classList.remove(cls), { once: true });
+}
+
 async function render() {
   const my = ++token;
   const main = document.getElementById('main');
@@ -152,8 +203,13 @@ async function render() {
     const data = mod.load ? await mod.load(ctx) : null;
     if (my !== token) return;
     current = { route: found.route, ctx, path, mod };
+    state.screenExamples = null;
+    const node = mod.view(ctx, data);
     bus.emit('route', current);
-    mount(main, mod.view(ctx, data));
+    mount(main, node);
+    setScreen(screenFor(ctx, data));
+    if (!firstRender) turnPage(main, found.route.meta.screen);
+    lastScreen = found.route.meta.screen;
     document.title = ctx.title ? `${ctx.title} · ${t('app.name')}` : t('app.name');
     window.scrollTo(0, 0);
     // After a move to another screen the focus goes to its content. On the
@@ -199,7 +255,12 @@ async function refresh(force) {
   const selection = keepKey && 'selectionStart' in active ? [active.selectionStart, active.selectionEnd] : null;
   const scrolled = [...main.querySelectorAll('[data-scroll]')].map((el) => [el.dataset.scroll, el.scrollTop]);
   ctx.cleanup();
-  mount(main, mod.view(ctx, data));
+  const examples = state.screenExamples;
+  state.screenExamples = null;
+  const node = mod.view(ctx, data);
+  if (!state.screenExamples) state.screenExamples = examples;
+  mount(main, node);
+  setScreen(screenFor(ctx, data));
   document.title = ctx.title ? `${ctx.title} · ${t('app.name')}` : t('app.name');
   for (const [key, top] of scrolled) {
     const el = main.querySelector(`[data-scroll="${CSS.escape(key)}"]`);

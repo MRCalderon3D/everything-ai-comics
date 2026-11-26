@@ -11,6 +11,9 @@ const SHORT = new Set(['id', 'name', 'title', 'age', 'role', 'genre', 'language'
 // Fields the pipeline writes. They stay editable, out of the way.
 const MANAGED = new Set(['id', 'references', 'wardrobe_file', 'map_file', 'status', 'approved_render', 'issue',
   'character', 'location', 'default_wardrobe', 'first_appearance', 'visually_adjacent_to', 'source_span']);
+// Inside a list item (a fact, an event), the IDs and cross-references are
+// bookkeeping too: they sit under "details" so the words come first.
+const ITEM_MANAGED = new Set(['id', 'order', 'source_ref', 'replaces', 'issue', 'affects', 'provenance']);
 
 function humanize(key) {
   const text = String(key).replace(/_/g, ' ');
@@ -220,11 +223,11 @@ export function buildForm(schema, data, onChange) {
         () => { const obj = get(); return obj && typeof obj === 'object' ? obj[key] : undefined; },
         (v) => { const obj = ensure(); if (v === undefined) delete obj[key]; else obj[key] = v; },
         required.has(key));
-      (top && MANAGED.has(key) ? managed : main).push(el);
+      ((top ? MANAGED : ITEM_MANAGED).has(key) ? managed : main).push(el);
     }
     return h('div', { class: 'sf-object' }, main,
-      managed.length ? h('details', { class: 'disclosure sf-managed' }, h('summary', null, t('form.managed_fields')),
-        h('div', { class: 'disclosure-body' }, h('p', { class: 'hint' }, t('form.managed_hint')), managed)) : null);
+      managed.length ? h('details', { class: 'disclosure sf-managed' }, h('summary', null, top ? t('form.managed_fields') : t('form.details')),
+        h('div', { class: 'disclosure-body' }, top ? h('p', { class: 'hint' }, t('form.managed_hint')) : null, managed)) : null);
   }
 
   const el = h('div', { class: 'schema-form' }, object(schema, () => root.value, (v) => { root.value = v; }, true));
