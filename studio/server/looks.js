@@ -2,7 +2,7 @@
 /**
  * The look presets of the scaffold (templates/looks/*.yaml), as the style
  * screen lists them and as style.define applies them, with the sample page
- * of each one (templates/looks/previews/<preset file stem>.png) when it has
+ * of each one (templates/looks/previews/<preset file stem>.jpg, .png or .webp) when it has
  * been drawn.
  */
 

@@ -730,7 +730,7 @@ other choices are plain ids.
 | Field | Meaning |
 |---|---|
 | `drift_risks` | What tends to drift from page to page with this look, as the preset records it: a list of English sentences, written for the model. An empty list when the preset has none. |
-| `preview` | The sample page of the preset, `{ url, width, height }`, or `null` when none has been drawn. The samples live in `templates/looks/previews/<key>.png` (`.jpg` and `.webp` are read too), all drawn from the same small scene so the looks can be compared; `templates/looks/previews/README.md` says how they were made. `url` carries a version (`?v=`) that changes with the file. |
+| `preview` | The sample page of the preset, `{ url, width, height }`, or `null` when none has been drawn. The samples live in `templates/looks/previews/<key>.jpg` (`.png` and `.webp` are read too), all drawn from the same small scene so the looks can be compared; `templates/looks/previews/README.md` says how they were made. `url` carries a version (`?v=`) that changes with the file. |
 
 A style described in words or taken from uploaded images is not a preset and
 has no sample until its look page is drawn (`style.look`).
