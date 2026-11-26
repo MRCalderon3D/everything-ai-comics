@@ -1,0 +1,15 @@
+id: CHAR_MARA
+name: Mara
+role: protagonist
+description:
+  summary: Ferry pilot in her fifties, weathered, economical in movement.
+  distinguishing_features:
+    - broken nose
+    - grey cropped hair
+    - oilskin coat with a torn left cuff
+visually_adjacent_to: [CHAR_OSKAR]
+default_wardrobe: WARD_MARA_OILSKIN
+wardrobe_file: wardrobe.yaml
+references:
+  - CHAR_MARA_TURN_MASTER_V01
+status: approved

@@ -1,0 +1,25 @@
+assets:
+  - id: LOOK_NOIR_INK_MASTER_V01
+    entity: LOOK_NOIR_INK
+    kind: look
+    path: references/style/LOOK_NOIR_INK_MASTER_V01.png
+    status: approved
+    default_role: style
+  - id: CHAR_MARA_TURN_MASTER_V01
+    entity: CHAR_MARA
+    kind: turnaround
+    path: characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V01.png
+    status: approved
+    default_role: identity
+  - id: CHAR_OSKAR_TURN_MASTER_V01
+    entity: CHAR_OSKAR
+    kind: turnaround
+    path: characters/CHAR_OSKAR/refs/CHAR_OSKAR_TURN_MASTER_V01.png
+    status: approved
+    default_role: identity
+  - id: LOC_FERRY_DECK_PLATE_MASTER_V01
+    entity: LOC_FERRY_DECK
+    kind: plate
+    path: locations/LOC_FERRY_DECK/refs/LOC_FERRY_DECK_PLATE_MASTER_V01.png
+    status: review
+    default_role: spatial_continuity

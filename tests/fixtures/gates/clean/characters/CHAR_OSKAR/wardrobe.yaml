@@ -1,0 +1,7 @@
+character: CHAR_OSKAR
+outfits:
+  - id: WARD_OSKAR_HOODED
+    description: Hooded jacket two sizes too big, canvas trousers.
+    hands: bandaged
+    references: [CHAR_OSKAR_TURN_MASTER_V01]
+    used_in: [ISS_001]

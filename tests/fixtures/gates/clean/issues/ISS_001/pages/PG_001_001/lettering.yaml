@@ -1,0 +1,22 @@
+page: PG_001_001
+render: PG_001_001_V01
+canvas: { width_px: 2000, height_px: 3000 }
+font:
+  family: Comic Neue
+  size_px: 34
+  line_height: 1.15
+elements:
+  - id: L01
+    panel: PN_001_001_01
+    type: caption
+    text: Last crossing of the night.
+    box: { x: 120, y: 110, width: 520, height: 90 }
+    shape: rect
+    tail: null
+  - id: L02
+    panel: PN_001_001_02
+    type: sfx
+    text: THUMP
+    box: { x: 1300, y: 2500, width: 420, height: 160 }
+    shape: none
+    tail: null

@@ -1,0 +1,23 @@
+page: PG_001_001
+provider: harness-native
+budget: 4
+required:
+  - asset_id: LOOK_NOIR_INK_MASTER_V01
+    entity: LOOK_NOIR_INK
+    role: style
+    priority: critical
+    reason: Fixed drawing style for every request.
+    omission_risk: Style drifts toward the default look of the model.
+  - asset_id: CHAR_MARA_TURN_MASTER_V01
+    entity: CHAR_MARA
+    role: identity
+    priority: critical
+    reason: Mara is drawn in both panels.
+optional:
+  - asset_id: LOC_FERRY_DECK_PLATE_MASTER_V01
+    entity: LOC_FERRY_DECK
+    role: spatial_continuity
+    priority: medium
+    reason: Deck layout for the wide panel.
+exclude: []
+created_at: "2026-11-26"

@@ -1,0 +1,15 @@
+id: CHAR_OSKAR
+name: Oskar
+role: supporting
+description:
+  summary: Stowaway boy, about twelve, wary and quick.
+  distinguishing_features:
+    - round face
+    - hooded jacket
+    - cut on his left hand
+visually_adjacent_to: [CHAR_MARA]
+default_wardrobe: WARD_OSKAR_HOODED
+wardrobe_file: wardrobe.yaml
+references:
+  - CHAR_OSKAR_TURN_MASTER_V01
+status: approved

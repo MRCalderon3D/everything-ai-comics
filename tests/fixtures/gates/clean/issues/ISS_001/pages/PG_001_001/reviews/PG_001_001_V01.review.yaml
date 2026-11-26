@@ -1,0 +1,34 @@
+page: PG_001_001
+render: PG_001_001_V01
+supersedes: null
+reviewer: visual-reviewer
+independent: true
+compared_against:
+  references: [LOOK_NOIR_INK_MASTER_V01, CHAR_MARA_TURN_MASTER_V01]
+  neighbors: []
+checks:
+  identity:        { result: pass, evidence: "Broken nose and cropped grey hair match the sheet in panel 2." }
+  cast_count:      { result: pass, evidence: "One Mara in panel 2, nobody else drawn." }
+  position:        { result: pass, evidence: "Mara inside the wheelhouse in both panels." }
+  movement:        { result: not_applicable, evidence: "Nobody changes place on this page." }
+  role_causality:  { result: pass, evidence: "Mara is the one turning toward the sound." }
+  object_identity: { result: pass, evidence: "Flare gun on the shelf has the wide barrel." }
+  object_custody:  { result: pass, evidence: "Gun on the shelf; one hand on the wheel, the other empty." }
+  physical_state:  { result: not_applicable, evidence: "No injuries on the drawn cast." }
+  wardrobe:        { result: pass, evidence: "Torn left cuff visible in panel 2." }
+  spatial_logic:   { result: pass, evidence: "Bow at screen left in panel 1." }
+  drawing_clarity: { result: pass, evidence: "Hand on the wheel reads cleanly." }
+  lettering:       { result: not_applicable, evidence: "Overlay lettering; no text in the image." }
+  page_structure:  { result: pass, evidence: "Two stacked wide panels." }
+  style_fidelity:  { result: pass, evidence: "Heavy blacks, no gradients, as in the look master." }
+findings: []
+gates:
+  style_fidelity: pass
+  narrative_continuity: pass
+verdict: pass
+repair_cycle: 0
+reviewed_at: "2026-11-26"
+human_approval:
+  status: pending
+  by: null
+  at: null

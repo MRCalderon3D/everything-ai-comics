@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "description": "Harness-agnostic hook wiring: event -> handler script. Handlers read a JSON event on stdin, write messages to stderr, and exit 0 (allow) or 2 (block). sync-harnesses.js translates this file into each harness's native hook configuration. The match globs start with ** because a workspace is any directory holding project.yaml, whatever its name; each handler resolves the workspace root by that marker and ignores files outside one.",
+  "hooks": [
+    {
+      "id": "protect-approved-assets",
+      "event": "before-file-write",
+      "match": "**/{references/**,characters/*/refs/**,locations/*/refs/**,props/*/refs/**,issues/*/pages/*/renders/**,editions/*/exports/**}",
+      "script": "hooks/protect-approved-assets.js",
+      "blocking": true,
+      "description": "Block overwriting approved reference assets, existing page renders, and existing edition exports; create the next version instead."
+    },
+    {
+      "id": "validate-after-write",
+      "event": "after-file-write",
+      "match": "**/*.{yaml,yml}",
+      "script": "hooks/validate-after-write.js",
+      "blocking": true,
+      "description": "Validate schema-known workspace artifacts against their schema after every write."
+    },
+    {
+      "id": "detect-continuity-drift",
+      "event": "after-file-write",
+      "match": "**/issues/*/pages/*/page.yaml",
+      "script": "hooks/detect-continuity-drift.js",
+      "blocking": false,
+      "description": "After a page.yaml write, run the panel ledger audit for its issue and warn about findings on that page."
+    },
+    {
+      "id": "require-cost-confirmation",
+      "event": "before-shell-command",
+      "match": "generate-assets",
+      "script": "hooks/require-cost-confirmation.js",
+      "blocking": true,
+      "description": "Block generate-assets --live without an explicit --yes confirmation."
+    }
+  ]
+}

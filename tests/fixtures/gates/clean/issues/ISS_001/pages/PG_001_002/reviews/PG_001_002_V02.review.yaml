@@ -1,0 +1,45 @@
+page: PG_001_002
+render: PG_001_002_V02
+supersedes: PG_001_002_V01
+reviewer: visual-reviewer
+independent: true
+compared_against:
+  references: [LOOK_NOIR_INK_MASTER_V01, CHAR_MARA_TURN_MASTER_V01, CHAR_OSKAR_TURN_MASTER_V01]
+  neighbors: [PG_001_001_V01]
+checks:
+  identity:        { result: pass, evidence: "Round face and hood of Oskar match the sheet in panel 2." }
+  cast_count:      { result: pass, evidence: "One Mara and one Oskar in panel 2." }
+  position:        { result: pass, evidence: "Both on the deck at the crates." }
+  movement:        { result: pass, evidence: "Ladder descent shown in panel 1." }
+  role_causality:  { result: pass, evidence: "Mara, not Oskar, lifts the tarpaulin." }
+  object_identity: { result: pass, evidence: "Flare gun keeps its wide barrel." }
+  object_custody:  { result: pass, evidence: "Gun in the right hand of Mara in both panels." }
+  physical_state:  { result: pass, evidence: "Cut visible on the raised left hand of Oskar." }
+  wardrobe:        { result: pass, evidence: "Torn left cuff present; hood up." }
+  spatial_logic:   { result: pass, evidence: "Bow stays screen left." }
+  drawing_clarity: { result: pass, evidence: "Hands separate and readable." }
+  lettering:       { result: not_applicable, evidence: "Overlay lettering; no text in the image." }
+  page_structure:  { result: pass, evidence: "Two stacked panels." }
+  style_fidelity:  { result: pass, evidence: "Line weight matches the look master." }
+findings:
+  - id: F01
+    panel: PN_001_002_02
+    check: identity
+    expected: Oskar has a round face and a hooded jacket.
+    visible: In V01 the boy had the long face and cropped hair of Mara.
+    severity: blocking
+    repair: Regenerate panel 2 with the Oskar sheet attached and the difference from Mara stated.
+    status: fixed
+    recheck:
+      render: PG_001_002_V02
+      evidence: Round face and hood present in panel 2 of V02.
+gates:
+  style_fidelity: pass
+  narrative_continuity: pass
+verdict: fixed
+repair_cycle: 1
+reviewed_at: "2026-11-26"
+human_approval:
+  status: pending
+  by: null
+  at: null

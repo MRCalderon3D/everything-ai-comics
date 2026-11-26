@@ -1,0 +1,8 @@
+id: LOC_FERRY_DECK
+name: Ferry deck
+description:
+  summary: Open steel car deck of a small river ferry, wheelhouse raised aft.
+time_of_day_states: [night]
+map_file: map.yaml
+references: [LOC_FERRY_DECK_PLATE_MASTER_V01]
+status: approved

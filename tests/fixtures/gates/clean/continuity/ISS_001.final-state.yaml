@@ -1,0 +1,23 @@
+issue: ISS_001
+after_page: PG_001_002
+characters:
+  CHAR_MARA:
+    location: LOC_FERRY_DECK
+    position: { level: deck, side: left, landmark: crates }
+    wardrobe: WARD_MARA_OILSKIN
+    state: []
+    holding: [PROP_FLARE_GUN]
+  CHAR_OSKAR:
+    location: LOC_FERRY_DECK
+    position: { level: deck, side: left, landmark: crates }
+    wardrobe: WARD_OSKAR_HOODED
+    state: [cut_left_hand]
+    holding: []
+props:
+  PROP_FLARE_GUN:
+    custody: CHAR_MARA
+    location: LOC_FERRY_DECK
+    state: []
+open_threads:
+  - The patrol launch has not reached the ferry yet.
+last_validated: "2026-11-26"
