@@ -1,0 +1,83 @@
+# Cost control
+
+## Purpose
+
+Prevent surprise spend. Image generation costs money per call, and a comic is
+many calls. Every live call is estimated, confirmed, and made on purpose.
+
+## Scope
+
+All layers. Applies to every provider call, every script that can trigger
+generation, and every agent that plans a batch of pages or reference art.
+
+## Core Principles
+
+- Dry-run is the default everywhere. Live generation is an explicit opt-in,
+  never a side effect of another command.
+- Estimate before execute. No batch runs without a cost estimate shown and
+  confirmed.
+- Cheap first. Test readability with text, thumbnails, and the ledger audit
+  before paying for a finished page.
+- One page at a time. A defect found on page three costs one page when the
+  pages after it have not been generated yet.
+
+## Dry-run default
+
+- Every provider's `generate` MUST default to `dryRun: true`: it writes the
+  request spec and a pending generation record and makes no network call.
+- Live generation requires `--live` and `--yes` on
+  `scripts/generate-assets.js`, plus the provider's required environment
+  variables. A missing variable MUST abort the run. It never falls back to
+  another provider in silence.
+- API keys are NEVER logged or written into records.
+- `manual` and `harness-native` never call the network. They produce a
+  handoff package for a person or for the harness's own image tool.
+
+## Batch estimates and confirmation
+
+- Before a live batch, the agent MUST present the item count, the provider
+  and model per item, the per-item and total estimated cost, and the state of
+  each item's reference plan. Then it waits for explicit confirmation.
+- Confirmation scales with cost. At zero external cost (`harness-native`,
+  `manual`, a local `comfyui`) there is nothing to confirm: the agent states
+  what it is about to generate and proceeds. Plan, provenance, and review are
+  unchanged.
+- A confirmation covers the batch that was estimated. New items mean a new
+  estimate, including one extra page added to a confirmed run.
+- When pricing is unknown, the agent MUST say so and treat the item as
+  high-cost. It does not print a guessed figure.
+
+## Sequential generation
+
+- Pages are generated in reading order, one per request. The returned file is
+  opened and reviewed before the next page is requested (see
+  `visual-evidence.md` and `image/page-generation.md`).
+- A confirmed batch is a budget and an order of work. It does not authorize
+  generating page five while page four is still unreviewed.
+- A page that fails review stops the batch at that page. The remaining pages
+  wait for the repair, because they would be conditioned on the defect.
+- Reference art comes before pages for the same reason: a character sheet
+  approved late invalidates every page drawn without it.
+
+## Repair budgets
+
+- Each render gets at most `project.repair_policy.max_cycles` repair cycles
+  (default 2). The limit and what follows it are in `repair-limits.md`.
+- Repeated failure is a planning defect. Change the plan or the references
+  before spending again on the same inputs.
+- Regenerating a page whose render is already approved always needs human
+  confirmation, whatever budget remains.
+
+## Validation
+
+- `hooks/require-cost-confirmation.js` blocks `generate-assets --live`
+  without `--yes`.
+- `scripts/generate-assets.js` runs dry by default, and providers refuse a
+  live run when a required environment variable is missing.
+- Each generation record carries a `cost` block with `estimated` and
+  `reported` flags, so spend can be totalled from `generations/`.
+- `scripts/validate-workspace.js` rejects a review whose `repair_cycle`
+  exceeds `project.repair_policy.max_cycles`.
+- Whether a batch was generated one page at a time with a review in between
+  shows in the order of generation records and review dates. A person reads
+  that, along with the spend report, at each phase gate.

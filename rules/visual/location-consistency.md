@@ -1,0 +1,93 @@
+# Location consistency
+
+## Purpose
+
+Make every location a stable place the reader can find their way around: the
+same architecture, the same dressing, the same light, and the same side of
+the page for the same end of the room, in every panel.
+
+## Scope
+
+Visual layer. Applies to location design, location maps, reference plans, and
+every render that depicts a `LOC_*` entity.
+
+## Core Principles
+
+- A location is geometry first and pictures second. The map defines the
+  space, and panels depict it.
+- Every request anchors to the approved location master and the map. Prose
+  alone, or the previous page alone, is not an anchor.
+- Sides are fixed. Whatever is screen left in the first panel of a location
+  stays screen left.
+- Light belongs to the location's identity. It is recorded and reused.
+
+## The map
+
+- Every location MUST have a `map.yaml` before any page set there is planned.
+  It names the vertical `levels` from bottom to top, the `landmarks` with
+  their level and side, the `exits`, and the `connections` that say how a
+  character gets from one level to another.
+- Levels separate what the reader must not confuse: platform and ground,
+  deck and wheelhouse, inside and outside.
+- A panel may place a character only at a level and landmark the map
+  defines. A new landmark is added to the map first, then used.
+- A landmark SHOULD be something a reader can recognize in a small panel: the
+  lashed crates, the ladder.
+
+## The side convention
+
+- The map's `sides` block fixes the convention for the location in one
+  sentence, plus what lies on the `left` and on the `right`. For
+  `LOC_FERRY_DECK`: bow is screen left, stern is screen right.
+- Every panel at the location follows it. The crates near the bow are on the
+  left of every panel that shows them.
+- A reverse view that flips the sides SHOULD be avoided. When the story needs
+  one, the panel says so in `framing.composition` and in its `notes`, the
+  ledger positions keep using the map's sides, and the review judges the
+  render against the declared flip.
+- Directions of travel and threat for a scene are set against this convention
+  (`spatial-continuity.md`).
+
+## Architecture and dressing
+
+- `location.yaml` records `architecture` and `dressing` separately.
+  Architecture does not change. Dressing changes only when a panel moves it.
+- Every location has an approved plate (`LOC_<NAME>_PLATE_MASTER_V##`) before
+  pages are generated there. It is attached in the role its registry entry
+  declares.
+- Dressing items do not appear, vanish, or move between panels. An object
+  that matters to the plot is a prop with its own ledger rows
+  (`state-continuity.md`).
+- When `continuity.attach_previous_render` is set, the previous reviewed page
+  is attached for environment and staging continuity. It is used only after
+  its own review, because every defect in it would be inherited.
+
+## Light
+
+- `description.light` states the sources and their position. On the ferry
+  deck: one shielded lamp on the wheelhouse, moonlight otherwise.
+- `time_of_day_states` lists the states the location has been designed for.
+  A scene's `time_of_day` SHOULD be one of them. If it is not, design the
+  state before generating.
+- Within a scene, the direction of light and of cast shadows agrees from
+  panel to panel.
+- Weather and atmosphere (rain, fog, smoke) are scene-level. They appear in
+  every panel of the scene or in none, unless a panel changes them.
+
+## Validation
+
+- `location.schema.json` requires the description and the `references` list.
+  `location-map.schema.json` requires `levels` and `landmarks`, each landmark
+  with a `level`.
+- `scripts/check-continuity.js` reports a panel that names a level or
+  landmark the map does not define (`UNKNOWN_REFERENCE`, ledger rule 11). For
+  a location with no `map.yaml` this is a warning, and the location still
+  needs its map under this rule.
+- `scripts/validate-workspace.js` schema-checks location and map files and
+  resolves the IDs they cite.
+- `hooks/detect-continuity-drift.js` is advisory: it warns on write and never
+  blocks.
+- Whether the drawn architecture, dressing, light, and sides match the plate
+  and the map can only be seen in the render. The `spatial_logic` and
+  `position` checks of the visual review cover it, with the
+  environment-designer deciding doubtful cases.

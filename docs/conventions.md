@@ -298,6 +298,7 @@ rows above. `validate.js` cross-checks every listed name against the manifests.
 - Wardrobe states: `WARD_<CHARACTER>_<NAME>` (e.g. `WARD_MARA_OILSKIN`).
 - Prompt packages: `PP_<page-or-asset-id>_<PROVIDER>`.
 - Generation records: `GEN_<page-id>_<attempt##>` or `GEN_<asset-id>_<attempt##>`.
+- Canon facts: `FACT_###`, unique within the story bible.
 - Review findings: `F##`, unique within a review file.
 - Editions: `ED_<issue>_##` (e.g. `ED_001_03`).
 - Files are lowercase-kebab or the ID itself; YAML for structured data,

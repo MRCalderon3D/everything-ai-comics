@@ -1,0 +1,111 @@
+# Repair limits
+
+## Purpose
+
+Keep repairs targeted, traceable, and finite. A failed page is fixed by a
+specific request against a specific version, the result is checked, and after
+a set number of attempts the work goes back to the plan instead of to the
+generator.
+
+## Scope
+
+All layers. Applies to every render and every piece of reference art that
+fails review, to `/repair-page`, and to any regeneration requested because of
+a finding.
+
+## Core Principles
+
+- A repair produces a sibling version. It never writes over the file it
+  repairs.
+- Rejected versions stay on disk with their prompts and reviews, marked as
+  superseded.
+- Fix the cause before asking again. Sending the same ambiguous description
+  a second time is a reroll, and rerolls do not address causes.
+- A repair is finished when the new file has been opened and each requested
+  change has been seen in it.
+- Repairs are counted. When the count reaches the project's limit, generation
+  stops.
+
+## Before the request
+
+- Read the finding. Decide whether the cause is in the image or upstream: a
+  missing identity reference, two characters the bible does not tell apart, a
+  ledger row that never said who holds the object, a position with no
+  landmark.
+- An upstream cause MUST be corrected first, in the bible, in `page.yaml`, or
+  in the reference plan. Then the repair is compiled from the corrected
+  files.
+- Mark the failed render. Its review keeps the verdict `flagged`, its
+  generation record takes `status: rejected`, and it stops being listed as
+  the page's result once the replacement is reviewed.
+
+## The repair request
+
+A repair prompt package (`mode: repair`, compiled with
+`scripts/compile-prompts.js --repair <review.yaml>`) states four things.
+
+- The edit target: the exact render being repaired (`edit_target`,
+  `repair.of_render`).
+- The failing panels and their findings (`repair.findings`, by `F##`).
+- The exact changes (`repair.changes`), one per line, each phrased so that
+  its presence in the result can be seen: "Give Oskar a round face and a
+  hooded jacket in panel 3".
+- The locked elements (`repair.locked`): everything that must come back
+  untouched, such as lettering, panel borders, and the characters that were
+  right.
+
+Further requirements:
+
+- Identity repairs and prop or state repairs SHOULD be separate requests when
+  a combined request has left some changes undone.
+- The identity reference of every character being corrected is attached, with
+  the difference from adjacent characters stated in words
+  (`visual/character-consistency.md`).
+- A provider without the `imageEditing` capability cannot take an edit
+  target. The repair is then a full regeneration of the page from the
+  corrected plan, still saved as the next version.
+
+## After the repair
+
+- The result is saved as the next version (`PG_001_002_V02` after `V01`) and
+  gets its own generation record and its own review file.
+- Open the new file. Verify every requested change, one by one. A change that
+  did not happen leaves its finding `open`.
+- Recheck the entire page and its neighbours for collateral changes: text,
+  identities, anatomy, clothing, geography. Local edits move things that were
+  not asked to move. The new review fills in all fourteen checks again.
+- Each repaired finding gets `status: fixed` and a `recheck` that names the
+  new render and what is visible there. The new review names the old render
+  in `supersedes`, and `current_render` in `page.yaml` moves to the new
+  version.
+- The verdict is `fixed` only when no blocking finding is open. A minor
+  finding MAY be `accepted` and listed in the report. A blocking finding
+  cannot be accepted.
+
+## Cycle limit
+
+- `repair_cycle` is 0 for a first render and rises by one with each repair.
+- The limit is `project.repair_policy.max_cycles`, 2 by default.
+- When the limit is reached and a blocking finding is still open, no further
+  generation is requested for that page. The verdict is `flagged`. The agent
+  records the upstream issue and the decision needed, and the work returns to
+  the page plan or to the references.
+- After the plan or the references have changed, the page starts again from a
+  newly compiled prompt as a first render of the revised plan, with a new
+  version number.
+- Declaring success at the limit, or raising the limit to keep rerolling, is
+  NEVER acceptable. Changing `max_cycles` is a project decision for the user.
+
+## Validation
+
+- `scripts/validate-workspace.js` rejects a review whose `repair_cycle`
+  exceeds `project.repair_policy.max_cycles`, a `fixed` finding without a
+  `recheck` and its evidence, a `fixed` verdict with an open blocking
+  finding, and a blocking finding marked `accepted`.
+- `prompt-package.schema.json` defines the `repair` block and `edit_target`
+  for packages in `mode: repair`.
+- Whether the earlier render and its prompt are still on disk is checked by
+  `production-qa` against the generation records.
+- Whether each requested change is visible in the new file, and whether
+  anything else moved, is visual review under `visual-evidence.md`. No script
+  can confirm it.

@@ -1,0 +1,125 @@
+# Approval policy
+
+## Purpose
+
+Define the lifecycle every asset moves through, so "done" has one meaning,
+approved material cannot drift, and changes to canon are deliberate and
+versioned.
+
+## Scope
+
+All layers. Applies to bibles, reference assets, page plans, reference plans,
+prompt packages, renders, reviews, and editions.
+
+## Core Principles
+
+- Three states, one direction: `draft → review → approved`. There is nothing
+  in between.
+- Approved is immutable. Change means supersede, never edit in place.
+- Approval is a human act. Agents prepare, review, and recommend. They NEVER
+  set an asset to approved on their own authority.
+- A review verdict and a human approval are two records. An agent's `pass`
+  says the render matched the plan. It does not say a person accepted it.
+- Approvals name what they approve. "Next", "continue", or "ok" approves
+  nothing that is waiting in review. On receiving one, the agent states what
+  is pending and asks for the explicit decision.
+- An approved plan or prompt fixes intent. It does not approve an image that
+  has not been produced yet.
+
+## Lifecycle
+
+- `draft`: work in progress, freely editable by the owning agent. A draft
+  MUST NOT be attached to a generation request as a reference.
+- `review`: a candidate submitted for human review with its review card: what
+  it is, the canon anchors to verify (named, from the bible), anchors the
+  candidate could not show, what it replaces, known deviations, and what
+  approving it allows next. A bare file is not a submission. Editing a file
+  in `review` sends it back to `draft`. A candidate MUST pass its
+  self-evaluation before submission (`self-review.md`).
+- `approved`: canon. Recorded with reviewer and date. For reference assets
+  that means `status: approved`, `approved_by`, and `approved_at` in
+  `references/manifest.yaml`.
+
+Some artifacts spell the same lifecycle with their own status values. A page
+moves `planned → scripted → prompted → rendered → reviewed → approved`. An
+edition moves `draft → reviewed → published`. In both, the last step is the
+human one.
+
+## Verdicts and human approval
+
+- Every review of a render ends in one verdict: `pass`, `fixed`, or
+  `flagged`.
+- `pass`: no findings, and every check is `pass` or `not_applicable`.
+- `fixed`: at least one finding was raised and repaired, and the corrected
+  render was reopened and rechecked. Use it only after seeing the listed
+  repairs in the new file.
+- `flagged`: a blocking finding is still open, a gate failed, or the visible
+  evidence is ambiguous.
+- Human approval is recorded separately in the review's `human_approval`
+  block (`pending`, `approved`, or `rejected`, with `by` and `at`). A page
+  takes `status: approved` only after that block says `approved`.
+- A draft or a flagged page is NEVER described as approved, in a report or
+  anywhere else.
+
+## Reusing approvals
+
+- An approval stands until its asset is superseded. An approved character
+  sheet is approved for every later page. Do not ask for it again.
+- Ask for a decision only where one is missing: an unresolved design, a canon
+  change, or a new version of something already approved.
+- A fresh instruction from the user that changes canon is itself the decision
+  on that change (see `ask-dont-assume.md`). Its consequences still go
+  through review: the new master, the new wardrobe, the recompiled prompts.
+
+## Approval syncs the bible
+
+An approved image outranks the written description it was drawn from. Where
+the approved master differs from the bible (the extent of a tear, the shape
+of a scar), the bible is updated to match the image as part of registering
+the approval, or the difference is raised and the approval reconsidered.
+Skipping the sync forks canon: the next asset follows the stale text while
+being conditioned on the newer image.
+
+## Immutability and supersession
+
+- Approved reference assets are read-only. `hooks/protect-approved-assets.js`
+  blocks writes. Working around the hook by renaming, deleting, or
+  re-creating a file is NEVER acceptable.
+- To change an approved asset, create the next version
+  (`CHAR_MARA_TURN_MASTER_V01` → `..._V02`), take it through the lifecycle,
+  then mark the old registry entry `superseded`. The old file stays on disk.
+- Renders follow the same logic. A replaced render keeps its file and its
+  review. The new review names it in `supersedes`, and `current_render` in
+  `page.yaml` moves to the new version.
+- Artifacts that cite a superseded version are stale. Regenerate them against
+  the new version before their next approval.
+- Revoking an approval after a defect is found is a human act, noted in the
+  asset's file. The asset returns to `draft` and its dependents are flagged.
+
+## Approval gates
+
+- A master is approved before it appears in a reference plan.
+- A page's plan and ledger are written and audited before its prompt is
+  compiled (plan before pixels).
+- A render is reviewed before it is attached as a continuity reference for
+  the next page.
+- A non-draft edition lists only renders whose review verdict is `pass` or
+  `fixed`.
+- The contexts in `contexts/` list the approvals that gate each phase.
+
+## Validation
+
+- The schemas restrict every `status`, `verdict`, and `human_approval.status`
+  field to its allowed values.
+- `scripts/validate-workspace.js` enforces the verdict rules above, rejects a
+  blocking finding marked `accepted`, and requires a page with
+  `status: reviewed` or `approved` to have a review of its `current_render`
+  with verdict `pass` or `fixed`.
+- `scripts/build-edition.js` refuses renders without a `pass` or `fixed`
+  review unless it is run with `--draft`.
+- `hooks/protect-approved-assets.js` enforces immutability of approved
+  reference assets on write.
+- Whether a reference plan cites only approved, current masters is read from
+  `references/manifest.yaml` by `production-qa` at the generation gate.
+- The approval act itself is human review. The tooling verifies the
+  bookkeeping around it.
