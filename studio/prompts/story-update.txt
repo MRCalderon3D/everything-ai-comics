@@ -1,0 +1,19 @@
+TASK
+Update the story canon as the person asks.
+
+COMMAND FILES TO FOLLOW, IN THIS ORDER
+{{#if source_file}}- commands/source-analyze.md (source: {{source_file}})
+{{/if}}- commands/story-bible.md
+- commands/series-plan.md (only when the change affects issues or page budgets)
+
+INPUT FROM THE PERSON
+{{#if instruction}}What to change:
+<<<
+{{instruction}}
+>>>
+{{/if}}{{#if source_file}}A source text was added to the workspace at {{source_file}}. Analyse it and fold it into the canon.
+{{/if}}
+INSTRUCTIONS FOR THIS RUN
+- A change the person asks for is a user_change: add a new fact, set "replaces" to the fact it supersedes, and walk the change to every file listed in that fact's "affects" (character, location and prop files, wardrobe, dialogue already written in page files).
+- Report under "decisions" every file the change reached.
+- Do not touch a page that already has a render without saying so in the summary: its render no longer matches.

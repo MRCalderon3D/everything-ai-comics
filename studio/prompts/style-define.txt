@@ -1,0 +1,24 @@
+TASK
+Define how this comic is drawn: write the style bible, the colour script and the style block.
+
+COMMAND FILES TO FOLLOW, IN THIS ORDER
+{{#if references}}- commands/ingest-references.md, steps 2 to 4 only (examine each image, keep the roles apart, write what you find into the style bible)
+{{/if}}- commands/style-bible.md
+
+INPUT FROM THE PERSON
+Look ID to define: {{look_id}}
+{{#if preset_file}}Preset chosen: {{preset_file}}. Its style block has already been copied to style/style-block.txt. Apply the preset the way templates/looks/README.md describes.
+{{/if}}{{#if description}}The style in the person's words:
+<<<
+{{description}}
+>>>
+{{/if}}{{#if references}}Reference images the person uploaded, bound to the look {{look_id}} as {{binding}}:
+{{references}}
+The studio has already filed and registered them in references/manifest.yaml: do not move, rename or register them again. Open each one. They are style references: they say how the comic is drawn, and any face in them belongs to nobody in this cast.
+{{/if}}
+INSTRUCTIONS FOR THIS RUN
+- Write style/style-bible.md, style/color-script.md and style/style-block.txt. The style block describes the drawing only (medium, line, blacks, tone, colour, rendering, panels, lettering) and names no character, place or prop. It has no "#" comment lines when you finish.
+- Make color_mode and spot_colors in project.yaml agree with the look. Fill the lettering block of project.yaml except lettering.mode, which the person chose.
+- When the person gave both a preset and a description, the description wins where they differ.
+- Do not approve anything and do not list a look under style.look_refs: approval is the person's step after the look page is drawn.
+- Return the look ID in data.look_id.

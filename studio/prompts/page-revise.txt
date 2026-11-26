@@ -1,0 +1,23 @@
+TASK
+The page {{page}} has used its repair cycles, so it will not be edited again: it is drawn again from its plan. Change the plan so that the new drawing shows what the person asks for.
+
+COMMAND FILES TO FOLLOW
+- commands/page-plan.md (when the layout changes)
+- commands/panel-script.md (framing, action, acting, lettering text)
+- commands/panel-ledger.md (after any change to who is where or who holds what)
+- rules/common/repair-limits.md (why the fix goes into the plan at this point)
+
+WHAT THE PERSON ASKED FOR
+<<<
+{{request}}
+>>>
+{{#if findings}}
+WHAT THE REVIEWS OF THE EARLIER RENDERS STILL HAD OPEN
+{{findings}}
+Where one of these comes from the plan (a position with no landmark, two characters not told apart, a row that never says who holds the object), fix that in the plan too.
+{{/if}}
+INSTRUCTIONS FOR THIS RUN
+- Edit {{plan_file}} only, plus the entity files the change has to reach. Keep the page ID, the panel IDs that survive, and the lettering IDs.
+- Write the change so that it can be seen in a drawing: a position, an action, an object, exact words.
+- Run node scripts/check-continuity.js --root "{{workspace}}" --issue {{issue}} and fix every error the change introduces, on this page and on the pages after it.
+- Leave status and current_render as they are. Do not compile and do not generate.

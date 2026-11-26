@@ -1,0 +1,17 @@
+TASK
+{{#if update}}Change the cover of issue {{issue}} as the person asks.{{/if}}{{#if create}}Write the cover of issue {{issue}}.{{/if}}
+
+COMMAND FILES TO FOLLOW
+- commands/cover.md
+
+INPUT FROM THE PERSON
+{{#if description}}<<<
+{{description}}
+>>>
+{{/if}}{{#if propose}}The person left the cover to you: propose the one image that sells this issue without giving away its ending.
+{{/if}}
+INSTRUCTIONS FOR THIS RUN
+- Write issues/{{issue}}/cover/cover.yaml only. Use characters, wardrobe, locations and props that exist in the workspace.
+- Set generation.provider to {{provider}}, status to draft and approved_render to null.
+- The title text is the project's title unless the person gave another one.
+- Do not compile or generate: the studio does both next.

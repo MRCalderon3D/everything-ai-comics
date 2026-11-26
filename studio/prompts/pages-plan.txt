@@ -1,0 +1,18 @@
+TASK
+Turn the new scene or scenes of issue {{issue}} into page plans: layout, panel script, lettering text and ledger for the pages {{page_ids}}.
+
+COMMAND FILES TO FOLLOW, IN THIS ORDER
+- commands/smart-page.md, once per scene, steps 1 to 7 and step 10
+
+INPUT FROM THE PERSON
+What happens on these pages:
+<<<
+{{text}}
+>>>
+
+INSTRUCTIONS FOR THIS RUN
+- Stop after the ledger audit. Skip steps 8 and 9 of the command (reference plans and prompt packages) and do not run build-board.js: the studio builds the reference plan and compiles the prompt right before it draws each page.
+- Set generation.mode to full_page and generation.provider to {{provider}} in every page, and status to scripted.
+- Run node scripts/check-continuity.js --root "{{workspace}}" --issue {{issue}} and fix every error in the plan until it reports none.
+- One drawable moment per panel. Write the exact words of every caption and balloon in the project's language.
+- Do not replan a page that already has a render.

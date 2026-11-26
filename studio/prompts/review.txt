@@ -1,0 +1,38 @@
+TASK
+Review one rendered {{kind}} by looking at the image: {{render}}.
+
+COMMAND FILES TO FOLLOW
+- commands/visual-review.md (the checks, what counts as evidence, what blocks). Follow its method for looking. Do not write the review file: return the review in "data" and the studio writes it.
+
+WHAT TO OPEN
+- The render under review: {{render_file}}
+- The plan it must match: {{plan_file}}
+{{references}}
+{{#if neighbor}}- The previous page as it was drawn, for continuity at the page boundary: {{neighbor}}
+{{/if}}
+{{#if lettering}}THE EXACT TEXT THE IMAGE MUST CONTAIN
+{{lettering}}
+
+{{/if}}{{#if overlay}}This project letters its pages afterwards: the image must contain no text at all. Judge the "lettering" check on that.
+
+{{/if}}{{#if previous}}THIS RENDER REPLACES {{supersedes}}
+It was repaired because of these findings. Open the new file and check each one in it, one by one:
+{{previous}}
+Return one entry per finding in data.review.rechecks: {"id": "F01", "fixed": true or false, "evidence": "what is visible now, in which panel"}. Then review the whole image again: a local edit moves things nobody asked it to move.
+
+{{/if}}{{#if requests}}CHANGES THE PERSON ASKED FOR
+This image was drawn again from an updated plan so that it shows these changes. Look for each one:
+{{requests}}
+Return one entry per change in data.review.rechecks: {"id": "REQ1", "fixed": true or false, "evidence": "what is visible, in which panel"}.
+
+{{/if}}{{#if not_applicable}}CHECKS THAT DO NOT APPLY
+A cover has no panels and no ledger: return "not_applicable" for {{not_applicable}}, with evidence that says so.
+
+{{/if}}
+INSTRUCTIONS FOR THIS RUN
+- Read-only run: write no file.
+- Judge pixels. "As specified in the prompt" is not evidence. Each of the fourteen checks gets a result (pass, fail, not_applicable) and one line of evidence naming the panel and what is drawn there.
+- Every difference from the plan or the references is a finding: the panel ID (or null for the whole image), the check, what was expected, what is visible, the severity (blocking or minor), and the repair it needs, written so the change can be seen in the result.
+- Identity ambiguity, a duplicated character, an impossible position, broken causality and a missing state transition are blocking. If the image does not establish who acts, that is blocking even when a caption names them.
+- Set "repairable" to false when the cause is upstream (a character with no sheet, two characters the files do not tell apart, a plan that contradicts itself): another render would repeat the defect.
+- data.review has: checks (all fourteen keys), findings, rechecks, gates (style_fidelity and narrative_continuity, each pass or fail), repairable, and references_compared (the asset IDs you opened).

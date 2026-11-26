@@ -25,7 +25,8 @@
     "approve:asset": "node scripts/approve-asset.js",
     "letter": "node scripts/letter-pages.js",
     "build:edition": "node scripts/build-edition.js",
-    "board": "node scripts/build-board.js"
+    "board": "node scripts/build-board.js",
+    "studio": "node studio/server/index.js"
   },
   "keywords": [
     "ai-comics",

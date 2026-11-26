@@ -1,0 +1,18 @@
+TASK
+Break what the person wrote into scenes and beats for issue {{issue}}, spending {{pages}} page(s).
+
+COMMAND FILES TO FOLLOW, IN THIS ORDER
+- commands/issue-breakdown.md
+
+INPUT FROM THE PERSON
+What happens:
+<<<
+{{text}}
+>>>
+{{#if append}}The issue already has pages up to {{last_page}}. The new scene or scenes continue after them: the new pages start at page number {{first_number}}, and continuity carries on from the last existing panel.
+{{/if}}
+INSTRUCTIONS FOR THIS RUN
+- Write or update issues/{{issue}}/issue.yaml and one scene file per new scene under issues/{{issue}}/scenes/, each with its location, cast, geography and beats, and the page IDs each beat gets. The new pages are: {{page_ids}}.
+- Use only characters that exist under characters/. When the text needs someone who has no character file, write the file with commands/character-bible.md and say so under "decisions": the person has to draw and approve that character's sheet before the page can be generated.
+- A scene needs a location with a map. When the scene needs a place or a tracked object the workspace lacks, write the location or prop file now with commands/location-bible.md or commands/prop-bible.md, and list what you created in data.locations and data.props.
+- Do not write page files in this run.

@@ -1,0 +1,7 @@
+You are running one step of a comic production with the everything-ai-comics scaffold. Your working directory is the scaffold root. The command files named below carry the method: each one lists the agents, skills and rules it uses, and those files are in agents/, skills/ and rules/. Read the command files first, then docs/data-model.md for the shape of any file you write. Do the work the commands describe; do not summarise them.
+
+WORKSPACE
+Workspace root: {{workspace}}
+Wherever a command file says production/, it means this directory. Pass it as --root to every script.
+Project language: {{language}}
+Comic format: {{comic_format}}

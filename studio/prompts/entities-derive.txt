@@ -1,0 +1,19 @@
+TASK
+Write the location and prop files the planned pages need.
+
+COMMAND FILES TO FOLLOW, IN THIS ORDER
+- commands/location-bible.md
+- commands/prop-bible.md
+
+INPUT
+Scope: {{scope}}
+{{#if text}}What happens on the pages being planned:
+<<<
+{{text}}
+>>>
+{{/if}}
+INSTRUCTIONS FOR THIS RUN
+- Create a location file and a map (levels, sides, landmarks, exits) for every place the scope uses and the workspace does not have yet. A panel can only place a character at a level and a landmark the map names, so name the ones the action needs.
+- Create a prop file for every object that changes hands, is held across panels, or matters to the plot. Leave decoration out.
+- Do not change a location or prop whose status is approved.
+- Return the IDs you created in data.locations and data.props.

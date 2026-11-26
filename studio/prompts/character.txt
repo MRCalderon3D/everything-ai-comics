@@ -1,0 +1,23 @@
+TASK
+{{#if update}}Update the character {{character_id}} as the person asks.{{/if}}{{#if create}}Add a character to the cast: write the character file and the wardrobe file.{{/if}}
+
+COMMAND FILES TO FOLLOW, IN THIS ORDER
+{{#if references}}- commands/ingest-references.md, steps 2 to 4 only (examine each image, keep the roles apart, write what you find into the character file)
+{{/if}}- commands/character-bible.md (scope: {{character_id}} only)
+
+INPUT FROM THE PERSON
+Character ID: {{character_id}}
+{{#if name}}Name: {{name}}
+{{/if}}{{#if description}}{{#if update}}What to change:{{/if}}{{#if create}}Who they are:{{/if}}
+<<<
+{{description}}
+>>>
+{{/if}}{{#if references}}Photos or drawings of the character (already in the workspace):
+{{references}}
+The studio has already filed and registered them in references/manifest.yaml as identity references: do not move, rename or register them again. Open each one. Take from it what is identity (face shape, hair, build, marks) and write it into the description. Clothing and lighting in a photo are not identity unless the person says so.
+{{/if}}
+INSTRUCTIONS FOR THIS RUN
+- Write characters/{{character_id}}/character.yaml and characters/{{character_id}}/wardrobe.yaml with one default outfit. Give at least three distinguishing features that separate this character from every other one in the cast, and fill visually_adjacent_to in both directions where two characters could be confused.
+- Add the character to the "characters" list of story/story-bible.yaml when it is not there.
+- Leave "references" as it is and status as draft: the turnaround sheet is drawn and approved in later steps.
+- Return the character ID in data.character_id.

@@ -1,0 +1,14 @@
+TASK
+Place the lettering of {{pages}} for overlay lettering.
+
+COMMAND FILES TO FOLLOW
+- commands/lettering.md
+
+WHAT TO OPEN
+{{renders}}
+
+INSTRUCTIONS FOR THIS RUN
+- For each page write issues/{{issue}}/pages/<PAGE_ID>/lettering.yaml: one element per lettering entry of page.yaml, with the same id, type and text, a box in canvas pixels, a shape, and a tail that points at the speaker's mouth for spoken types.
+- Open each render before placing anything: balloons sit in the clear areas and cover no face, hand or object the panel is about. They are met in reading order.
+- The text is never changed here. A wrong word is fixed in page.yaml.
+- Run node scripts/letter-pages.js --page <page.yaml> for each page and fix every error and overflow warning it prints.

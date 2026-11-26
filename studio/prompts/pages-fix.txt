@@ -1,0 +1,14 @@
+TASK
+The mechanical checks report errors in the plan of issue {{issue}}. Fix them in the plan files.
+
+COMMAND FILES TO FOLLOW
+- commands/panel-ledger.md (for ledger errors)
+- commands/page-plan.md and commands/panel-script.md (for layout and script errors)
+
+ERRORS REPORTED
+{{errors}}
+
+INSTRUCTIONS FOR THIS RUN
+- Fix each error where it starts, in the page, scene, issue or entity file. Errors are fixed, never waived, and never by deleting the panel that carries them unless the panel moves nothing.
+- Change nothing the errors do not touch.
+- Run node scripts/check-continuity.js --root "{{workspace}}" --issue {{issue}} again and list what is still open, if anything, in the summary.
