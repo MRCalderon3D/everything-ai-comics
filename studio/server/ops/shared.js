@@ -243,8 +243,11 @@ async function renderReviewRepair(ctx, job) {
   let repairs = 0;
   let stopped = null;
   while (!review.passes) {
+    // Only what blocks is repaired (pipeline.reviewRender decides). Minor
+    // notes pass and never reach this loop.
     if (!review.repairable) {
-      stopped = 'The review says another render would repeat the problem: the cause is in the plan or the references.';
+      stopped = review.not_repaired_because ||
+        'The review says another render would repeat the problem: the cause is in the plan or the references.';
       break;
     }
     const doc = S.ws.loadReview(root, review.render);
@@ -273,6 +276,7 @@ async function renderReviewRepair(ctx, job) {
   return {
     render: review.render,
     verdict: review.verdict,
+    outcome: review.outcome,
     passes: review.passes,
     open_findings: review.open,
     repairs,

@@ -12,13 +12,14 @@ WHAT TO OPEN
 {{/if}}
 {{#if lettering}}THE EXACT TEXT THE IMAGE MUST CONTAIN
 {{lettering}}
+Compare the words, the accents and the punctuation. Comics lettering is set in capitals by convention, so a text drawn in upper case where the plan writes it in sentence case is correct. Letter case is a finding only when the plan says the case carries meaning.
 
 {{/if}}{{#if overlay}}This project letters its pages afterwards: the image must contain no text at all. Judge the "lettering" check on that.
 
 {{/if}}{{#if previous}}THIS RENDER REPLACES {{supersedes}}
-It was repaired because of these findings. Open the new file and check each one in it, one by one:
+The version it replaces had these open findings. Open the new file and look for each one in it:
 {{previous}}
-Return one entry per finding in data.review.rechecks: {"id": "F01", "fixed": true or false, "evidence": "what is visible now, in which panel"}. Then review the whole image again: a local edit moves things nobody asked it to move.
+Return one entry per finding in data.review.rechecks: {"id": "F01", "fixed": true or false, "evidence": "what is visible now, in which panel"}. Do not list any of them again under "findings": the recheck is their answer. Then review the whole image again, because a local edit moves things nobody asked it to move.
 
 {{/if}}{{#if requests}}CHANGES THE PERSON ASKED FOR
 This image was drawn again from an updated plan so that it shows these changes. Look for each one:
@@ -28,11 +29,19 @@ Return one entry per change in data.review.rechecks: {"id": "REQ1", "fixed": tru
 {{/if}}{{#if not_applicable}}CHECKS THAT DO NOT APPLY
 A cover has no panels and no ledger: return "not_applicable" for {{not_applicable}}, with evidence that says so.
 
-{{/if}}
+{{/if}}WHAT COUNTS AS A FINDING
+- A finding is something a reader would notice, or something that breaks identity, continuity, the story beat, the exact lettering text, or the style of this comic. If nobody reading the page would see it and nothing later depends on it, it is not a finding.
+- Do not report a difference of degree the plan does not quantify. "Leans forward" drawn as a slight lean is what was planned; so is "smiles" drawn as a small smile.
+- Do not report what the plan leaves open: the side an unplanned accessory sits on, a background detail nobody specified, the exact shape of a pose.
+- Blocking is for: a wrong, ambiguous or duplicated identity; wrong or missing text; a story action that is missing or done by the wrong character; a position, a level or a causality that cannot be; a physical state, an object or a custody that contradicts the ledger; a style that has left the look of this comic. If the image does not establish who acts, that is blocking even when a caption names them.
+- Everything else that is worth telling the person is minor.
+- A minor finding does not trigger a repair. The page passes with it listed as a note, and the person decides whether to ask for a correction. A blocking finding does trigger a repair, which costs minutes and can disturb what was right. So the severity has to be honest in both directions: do not call a defect blocking to get it fixed, and do not call a real break minor to let the page through.
+- A check is "fail" only when it has a blocking finding. A check with only a minor finding stays "pass", and its evidence mentions the note.
+- A gate fails only when a blocking finding of its kind is open: style_fidelity for the style, narrative_continuity for everything else.
+
 INSTRUCTIONS FOR THIS RUN
 - Read-only run: write no file.
 - Judge pixels. "As specified in the prompt" is not evidence. Each of the fourteen checks gets a result (pass, fail, not_applicable) and one line of evidence naming the panel and what is drawn there.
-- Every difference from the plan or the references is a finding: the panel ID (or null for the whole image), the check, what was expected, what is visible, the severity (blocking or minor), and the repair it needs, written so the change can be seen in the result.
-- Identity ambiguity, a duplicated character, an impossible position, broken causality and a missing state transition are blocking. If the image does not establish who acts, that is blocking even when a caption names them.
-- Set "repairable" to false when the cause is upstream (a character with no sheet, two characters the files do not tell apart, a plan that contradicts itself): another render would repeat the defect.
+- Each finding has: the panel ID (or null for the whole image), the check, what was expected, what is visible, the severity (blocking or minor), and the repair it needs, written so the change can be seen in the result.
+- Set "repairable" to false when the cause of a blocking finding is upstream (a character with no sheet, two characters the files do not tell apart, a plan that contradicts itself): another render would repeat the defect.
 - data.review has: checks (all fourteen keys), findings, rechecks, gates (style_fidelity and narrative_continuity, each pass or fail), repairable, and references_compared (the asset IDs you opened).

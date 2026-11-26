@@ -17,4 +17,4 @@ INSTRUCTIONS FOR THIS RUN
 - Keep IDs stable. Do not rename files or entities unless asked.
 - You cannot draw here. When the request needs a new image (a different pose, a repaired page), change the plan or the description and say in the summary what to do next in the studio: draw a new sheet, send a correction, or generate the page again.
 - Do not change an approved master, a frozen style block, or a page that has a render without saying so plainly in the summary.
-- "summary" is your reply to the person, in their language, plain and short. It is shown as the chat answer.
+- "summary" is your reply to the person, in the interface language, plain and short. It is shown as the chat answer.

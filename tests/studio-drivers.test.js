@@ -270,6 +270,56 @@ async function main() {
       assert.ok(fs.existsSync(path.join(SCAFFOLD, m)), `${kind} names ${m}, which does not exist`);
     }
   }
+  // The language of what the person reads is stated in every prompt, apart from the story's language.
+  const mixed = prompts.build('review', { kind: 'page', render: 'PG_001_001_V01', lettering: '1. "Stay down."' },
+    { workspace: WORKSPACE, language: 'en', interfaceLanguage: 'es', readOnly: true });
+  for (const needle of [
+    'Interface language: es (Spanish)', 'Project language: en (English)', 'every finding and every line of evidence',
+    'override any other language preference',
+    // Reviewer calibration: what is a finding, what blocks, and that a minor finding triggers no repair.
+    'something a reader would notice', 'Comics lettering is set in capitals by convention',
+    'difference of degree the plan does not quantify', 'A minor finding does not trigger a repair', 'honest in both directions',
+    'This is a read-only run',
+  ]) {
+    assert.ok(mixed.includes(needle), `the review prompt lacks: ${needle}`);
+  }
+  assert.ok(!mixed.includes('validate-workspace.js'), 'a read-only run is not told to run scripts');
+  assert.strictEqual(prompts.languageLabel('pt-BR'), 'pt-BR (Portuguese)');
+  assert.strictEqual(prompts.languageLabel('xx'), 'xx');
+
+  // --- the verdict of a composed review follows the review rules -------------------------------------------
+  const { composeReview, outcomeOf } = require('../studio/server/pipeline');
+  const allPass = {};
+  for (const key of prompts.REVIEW_CHECKS) allPass[key] = { result: 'pass', evidence: 'Panel 1 shows it.' };
+  const compose = (returned, extra = {}) => composeReview(Object.assign({
+    owner: { kind: 'page', id: 'PG_001_001', issue: 'ISS_001' }, render: 'PG_001_001_V01', supersedes: null, previous: null,
+    existing: null, independent: true, repairCycle: 0, references: [], neighbors: [], toolLabel: 'Claude Code',
+    panelIds: ['PN_001_001_01'], notApplicable: [],
+    returned: Object.assign({ checks: allPass, findings: [], gates: { style_fidelity: 'pass', narrative_continuity: 'pass' } }, returned),
+  }, extra));
+  const finding = (severity) => ({ panel: 'PN_001_001_01', check: 'wardrobe', expected: 'a', visible: 'b', severity, repair: 'c' });
+  let review = compose({});
+  assert.deepStrictEqual([review.verdict, outcomeOf(review)], ['pass', 'pass']);
+  review = compose({ findings: [finding('minor'), finding('minor')] });
+  assert.deepStrictEqual([review.verdict, outcomeOf(review), review.findings.map((f) => f.status).join()], ['fixed', 'notes', 'open,open'],
+    'only minor findings: fixed, with the notes left open');
+  review = compose({ findings: [finding('minor'), finding('blocking')] });
+  assert.deepStrictEqual([review.verdict, outcomeOf(review)], ['flagged', 'flagged']);
+  review = compose({ findings: [finding('minor')], gates: { style_fidelity: 'fail', narrative_continuity: 'pass' } });
+  assert.strictEqual(review.verdict, 'flagged', 'a failed gate flags the review');
+  review = compose({ gates: { style_fidelity: 'pass' } });
+  assert.deepStrictEqual([review.verdict, review.gates.narrative_continuity], ['flagged', 'not_performed'], 'a gate nobody judged flags the review');
+  review = compose({ checks: Object.assign({}, allPass, { identity: { result: 'fail', evidence: 'Wrong face in panel 1.' } }) });
+  assert.deepStrictEqual([review.verdict, review.findings[0].severity], ['flagged', 'blocking'], 'a failed check with no finding becomes a blocking one');
+  review = compose({}, { requests: [{ id: 'REQ1', text: 'Hood up.' }] });
+  assert.deepStrictEqual([review.verdict, review.findings[0].source], ['flagged', 'user_request'], 'a request that was not seen keeps the review flagged');
+  review = compose({ rechecks: [{ id: 'F01', fixed: true, evidence: 'Round face in panel 1.' }] }, {
+    render: 'PG_001_001_V02', supersedes: 'PG_001_001_V01', repairCycle: 1,
+    previous: { findings: [Object.assign({ id: 'F01', status: 'open' }, finding('blocking')), Object.assign({ id: 'F02', status: 'open' }, finding('minor'))] },
+  });
+  assert.deepStrictEqual([review.verdict, outcomeOf(review), review.findings.map((f) => f.status).join()], ['fixed', 'notes', 'fixed,open'],
+    'after a repair, the fixed finding is rechecked and a carried note stays open');
+
   assert.strictEqual(prompts.render('a{{#if x}}[{{x}}{{#if y}}-{{y}}{{/if}}]{{/if}}b', { x: '1' }), 'a[1]b');
   assert.strictEqual(prompts.render('a{{#if x}}[{{x}}]{{/if}}b', {}), 'ab');
   const contract = prompts.contractSchema();

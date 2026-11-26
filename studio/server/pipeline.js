@@ -501,12 +501,18 @@ function composeReview(input) {
   const gateOf = (name) => (data.gates && ['pass', 'fail'].includes(data.gates[name]) ? data.gates[name] : 'not_performed');
   const gates = { style_fidelity: gateOf('style_fidelity'), narrative_continuity: gateOf('narrative_continuity') };
 
+  // The review rules of docs/data-model.md: flagged is for an open blocking
+  // finding, a failed gate, an open change request, or a check nobody made.
+  // A review whose only open findings are minor is fixed: nothing blocks, and
+  // the notes stay listed as open for the person to read.
   const open = findings.filter((f) => f.status === 'open');
   const notPerformed = Object.values(checks).some((c) => c.result === 'not_performed') ||
     Object.values(gates).includes('not_performed');
   const gateFail = Object.values(gates).includes('fail');
+  const openBlocking = open.some((f) => f.severity === 'blocking');
+  const openRequest = open.some((f) => f.source === 'user_request');
   let verdict;
-  if (open.length || gateFail || notPerformed) verdict = 'flagged';
+  if (openBlocking || openRequest || gateFail || notPerformed) verdict = 'flagged';
   else if (!findings.length) verdict = 'pass';
   else verdict = 'fixed';
 
@@ -612,8 +618,17 @@ async function reviewRender(ctx, handle, options) {
   const toRecheck = previous && !existing
     ? (Array.isArray(previous.findings) ? previous.findings : []).filter((f) => f && f.status === 'open')
     : [];
+  // Which of them the repair was compiled to fix (the scaffold's own selection).
+  let addressed = new Set(toRecheck.map((f) => String(f.id)));
+  if (previous && toRecheck.length) {
+    try {
+      addressed = new Set(S.selectRepairFindings(previous).map((f) => String(f.id)));
+    } catch (err) {
+      // keep them all marked as addressed
+    }
+  }
   const notApplicable = isCover ? (S.coverLib.NOT_APPLICABLE_CHECKS || []) : [];
-  const requests = (Array.isArray(options.requests) ? options.requests : [])
+  const requests =(Array.isArray(options.requests) ? options.requests : [])
     .map((text, i) => ({ id: `REQ${i + 1}`, text: String(text) }));
 
   const vars = {
@@ -626,7 +641,12 @@ async function reviewRender(ctx, handle, options) {
     lettering: strings.map((s, i) => `${i + 1}. ${JSON.stringify(s)}`).join('\n'),
     overlay: letteringMode === 'overlay',
     supersedes: supersedes && toRecheck.length ? supersedes : '',
-    previous: toRecheck.map((f) => `- ${f.id}${f.panel ? ` (${f.panel})` : ''}: expected ${cleanText(f.expected, '')} The repair asked for: ${cleanText(f.repair, '')}`).join('\n'),
+    previous: toRecheck.map((f) => {
+      const where = f.panel ? ` (${f.panel})` : '';
+      const kind = f.source === 'user_request' ? 'a change the person asked for' : `${f.severity || 'minor'} finding`;
+      const part = addressed.has(String(f.id)) ? 'the repair was asked to fix this' : 'a note, not part of the repair';
+      return `- ${f.id}${where} [${kind}; ${part}]: expected ${cleanText(f.expected, '')} Asked for: ${cleanText(f.repair, '')}`;
+    }).join('\n'),
     not_applicable: notApplicable.join(', '),
     requests: requests.map((r) => `- ${r.id}: ${cleanText(r.text, '')}`).join('\n'),
   };
@@ -683,14 +703,32 @@ async function reviewRender(ctx, handle, options) {
     markRejected(root, options.replaces, `Replaced by ${render}, drawn again from an updated plan.`);
   }
   const open = review.findings.filter((f) => f.status === 'open');
-  handle.log(`review of ${render}: ${review.verdict}${open.length ? `, ${open.length} open finding(s)` : ''}${independent ? '' : ' (not independent)'}`);
+  const outcome = outcomeOf(review);
+  // A repair is for what blocks: an open blocking finding, or a failed gate
+  // with a finding to act on. Minor notes never trigger one, and a change
+  // request that did not land is the person's to send again.
+  const blocking = open.filter((f) => f.severity === 'blocking');
+  const gateFailed = Object.values(review.gates || {}).includes('fail');
+  const repairable = !passes && returned.repairable !== false &&
+    (blocking.length > 0 || (gateFailed && open.length > 0));
+  let why = null;
+  if (!passes && !repairable) {
+    if (returned.repairable === false) why = 'The review says another render would repeat the problem: the cause is in the plan or the references.';
+    else if (open.some((f) => f.source === 'user_request')) why = 'The requested change is not visible in the new version. Send the correction again, or change the plan.';
+    else if (gateFailed) why = 'A gate of the review failed with no finding to repair. Check the page again.';
+    else why = 'The review is incomplete: a check was not made. Check the page again.';
+  }
+  handle.log(`review of ${render}: ${review.verdict}${open.length ? `, ${open.length} open finding(s), ${blocking.length} blocking` : ''}${independent ? '' : ' (not independent)'}`);
   return {
     render,
     verdict: review.verdict,
+    outcome,
     passes,
-    repairable: open.length > 0 && returned.repairable !== false,
+    repairable,
+    not_repaired_because: why,
     findings: review.findings.length,
     open: open.length,
+    open_blocking: blocking.length,
     independent,
     file: ws.rel(root, file),
     tool: result.tool,
@@ -698,7 +736,19 @@ async function reviewRender(ctx, handle, options) {
   };
 }
 
+/**
+ * What a review comes to, for the person: "pass" (it passes and nothing is
+ * open), "notes" (it passes and lists open minor findings), or "flagged".
+ */
+function outcomeOf(review) {
+  if (!review) return null;
+  if (!S.ws.reviewPasses(review)) return 'flagged';
+  const open = (Array.isArray(review.findings) ? review.findings : []).filter((f) => f && f.status === 'open');
+  return open.length ? 'notes' : 'pass';
+}
+
 module.exports = {
+  outcomeOf,
   ownerOfRender,
   ownerDir,
   planFileOf,

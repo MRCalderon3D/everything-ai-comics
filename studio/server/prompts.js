@@ -49,6 +49,18 @@ function isEmpty(value) {
     (Array.isArray(value) && value.length === 0);
 }
 
+const LANGUAGE_NAMES = {
+  en: 'English', es: 'Spanish', fr: 'French', de: 'German', it: 'Italian', pt: 'Portuguese', ca: 'Catalan',
+  gl: 'Galician', eu: 'Basque', nl: 'Dutch', ja: 'Japanese', ko: 'Korean', zh: 'Chinese',
+};
+
+/** "es" -> "es (Spanish)": a code alone is easy for a model to skip. */
+function languageLabel(code) {
+  const text = String(code || 'en');
+  const name = LANGUAGE_NAMES[text.slice(0, 2).toLowerCase()];
+  return name ? `${text} (${name})` : text;
+}
+
 /** Fill a template. Unknown names become empty strings. */
 function render(text, vars) {
   let out = text;
@@ -167,7 +179,8 @@ function build(kind, vars, context) {
   if (!file) throw new Error(`no prompt template for "${kind}"`);
   const shared = {
     workspace: context.workspace,
-    language: context.language || 'en',
+    language: languageLabel(context.language || 'en'),
+    interface_language: languageLabel(context.interfaceLanguage || context.language || 'en'),
     comic_format: context.comicFormat || 'paged',
     // The contract has two wordings: one for runs that write, one for read-only runs.
     writes: !context.readOnly,
@@ -192,4 +205,4 @@ function fileList(items) {
     : `- ${item.path}${item.note ? ` (${item.note})` : ''}`)).join('\n');
 }
 
-module.exports = { TEMPLATES, REVIEW_CHECKS, render, build, contractSchema, reviewDataSchema, fileList, PROMPTS_DIR };
+module.exports = { TEMPLATES, REVIEW_CHECKS, languageLabel, render, build, contractSchema, reviewDataSchema, fileList, PROMPTS_DIR };

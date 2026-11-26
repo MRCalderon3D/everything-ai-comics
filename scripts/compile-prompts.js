@@ -573,6 +573,13 @@ function composePanelPrompt(input) {
   return sections.join('\n\n');
 }
 
+/** One line for the CLI: where the compiled request goes. */
+function endpointText(spec) {
+  if (spec.endpoint) return spec.endpoint;
+  if (spec.handoff) return '(none: handoff to a person or the harness tool)';
+  return `(none: ${spec.provider} runs a local tool)`;
+}
+
 /**
  * Select the findings a repair addresses: the open blocking ones, or every
  * open finding when none is blocking, plus every open change request from a
@@ -1578,7 +1585,7 @@ function mainCover(flags) {
   console.log(`  prompt: ${pkg.prompt.length} characters, ${pkg.references.length} reference image(s)${pkg.edit_target ? ' + edit target' : ''}, aspect ${pkg.parameters.aspect_ratio}`);
   if (pkg.repair) console.log(`  repair of ${pkg.repair.of_render}: findings ${pkg.repair.findings.join(', ')}`);
   console.log(`  lettering strings in the image: ${pkg.lettering_text.length}`);
-  console.log(`  request endpoint: ${spec.endpoint || '(none: handoff to a person or the harness tool)'}`);
+  console.log(`  request endpoint: ${endpointText(spec)}`);
   for (const w of warnings) console.log(`  warning: ${w}`);
   console.log(`  next: node scripts/generate-assets.js --cover ${flags.cover} --root ${toPosix(root)}`);
 }
@@ -1618,7 +1625,7 @@ function mainAsset(flags) {
   writeFileEnsuring(outFile, yaml.stringify(pkg));
   console.log(`prompt package: ${pkg.id} (asset ${pkg.asset}, ${pkg.provider}, model ${pkg.model}) -> ${toPosix(outFile)}`);
   console.log(`  prompt: ${pkg.prompt.length} characters, ${pkg.references.length} reference image(s), aspect ${pkg.parameters.aspect_ratio}`);
-  console.log(`  request endpoint: ${spec.endpoint || '(none: handoff to a person or the harness tool)'}`);
+  console.log(`  request endpoint: ${endpointText(spec)}`);
   for (const n of notes) console.log(`  note: ${n}`);
   for (const w of warnings) console.log(`  warning: ${w}`);
   console.log(`  next: node scripts/generate-assets.js --package ${toPosix(outFile)}`);
@@ -1670,7 +1677,7 @@ function main() {
   console.log(`  prompt: ${pkg.prompt.length} characters, ${pkg.references.length} reference image(s)${pkg.edit_target ? ' + edit target' : ''}, aspect ${pkg.parameters.aspect_ratio}`);
   if (pkg.repair) console.log(`  repair of ${pkg.repair.of_render}: findings ${pkg.repair.findings.join(', ')}`);
   console.log(`  lettering strings in the image: ${pkg.lettering_text.length}`);
-  console.log(`  request endpoint: ${spec.endpoint || '(none: handoff to a person or the harness tool)'}`);
+  console.log(`  request endpoint: ${endpointText(spec)}`);
   for (const w of warnings) console.log(`  warning: ${w}`);
 }
 

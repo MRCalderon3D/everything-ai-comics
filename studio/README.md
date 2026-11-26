@@ -135,9 +135,12 @@ other one takes it and the job says so.
 3. The check: the look driver opens the image beside the plan and the
    references and returns evidence for fourteen checks. The studio writes the
    review file from that, by the review rules of `docs/data-model.md`.
-4. Repair: when the review says a repair can fix the page, the studio repairs
-   it as a new version and checks again, up to the project's repair limit.
-   A page that still fails is left flagged with its evidence.
+4. Notes and repair: a review whose findings are all minor passes, and the
+   findings are shown as notes for the person to read. Only a blocking
+   finding or a failed gate flags the page. Then, when the review says a
+   repair can fix it, the studio repairs the page as a new version and checks
+   again, up to the project's repair limit. A page that still fails is left
+   flagged with its evidence.
 5. Corrections: a change the person asks for is recorded as a finding on the
    review and counts toward the same limit. Below the limit the existing
    image is edited. At the limit the change goes into the page plan and the
@@ -148,6 +151,30 @@ The automatic check is an AI reading an image. It catches a lot and it is not
 a guarantee, so the interface shows the evidence with every verdict, and the
 person's approval is recorded apart from it. The scripts and the tests check
 files; only a review says anything about a drawing.
+
+## How long things take
+
+Measured on 2026-11-26 in one run of a two-page issue with a cover, with
+Claude Code 2.1.314 planning and reviewing and Codex 0.167.1 drawing. Each
+figure is the whole job, from the click to the last commit.
+
+| Job | Time |
+|---|---|
+| `project.setup` (story bible and series plan) | 92 s |
+| `style.define` | 152 s |
+| `style.look` (one look page) | 157 s |
+| `character.create`, with its turnaround sheet | 150 to 180 s per character |
+| `pages.plan`, two pages | 496 s |
+| `pages.generate`, two pages | 1914 s |
+| `cover.create` | 491 s |
+| `publish.build`, five formats | 5 s |
+
+The run took about an hour from an empty project to the exported files. In
+it, every page and the cover were repaired twice for minor findings, which
+is where most of the drawing time went. The studio no longer repairs for
+minor findings (they are shown as notes), so a page that draws well costs
+one drawing and one review. The interface should let the person keep working
+on other screens while a job runs: nothing here is quick.
 
 ## History
 

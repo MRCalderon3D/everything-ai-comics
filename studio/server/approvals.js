@@ -125,13 +125,28 @@ function overrule(root, renderId, note) {
   return review;
 }
 
+/**
+ * Record the person's approval on a review. Approving a render that passed
+ * with notes accepts those notes: its open minor findings become accepted.
+ * @returns {string[]} ids of the findings accepted by this approval
+ */
 function setHumanApproval(root, renderId, status) {
   const file = S.ws.reviewFile(root, renderId);
   const review = S.ws.loadReview(root, renderId);
-  if (!review) return;
+  if (!review) return [];
   review.human_approval = { status, by: 'person', at: today() };
+  const accepted = [];
+  if (status === 'approved' && S.ws.reviewPasses(review)) {
+    for (const finding of Array.isArray(review.findings) ? review.findings : []) {
+      if (finding && finding.status === 'open' && finding.severity === 'minor' && finding.source !== 'user_request') {
+        finding.status = 'accepted';
+        accepted.push(finding.id);
+      }
+    }
+  }
   const header = S.yamlEdit ? S.yamlEdit.leadingComments(fs.readFileSync(file, 'utf8')) : '';
   fs.writeFileSync(file, header + S.yaml.stringify(review));
+  return accepted;
 }
 
 /** Approve a rendered page. `overrule: true` is needed when its review is flagged. */
@@ -157,9 +172,9 @@ function approvePage(project, body) {
     review = overrule(root, render, body.note);
     overruled = true;
   }
-  setHumanApproval(root, render, 'approved');
+  const accepted = setHumanApproval(root, render, 'approved');
   pipeline.setPageState(root, pageId, { status: 'approved', current_render: render });
-  return { page: pageId, render, verdict: review.verdict, overruled, status: 'approved' };
+  return { page: pageId, render, verdict: review.verdict, overruled, accepted_notes: accepted, status: 'approved' };
 }
 
 /** Approve a rendered cover (cover.yaml: status approved, approved_render). */
@@ -191,8 +206,8 @@ function approveCover(project, body) {
   } catch (err) {
     throw conflict(err);
   }
-  setHumanApproval(root, render, 'approved');
-  return { issue, cover: result.cover, render, previous: result.previous, verdict: review.verdict, overruled, status: 'approved' };
+  const accepted = setHumanApproval(root, render, 'approved');
+  return { issue, cover: result.cover, render, previous: result.previous, verdict: review.verdict, overruled, accepted_notes: accepted, status: 'approved' };
 }
 
 module.exports = { approveAsset, approvePlans, approvePage, approveCover, overrule };

@@ -201,7 +201,7 @@ async function record() {
     cap('character', r.body, { maxArray: 1, maxString: 100, keys: { assets: { maxDepth: 3 }, sheets: { maxDepth: 2 }, packages: { maxDepth: 2 } } });
 
     // --- pages -----------------------------------------------------------------------------
-    job = done(await s.runOp(id, 'pages.plan', { text: 'Mara crosses the river alone at night. FLAG She hears the crates shift and goes down to the deck. She finds the boy and decides to hide him.', pages: 3 }), 'pages.plan');
+    job = done(await s.runOp(id, 'pages.plan', { text: 'Mara crosses the river alone at night. FLAG She hears the crates shift and goes down to the deck. NOTE She finds the boy and decides to hide him.', pages: 3 }), 'pages.plan');
     cap('op.pages.plan', jobExample(job), { maxArray: 6, keys: { pages: { maxArray: 1 } } });
     job = done(await s.runOp(id, 'entities.derive', { issue: 'ISS_001' }), 'entities.derive');
     cap('op.entities.derive', jobExample(job));
@@ -234,6 +234,8 @@ async function record() {
     r = await s.api('GET', `${P}/issues/ISS_001`);
     cap('issue', r.body, { maxArray: 1, maxString: 110, keys: { text: { maxString: 80 } } });
     r = await s.api('GET', `${P}/pages/PG_001_002`);
+    const noted = await s.api('GET', `${P}/pages/PG_001_003`);
+    cap('review-notes', noted.body.renders[0].review, { maxArray: 2 });
     cap('page', r.body, {
       maxArray: 1, maxString: 110,
       keys: { renders: { maxArray: 2 }, tiers: { maxArray: 4 }, prompts: { maxDepth: 2 }, lettering: { maxDepth: 2 }, entries: { maxArray: 1 } },

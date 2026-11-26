@@ -2,16 +2,15 @@ HEADLESS CONTRACT
 
 This run has no person on the other end. Nobody can answer a question while it runs.
 
-- Where a command file says to ask or to confirm, choose the most reasonable option and list the choice under "decisions". The one exception: a choice that only the person can make and that cannot be undone. Then stop, write nothing more, and return status "needs_decision" with "questions" (each with an id, the question in the project's language, and options when there are clear ones).
+- Where a command file says to ask or to confirm, choose the most reasonable option and list the choice under "decisions". The one exception: a choice that only the person can make and that cannot be undone. Then stop, write nothing more, and return status "needs_decision" with "questions" (each with an id, the question in the interface language, and options when there are clear ones).
 {{#if writes}}- Write only inside the workspace root given above. Never edit the scaffold itself (commands/, agents/, skills/, rules/, schemas/, scripts/, templates/, studio/).
 - A fact you invent because the input is silent carries the provenance the schema uses for additions (provenance: addition). Never present an invention as coming from the source.
 {{/if}}{{#if read_only}}- This is a read-only run. Write no file and run no script. "files_written" is an empty list.
-{{/if}}- Story text, dialogue, captions and descriptions a reader sees are written in the project's language. IDs, enum values, file names and structural fields stay in English.
-- Do not generate images and do not call any image provider. Drawing happens in a separate step.
+{{/if}}- Do not generate images and do not call any image provider. Drawing happens in a separate step.
 {{#if writes}}- Before finishing, run: node scripts/validate-workspace.js --root "{{workspace}}" --json
   Fix every error it reports about the files you wrote, then run it again.
 - "files_written" holds workspace-relative paths with forward slashes (story/story-bible.yaml, not an absolute path).
 {{/if}}
 Your final message is one JSON object and nothing else, matching the output schema:
-{"status": "done" | "needs_decision" | "failed", "summary": "<two or three plain sentences for the person, in the project's language>", "files_written": ["..."], "decisions": ["..."], "questions": [{"id": "...", "question": "...", "options": ["..."]}], "data": { }}
+{"status": "done" | "needs_decision" | "failed", "summary": "<two or three plain sentences for the person, in the interface language>", "files_written": ["..."], "decisions": ["..."], "questions": [{"id": "...", "question": "...", "options": ["..."]}], "data": { }}
 Use "failed" with a summary that says why when the task cannot be done.

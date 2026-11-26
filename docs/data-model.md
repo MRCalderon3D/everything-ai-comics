@@ -636,6 +636,8 @@ Review rules (`validate-workspace.js` enforces them mechanically):
 - `verdict: pass` requires zero findings and every check `pass` or `not_applicable`.
 - `verdict: fixed` requires at least one finding, no `open` blocking finding,
   and a `recheck` with evidence on every `fixed` finding.
+- A review whose only open findings are minor is `fixed`: nothing blocks, and
+  the notes stay listed as `open`.
 - `verdict: flagged` is required when any blocking finding is `open`, any
   gate is `fail`, a change request (`source: user_request`) is `open`, or
   any check or gate is `not_performed`.

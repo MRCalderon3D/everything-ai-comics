@@ -26,6 +26,8 @@ function projectContext(project) {
   }
   return {
     workspace: project.root,
+    // What the person reads comes in the interface language; the story in the project's.
+    interfaceLanguage: project.settings().language,
     language: (doc && doc.language) || 'en',
     comicFormat: (doc && doc.comic_format) || 'paged',
   };

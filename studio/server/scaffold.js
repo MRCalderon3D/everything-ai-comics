@@ -79,6 +79,7 @@ const S = {
   runPackage: (...a) => fn('scripts/generate-assets.js', 'runPackage')(...a),
   approveAsset: (...a) => fn('scripts/approve-asset.js', 'approveAsset')(...a),
   addUserRequest: (...a) => fn('scripts/lib/review-requests.js', 'addUserRequest')(...a),
+  selectRepairFindings: (...a) => fn('scripts/lib/review-requests.js', 'selectRepairFindings')(...a),
   approveCover: (...a) => fn('scripts/lib/cover.js', 'approveCover')(...a),
   letterPage: (...a) => fn('scripts/letter-pages.js', 'letterPage')(...a),
   registerLetteredFile: (...a) => fn('scripts/letter-pages.js', 'registerLetteredFile')(...a),

@@ -19,6 +19,8 @@
  *               is flagged with one blocking finding; the repair passes
  *   FLAGALWAYS  every review of it is flagged, repairs included
  *   UPSTREAM    the flagged review says a repair cannot fix it
+ *   NOTE        the first review of it lists one minor finding: the page
+ *               passes with a note and no repair is tried
  *   EDIT        (chat) the reply also changes the screen's first file
  */
 
@@ -460,8 +462,15 @@ const handlers = {
     const always = has(marker, 'FLAGALWAYS');
     const flag = always || has(marker, 'FLAG');
     const upstream = has(marker, 'UPSTREAM');
-    const recheckIds = `${vars.previous || ''}\n${vars.requests || ''}`.split('\n')
-      .map((line) => (/^- (F\d{2}|REQ\d+)/.exec(line) || [])[1]).filter(Boolean);
+    const note = has(marker, 'NOTE');
+    // The findings to recheck, and whether the repair was asked to fix each
+    // (a carried note that was not part of the repair is still there).
+    const rechecked = `${vars.previous || ''}\n${vars.requests || ''}`.split('\n')
+      .map((line) => {
+        const id = (/^- (F\d{2}|REQ\d+)/.exec(line) || [])[1];
+        return id ? { id, carried: /not part of the repair/.test(line) } : null;
+      }).filter(Boolean);
+    const recheckIds = rechecked.map((x) => x.id);
     const isRecheck = recheckIds.length > 0;
     const failing = flag && (always || !isRecheck);
     const cover = vars.kind === 'cover';
@@ -485,13 +494,25 @@ const handlers = {
         repair: 'Redraw the figure from the approved sheet and keep everything else as it is.',
       });
     }
+    if (note && !isRecheck) {
+      // A minor finding: the check stays at pass and no gate fails.
+      checks.wardrobe = { result: 'pass', evidence: 'Placeholder: the outfit matches, with one small difference noted as a finding.' };
+      findings.push({
+        panel: cover ? null : (/^\s*- id: (PN_\d{3}_\d{3}_\d{2})/m.exec(plan) || [])[1] || null,
+        check: 'wardrobe',
+        expected: 'The jacket is buttoned, as on the sheet.',
+        visible: 'Placeholder note forced by the word NOTE in the text: the jacket is open.',
+        severity: 'minor',
+        repair: 'Button the jacket and keep everything else as it is.',
+      });
+    }
     out.data.review = {
       checks,
       findings,
-      rechecks: recheckIds.map((id) => ({
+      rechecks: rechecked.map(({ id, carried }) => ({
         id,
-        fixed: !always,
-        evidence: always ? 'Placeholder: the defect is still there.' : 'Placeholder: the change is present in the new render.',
+        fixed: !always && !carried,
+        evidence: always || carried ? 'Placeholder: it is still there.' : 'Placeholder: the change is present in the new render.',
       })),
       gates: { style_fidelity: 'pass', narrative_continuity: failing && !isRecheck ? 'fail' : 'pass' },
       repairable: !upstream,

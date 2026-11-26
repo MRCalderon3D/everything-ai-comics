@@ -150,6 +150,8 @@ function reviewView(project, renderId) {
   return {
     path: S.ws.rel(root, file),
     verdict: doc.verdict || null,
+    // pass: nothing open. notes: it passes and lists open minor findings. flagged: something blocks.
+    outcome: pipeline.outcomeOf(doc),
     passes: S.ws.reviewPasses(doc),
     independent: doc.independent !== false,
     reviewer: doc.reviewer || null,
@@ -161,6 +163,7 @@ function reviewView(project, renderId) {
     checks: doc.checks || {},
     findings,
     open_findings: findings.filter((f) => f && f.status === 'open').length,
+    open_blocking: findings.filter((f) => f && f.status === 'open' && f.severity === 'blocking').length,
     change_requests: findings.filter((f) => f && f.source === 'user_request').length,
     compared_against: doc.compared_against || { references: [], neighbors: [] },
     notes: doc.notes || '',
@@ -313,6 +316,7 @@ function pageSummary(project, entry, provider) {
     renders: renders.length,
     image: file ? files.image(project, S.ws.rel(root, file)) : null,
     verdict: review ? review.verdict : null,
+    outcome: review ? review.outcome : null,
     passes: review ? review.passes : false,
     flagged: !!review && !review.passes,
     open_findings: review ? review.open_findings : 0,
@@ -569,6 +573,8 @@ function coverSummary(project, issue) {
     current_render: pick,
     image: file ? files.image(project, S.ws.rel(root, file)) : null,
     verdict: review ? review.verdict : null,
+    outcome: review ? review.outcome : null,
+    open_findings: review ? review.open_findings : 0,
     passes: review ? review.passes : false,
   };
 }
@@ -628,6 +634,7 @@ function issue(project, issueId, drivers) {
       plan_approved: pages.filter((p) => p.plan_approved).length,
       rendered: pages.filter((p) => p.current_render).length,
       passed: pages.filter((p) => p.passes).length,
+      with_notes: pages.filter((p) => p.outcome === 'notes').length,
       flagged: pages.filter((p) => p.flagged).length,
     },
     mechanical: {
@@ -849,6 +856,7 @@ function overview(project, services) {
   const rendered = allPages.filter((p) => p.current_render);
   const passed = allPages.filter((p) => p.passes);
   const flagged = allPages.filter((p) => p.flagged);
+  const withNotes = allPages.filter((p) => p.outcome === 'notes');
   const budget = issueList.reduce((sum, i) => sum + (i.page_budget || 0), 0);
   const coverState = coverSummary(project, firstIssue);
   const editions = safe(() => S.ws.listEditions(root), []);
@@ -916,12 +924,20 @@ function overview(project, services) {
   add('check', !rendered.length ? 'todo' : flagged.length ? 'in_progress' : 'done',
     !rendered.length ? 'Nothing to check yet.'
       : flagged.length ? `${flagged.length} page(s) are flagged and need a look.`
-        : `All ${rendered.length} drawn page(s) passed the automatic check.`,
-    { counts: { passed: passed.length, flagged: flagged.length, not_independent: rendered.filter((p) => p.independent === false).length } });
+        : withNotes.length ? `All ${rendered.length} drawn page(s) passed the automatic check, ${withNotes.length} with notes to read.`
+          : `All ${rendered.length} drawn page(s) passed the automatic check.`,
+    {
+      counts: {
+        passed: passed.length, with_notes: withNotes.length, flagged: flagged.length,
+        not_independent: rendered.filter((p) => p.independent === false).length,
+      },
+    });
 
   add('corrections', 'optional',
-    flagged.length ? `${flagged.length} page(s) wait for a correction or a decision.` : 'Ask for a change on any drawn page.',
-    { counts: { flagged: flagged.length } });
+    flagged.length ? `${flagged.length} page(s) wait for a correction or a decision.`
+      : withNotes.length ? `${withNotes.length} page(s) have notes. Any of them can become a correction.`
+        : 'Ask for a change on any drawn page.',
+    { counts: { flagged: flagged.length, with_notes: withNotes.length } });
 
   add('cover', 'optional',
     coverState.status === 'approved' ? 'The cover is approved.'

@@ -158,6 +158,7 @@ module.exports = {
     return {
       pages: results,
       passed: drawn.filter((r) => r.passes).length,
+      with_notes: drawn.filter((r) => r.outcome === 'notes').length,
       flagged: drawn.filter((r) => r.flagged).length,
       failed: failed.length,
       tools: { draw: 'codex', look: ctx.job.tools.look || null },

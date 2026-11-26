@@ -162,7 +162,7 @@ async function main() {
 
     // --- pages: plan three, the second one forced to fail its first review ---------------------
     job = await s.runOp(id, 'pages.plan', {
-      text: 'Mara cruza el río sola de noche. FLAG Oye moverse las cajas y baja a cubierta. Encuentra al chico y decide esconderlo.',
+      text: 'Mara cruza el río sola de noche. FLAG Oye moverse las cajas y baja a cubierta. NOTE Encuentra al chico y decide esconderlo.',
       pages: 3,
     });
     assertDone(job, 'pages.plan');
@@ -209,8 +209,20 @@ async function main() {
     assert.deepStrictEqual(job.result.pages.map((p) => [p.page, p.render, p.verdict, p.repairs]), [
       ['PG_001_001', 'PG_001_001_V01', 'pass', 0],
       ['PG_001_002', 'PG_001_002_V02', 'fixed', 1],
-      ['PG_001_003', 'PG_001_003_V01', 'pass', 0],
+      ['PG_001_003', 'PG_001_003_V01', 'fixed', 0],
     ]);
+    // Three outcomes: clean, repaired after a blocking finding, and passing with a minor note and no repair.
+    assert.deepStrictEqual(job.result.pages.map((p) => [p.outcome, p.passes, p.open_findings]), [
+      ['pass', true, 0], ['pass', true, 0], ['notes', true, 1],
+    ]);
+    assert.deepStrictEqual([job.result.passed, job.result.with_notes, job.result.flagged, job.result.failed], [3, 1, 0, 0]);
+    assert.ok(!job.steps.some((x) => x.id.startsWith('PG_001_003:repair')), 'a minor finding triggers no repair');
+    const noted = ws.loadReview(root, 'PG_001_003_V01');
+    assert.deepStrictEqual([noted.verdict, noted.findings.length, noted.findings[0].severity, noted.findings[0].status],
+      ['fixed', 1, 'minor', 'open'], 'a review whose only open finding is minor is fixed, with the note left open');
+    assert.deepStrictEqual(noted.gates, { style_fidelity: 'pass', narrative_continuity: 'pass' });
+    assert.strictEqual(ws.loadPage(root, 'PG_001_003').status, 'reviewed', 'a page with notes counts as reviewed');
+    assert.deepStrictEqual(validateWorkspace(root).errors, [], 'validate-workspace.js accepts a fixed review with an open minor finding');
     assert.deepStrictEqual(job.result.tools, { draw: 'codex', look: 'claude' });
     assert.ok(job.steps.some((x) => x.id === 'PG_001_002:repair-1' && x.status === 'done'), stepStates(job));
     assert.ok(job.steps.some((x) => x.id === 'PG_001_002:review-1' && x.status === 'done'));
@@ -251,7 +263,8 @@ async function main() {
     assert.strictEqual(r.body.prompts[0].provider, 'codex-cli');
 
     r = await s.api('GET', `${P}/issues/ISS_001`);
-    assert.deepStrictEqual(r.body.counts, { pages: 3, planned_budget: 3, plan_approved: 3, rendered: 3, passed: 3, flagged: 0 });
+    assert.deepStrictEqual(r.body.counts, { pages: 3, planned_budget: 3, plan_approved: 3, rendered: 3, passed: 3, with_notes: 1, flagged: 0 });
+    assert.deepStrictEqual(r.body.pages.map((p) => p.outcome), ['pass', 'pass', 'notes']);
     assert.strictEqual(r.body.mechanical.errors, 0);
     assert.ok(r.body.pages.every((p) => p.image && p.image.url && p.verdict));
 
@@ -325,6 +338,18 @@ async function main() {
     assert.strictEqual(r.body.repair_limit, 1);
 
     // --- approving a page -----------------------------------------------------------------------------------
+    // A page that passed with a note: the note is in the API as an open minor finding, and approving the page accepts it.
+    r = await s.api('GET', `${P}/pages/PG_001_003`);
+    assert.deepStrictEqual([r.body.renders[0].review.outcome, r.body.renders[0].review.verdict, r.body.renders[0].review.open_findings, r.body.renders[0].review.open_blocking],
+      ['notes', 'fixed', 1, 0]);
+    r = await s.api('GET', P);
+    assert.strictEqual(r.body.screens.find((x) => x.key === 'check').counts.with_notes, 1);
+    r = await s.api('POST', `${P}/approve/page`, { page: 'PG_001_003' });
+    assert.strictEqual(r.status, 200, JSON.stringify(r.body));
+    assert.deepStrictEqual([r.body.overruled, r.body.accepted_notes], [false, ['F01']], 'no overrule is needed for a page with notes');
+    assert.strictEqual(ws.loadReview(root, 'PG_001_003_V01').findings[0].status, 'accepted');
+    r = await s.api('GET', `${P}/pages/PG_001_003`);
+    assert.strictEqual(r.body.renders[0].review.outcome, 'pass');
     r = await s.api('POST', `${P}/approve/page`, { page: 'PG_001_001' });
     assert.strictEqual(r.status, 200, JSON.stringify(r.body));
     assert.deepStrictEqual([r.body.render, r.body.status, r.body.overruled], ['PG_001_001_V02', 'approved', false]);

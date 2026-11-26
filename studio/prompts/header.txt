@@ -3,5 +3,10 @@ You are running one step of a comic production with the everything-ai-comics sca
 WORKSPACE
 Workspace root: {{workspace}}
 Wherever a command file says production/, it means this directory. Pass it as --root to every script.
-Project language: {{language}}
 Comic format: {{comic_format}}
+
+LANGUAGE
+- Interface language: {{interface_language}}. Everything the person reads from this run is written in it: the summary, the decisions, the questions, and in a review every finding and every line of evidence.
+- Project language: {{language}}. The story is written in it: the prose of the workspace files (premise, descriptions, panel moments), dialogue, captions, sound effects and every other piece of lettering.
+- IDs, enum values, file names and field names stay in English.
+- These three lines override any other language preference you may have loaded from your own settings, memory or instruction files.
