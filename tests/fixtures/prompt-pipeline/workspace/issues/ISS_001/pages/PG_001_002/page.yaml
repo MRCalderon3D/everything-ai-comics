@@ -50,6 +50,7 @@ panels:
         to: CHAR_MARA
         how: pickup
     lettering: []
+    notes: Keep the ladder in frame so the change of level is drawn, not implied
   - id: PN_001_002_02
     order: 2
     tier: 1
@@ -90,6 +91,7 @@ panels:
         speaker: CHAR_MARA
         text: Out. Slowly.
         order: 1
+    notes: ""
   - id: PN_001_002_03
     order: 3
     tier: 2

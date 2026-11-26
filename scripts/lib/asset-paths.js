@@ -5,15 +5,25 @@
  * generate-assets.js picks the candidate file; both read this file so they
  * cannot disagree.
  *
- *   package    characters/<ID>/refs/prompts/<provider>.<kind>.yaml
- *              locations/<ID>/refs/prompts/<provider>.<kind>.yaml
- *              props/<ID>/refs/prompts/<provider>.<kind>.yaml
+ * A sheet is an entity, a kind, and sometimes a variant: the outfit of a
+ * wardrobe sheet, the subject of a detail study, the time of day of a plate
+ * that is not the location's default state. The variant is part of every
+ * name, so two outfits or two details of one entity never share a file.
+ *
+ *   package    <refs dir>/prompts/<provider>.<kind>.yaml
+ *              <refs dir>/prompts/<provider>.wardrobe.<WARD_ID>.yaml
+ *              <refs dir>/prompts/<provider>.detail.<slug>.yaml
+ *              <refs dir>/prompts/<provider>.plate.<state>.yaml   (non-default time)
  *              references/style/prompts/<provider>.<LOOK_ID>.yaml
- *   candidate  <refs dir>/<ENTITY_ID>_<TAG>_V##.png
+ *              references/style/prompts/<provider>.<LOOK_ID>.detail.<slug>.yaml
+ *   package id PP_<ENTITY_ID>_<PROVIDER>-<TAG>[-<VARIANT>]
+ *   candidate  <refs dir>/<ENTITY_ID>_<TAG>[_<VARIANT>]_V##.png
  *              references/style/<LOOK_ID>_V##.png
  *
- * A candidate never takes the _MASTER name. Promotion to master is an
- * approval step; generation only ever adds the next free version.
+ * <refs dir> is characters/<ID>/refs, locations/<ID>/refs, or
+ * props/<ID>/refs. A candidate never takes the _MASTER name. Promotion to
+ * master is an approval step; generation only ever adds the next free
+ * version.
  */
 
 const fs = require('fs');
@@ -23,13 +33,13 @@ const { providerTag } = require('../../providers/lib/common');
 
 const ENTITY_DIRS = { CHAR: 'characters', LOC: 'locations', PROP: 'props' };
 
-/** Sheet kind (the registry's `kind`) -> tag used in package and file names. */
+/** Sheet kind (the registry's `kind`) -> tag used in package IDs and file names. */
 const SHEET_TAGS = {
   turnaround: 'TURN',
   expressions: 'EXPR',
   wardrobe: 'WARD',
   plate: 'PLATE',
-  prop: 'PROP',
+  prop: 'SHEET',
   look: 'LOOK',
   detail: 'DETAIL',
 };
@@ -41,6 +51,8 @@ const SHEET_KINDS = {
   PROP: ['prop', 'detail'],
   LOOK: ['look', 'detail'],
 };
+
+const SLUG_MAX = 40;
 
 /** "CHAR" | "LOC" | "PROP" | "LOOK", or null when the ID is not an entity ID. */
 function entityType(entityId) {
@@ -61,34 +73,97 @@ function promptsDir(entityId) {
   return dir ? `${dir}/prompts` : null;
 }
 
+/**
+ * Lowercase-kebab slug of a detail subject: "The cut on his left hand." ->
+ * "cut-on-his-left-hand". A leading article is dropped, and the slug is cut
+ * at a word boundary once it passes 40 characters. Empty when the text has
+ * no letter or digit.
+ */
+function subjectSlug(subject) {
+  const words = String(subject || '')
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean);
+  if (words.length > 1 && ['the', 'a', 'an'].includes(words[0])) words.shift();
+  let slug = '';
+  for (const word of words) {
+    const next = slug ? `${slug}-${word}` : word;
+    if (slug && next.length > SLUG_MAX) break;
+    slug = next;
+  }
+  return slug.slice(0, SLUG_MAX).replace(/-+$/, '');
+}
+
+/**
+ * Variant of a sheet, in both spellings: `file` goes into the package file
+ * name, `token` ([A-Z0-9_]) into the package ID and the candidate name.
+ * Null for a sheet with no variant.
+ * @param {string} entityId
+ * @param {string} kind
+ * @param {{outfit?: string, subject?: string, time?: string, defaultTime?: string}} [options]
+ * @returns {{file: string, token: string}|null}
+ */
+function sheetVariant(entityId, kind, options = {}) {
+  if (kind === 'wardrobe' && options.outfit) {
+    const outfit = String(options.outfit);
+    // WARD_MARA_OILSKIN on CHAR_MARA -> OILSKIN; any other shape keeps what follows WARD_.
+    const own = `WARD_${String(entityId).replace(/^CHAR_/, '')}_`;
+    const token = outfit.startsWith(own) && outfit.length > own.length
+      ? outfit.slice(own.length) : outfit.replace(/^WARD_/, '');
+    return { file: outfit, token: token.toUpperCase().replace(/[^A-Z0-9]+/g, '_') };
+  }
+  if (kind === 'detail') {
+    const slug = subjectSlug(options.subject);
+    return slug ? { file: slug, token: slug.toUpperCase().replace(/-/g, '_') } : null;
+  }
+  if (kind === 'plate' && options.time && options.time !== options.defaultTime) {
+    const state = String(options.time).toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    return { file: state, token: state.toUpperCase() };
+  }
+  return null;
+}
+
 /** Workspace-relative path of an asset package. */
-function packageFile(entityId, providerId, kind) {
+function packageFile(entityId, providerId, kind, variant = null) {
   const dir = promptsDir(entityId);
   if (!dir) return null;
+  const suffix = variant ? `.${variant.file}` : '';
   // Looks share one prompts/ directory, so the LOOK ID is in the file name.
   if (entityType(entityId) === 'LOOK') {
-    return `${dir}/${providerId}.${entityId}${kind === 'look' ? '' : `.${kind}`}.yaml`;
+    return `${dir}/${providerId}.${entityId}${kind === 'look' ? '' : `.${kind}`}${suffix}.yaml`;
   }
-  return `${dir}/${providerId}.${kind}.yaml`;
+  return `${dir}/${providerId}.${kind}${suffix}.yaml`;
 }
 
-/** PP_<ENTITY_ID>_<PROVIDER>-<TAG>, inside the prompt-package ID pattern. */
-function packageId(entityId, providerId, kind) {
-  return `PP_${entityId}_${providerTag(providerId)}-${SHEET_TAGS[kind]}`;
+/** PP_<ENTITY_ID>_<PROVIDER>-<TAG>[-<VARIANT>], inside the prompt-package ID pattern. */
+function packageId(entityId, providerId, kind, variant = null) {
+  return `PP_${entityId}_${providerTag(providerId)}-${SHEET_TAGS[kind]}${variant ? `-${variant.token}` : ''}`;
 }
 
-/** The sheet a compiled asset package is for: { kind, tag }, or null. */
+/**
+ * The sheet a compiled asset package is for, read from its ID:
+ * { kind, tag, variant, stemTag }. stemTag is what follows the entity ID
+ * in a candidate name (TURN, WARD_OILSKIN). Null when the ID names no sheet.
+ */
 function sheetOfPackage(pkg) {
   if (!pkg || !pkg.asset || !pkg.provider) return null;
   const prefix = `PP_${pkg.asset}_${providerTag(pkg.provider)}-`;
   const id = String(pkg.id || '');
   if (!id.startsWith(prefix)) return null;
-  const tag = id.slice(prefix.length);
+  const rest = id.slice(prefix.length);
+  const cut = rest.indexOf('-');
+  const tag = cut === -1 ? rest : rest.slice(0, cut);
+  const variant = cut === -1 ? null : rest.slice(cut + 1);
   const kind = Object.keys(SHEET_TAGS).find((k) => SHEET_TAGS[k] === tag);
-  return kind ? { kind, tag } : null;
+  if (!kind || (variant !== null && !/^[A-Z0-9][A-Z0-9_]*$/.test(variant))) return null;
+  return { kind, tag, variant, stemTag: variant ? `${tag}_${variant}` : tag };
 }
 
-/** Package files compiled for an entity, sorted (absolute paths). */
+/** Every package file compiled for an entity, sorted (absolute paths). */
 function listPackageFiles(root, entityId) {
   const rel = promptsDir(entityId);
   const dir = rel ? ws.abs(root, rel) : null;
@@ -101,9 +176,13 @@ function listPackageFiles(root, entityId) {
     .map((name) => path.join(dir, name));
 }
 
-/** Stem shared by every version of a sheet: CHAR_MARA_TURN, LOOK_NOIR_INK. */
-function candidateStem(entityId, tag) {
-  return entityType(entityId) === 'LOOK' && tag === SHEET_TAGS.look ? entityId : `${entityId}_${tag}`;
+/**
+ * Stem shared by every version of a sheet: CHAR_MARA_TURN,
+ * CHAR_MARA_WARD_OILSKIN, PROP_FLARE_GUN_SHEET, LOOK_NOIR_INK.
+ * @param {string} stemTag tag plus variant, as sheetOfPackage().stemTag
+ */
+function candidateStem(entityId, stemTag) {
+  return entityType(entityId) === 'LOOK' && stemTag === SHEET_TAGS.look ? entityId : `${entityId}_${stemTag}`;
 }
 
 /**
@@ -112,8 +191,8 @@ function candidateStem(entityId, tag) {
  * included, so a version number is never reused.
  * @returns {{id: string, version: number, rel: string}} rel has the given extension
  */
-function nextCandidate(root, entityId, tag, ext = '.png') {
-  const stem = candidateStem(entityId, tag);
+function nextCandidate(root, entityId, stemTag, ext = '.png') {
+  const stem = candidateStem(entityId, stemTag);
   const pattern = new RegExp(`^${stem}(?:_MASTER)?_V(\\d{2})$`);
   let max = 0;
   const dirRel = refsDir(entityId);
@@ -140,6 +219,8 @@ module.exports = {
   entityType,
   refsDir,
   promptsDir,
+  subjectSlug,
+  sheetVariant,
   packageFile,
   packageId,
   sheetOfPackage,

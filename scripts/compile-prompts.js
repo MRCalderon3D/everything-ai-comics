@@ -16,9 +16,10 @@
  *      framing, the moment, setting, each drawn character with identity,
  *      position, facing, action, acting, wardrobe, physical state and held
  *      props, a line that states how visually adjacent characters differ,
- *      and the props in view;
- *   5. lettering: the exact strings (in_image mode) or an instruction to
- *      leave the art free of text (overlay mode);
+ *      the props in view, and the panel's own notes;
+ *   5. lettering: the exact strings (in_image mode) with the page's safe
+ *      margin as a placement limit, or an instruction to leave the art free
+ *      of text (overlay mode);
  *   6. hard constraints: exact panel count, one of each named character
  *      per panel, no extra text.
  *
@@ -37,7 +38,10 @@
  * approved master yet compiles its first look with no image), and wardrobe
  * and expression sheets also attach the character's approved identity
  * master. The package is asset-scoped (page: null) and is written into the
- * entity's refs/prompts/ directory.
+ * entity's refs/prompts/ directory. A wardrobe sheet carries its outfit, a
+ * detail study its subject, and a plate at a non-default time of day that
+ * state in the file name, the package ID, and the candidate name
+ * (scripts/lib/asset-paths.js), so no two sheets share a file.
  *
  * provider.compile() runs last to enforce the provider's capabilities and
  * pin the model.
@@ -83,6 +87,8 @@ Asset options:
                      LOC:  plate        PROP: prop        LOOK: look
                      any entity: detail (needs --subject)
   --outfit <WARD_ID> wardrobe only. Default: the character's default_wardrobe.
+  --time <state>     plate only: one of the location's time_of_day_states.
+                     Default: the first one.
   --expressions <a,b,c>
                      expressions only. Default: neutral, wary, angry, afraid,
                      in pain, relieved.
@@ -102,10 +108,15 @@ the entity's bible file, and an approved look master (except the first look).
 
 Output, status "compiled":
   page    <page dir>/prompts/<provider>.yaml
-  sheet   characters/<ID>/refs/prompts/<provider>.<kind>.yaml
-          locations/<ID>/refs/prompts/<provider>.<kind>.yaml
-          props/<ID>/refs/prompts/<provider>.<kind>.yaml
-          references/style/prompts/<provider>.<LOOK_ID>.yaml
+  sheet   <refs>/prompts/<provider>.<kind>.yaml, where <refs> is
+          characters/<ID>/refs, locations/<ID>/refs, or props/<ID>/refs
+            wardrobe   <provider>.wardrobe.<WARD_ID>.yaml
+            detail     <provider>.detail.<subject-slug>.yaml
+            plate      <provider>.plate.yaml, or <provider>.plate.<state>.yaml
+                       for a --time that is not the default
+          references/style/prompts/<provider>.<LOOK_ID>.yaml for a look
+Package ID: PP_<ENTITY_ID>_<PROVIDER>-<TAG>[-<VARIANT>], TAG one of TURN,
+EXPR, WARD, PLATE, SHEET (props), LOOK, DETAIL.
 `;
 
 const DEFAULT_MAX_REPAIR_CYCLES = 2;
@@ -283,6 +294,8 @@ function panelBlock(panel, ctx) {
     lines.push(`Setting: ${ctx.bibles.locationName(panel.location)}.${summary ? ` ${lang.sentence(summary)}` : ''}`);
   }
   if (panel.background) lines.push(`Background: ${lang.sentence(panel.background)}`);
+  const panelNotes = typeof panel.notes === 'string' ? panel.notes.trim() : '';
+  if (panelNotes) lines.push(`Note: ${lang.sentence(panelNotes)}`);
 
   const drawn = drawnCast(panel);
   if (drawn.length) {
@@ -334,6 +347,26 @@ function letteringElements(page, panelIds = null) {
   });
 }
 
+/**
+ * The page's safe margin as a lettering limit the model can act on: a share
+ * of the page width and height (rounded up), from project.page.safe_margin_mm
+ * and trim_mm. Without a trim size only the distance is stated. Null when
+ * the project sets no safe margin.
+ */
+function safeMarginLine(project) {
+  const page = (project && project.page) || {};
+  const margin = Number(page.safe_margin_mm);
+  if (!(margin > 0)) return null;
+  const trim = page.trim_mm || {};
+  const width = Number(trim.width);
+  const height = Number(trim.height);
+  if (width > 0 && height > 0) {
+    const share = (side) => Math.max(1, Math.ceil((margin / side) * 100));
+    return `Safe margin: keep every balloon, caption, and sound effect at least ${share(width)}% of the page width away from the left and right edges, and at least ${share(height)}% of the page height away from the top and bottom edges.`;
+  }
+  return `Safe margin: keep every balloon, caption, and sound effect clear of the page edges, inside a margin of ${margin} mm on the printed page.`;
+}
+
 function letteringSection(page, project, mode, bibles, options = {}) {
   const elements = letteringElements(page, options.panelIds || null);
   const where = options.single ? 'the panel' : 'the page';
@@ -370,6 +403,8 @@ function letteringSection(page, project, mode, bibles, options = {}) {
     lines.push(`${i + 1}. ${capitalize(bits.join(', '))}: "${String(x.el.text)}"`);
   });
   lines.push('Keep balloons and captions clear of faces, hands, and the main action.');
+  const safeMargin = options.single ? null : safeMarginLine(project);
+  if (safeMargin) lines.push(safeMargin);
   return lines.join('\n');
 }
 
@@ -877,7 +912,7 @@ function adjacentInCast(root, charId, bibles) {
  * Compile the prompt package of a reference sheet (asset scope).
  * @param {string} root workspace root
  * @param {string} entityId CHAR_*, LOC_*, PROP_* or LOOK_* entity ID
- * @param {{sheet: string, outfit?: string, subject?: string, expressions?: string|string[],
+ * @param {{sheet: string, outfit?: string, subject?: string, time?: string, expressions?: string|string[],
  *          providerId?: string, provider?: object, project?: object,
  *          styleBlock?: string, model?: string}} options
  * @returns {{pkg: object, spec: object, warnings: string[], notes: string[], fileRel: string}}
@@ -898,6 +933,16 @@ function compileAsset(root, entityId, options = {}) {
   const subject = options.subject && options.subject !== true ? String(options.subject).trim() : '';
   if (kind === 'detail' && !subject) {
     throw pipelineError('bad_arguments', '--sheet detail needs --subject "<what the study shows>"');
+  }
+  const timeWanted = options.time && options.time !== true ? String(options.time).trim() : '';
+  if (timeWanted && kind !== 'plate') {
+    throw pipelineError('bad_arguments', '--time applies to --sheet plate only');
+  }
+  // What tells this sheet from another of the same kind (outfit, subject,
+  // non-default time of day); part of the file name, the ID, and the candidate.
+  let variant = kind === 'detail' ? assetPaths.sheetVariant(entityId, kind, { subject }) : null;
+  if (kind === 'detail' && !variant) {
+    throw pipelineError('bad_arguments', `--subject "${subject}" has no letter or digit to name the detail by`);
   }
 
   const project = options.project || ws.loadProject(root) || {};
@@ -945,6 +990,7 @@ function compileAsset(root, entityId, options = {}) {
         `${entityId}: ${outfitId ? `outfit ${outfitId} is not in characters/${entityId}/wardrobe.yaml` : 'no --outfit given and the character has no default_wardrobe'}` +
         ` (outfits on file: ${outfits.map((o) => o.id).join(', ') || 'none'})`);
     }
+    if (kind === 'wardrobe') variant = assetPaths.sheetVariant(entityId, kind, { outfit: outfit.id });
     if (kind === 'expressions') briefCtx.expressions = sheets.expressionList(options.expressions);
     subjectLines.push(...sheets.characterSubject(character, name));
     if (kind === 'wardrobe') {
@@ -959,8 +1005,15 @@ function compileAsset(root, entityId, options = {}) {
     const location = bibles.location(entityId);
     if (!location) throw missingBible(`locations/${entityId}/location.yaml`);
     const map = ws.loadLocationMap(root, entityId);
-    const states = Array.isArray(location.time_of_day_states) ? location.time_of_day_states : [];
-    if (states.length) briefCtx.time = lang.humanize(states[0]);
+    const states = (Array.isArray(location.time_of_day_states) ? location.time_of_day_states : []).map(String);
+    if (timeWanted && !states.includes(timeWanted)) {
+      throw pipelineError('time_unknown',
+        `${entityId}: --time ${timeWanted} is not one of the location's time_of_day_states (${states.join(', ') || 'none on file'}). ` +
+        'Design that state in location.yaml first, then compile its plate.');
+    }
+    const time = timeWanted || states[0] || null;
+    if (time) briefCtx.time = lang.humanize(time);
+    if (kind === 'plate') variant = assetPaths.sheetVariant(entityId, kind, { time, defaultTime: states[0] });
     subjectLines.push(...sheets.locationSubject(location, name));
     const geography = sheets.geographyLines(map);
     if (geography.length) extraSections.push(['GEOGRAPHY', ...geography].join('\n'));
@@ -1020,7 +1073,7 @@ function compileAsset(root, entityId, options = {}) {
   parameters.seed = null;
 
   const pkg = {
-    id: assetPaths.packageId(entityId, providerId, kind),
+    id: assetPaths.packageId(entityId, providerId, kind, variant),
     page: null,
     asset: entityId,
     provider: providerId,
@@ -1067,7 +1120,7 @@ function compileAsset(root, entityId, options = {}) {
   pkg.model = spec.model;
   for (const w of (spec.meta && spec.meta.warnings) || []) warnings.push(w);
 
-  return { pkg, spec, warnings, notes, fileRel: assetPaths.packageFile(entityId, providerId, kind) };
+  return { pkg, spec, warnings, notes, fileRel: assetPaths.packageFile(entityId, providerId, kind, variant) };
 }
 
 /** --asset branch of the CLI. */
@@ -1089,6 +1142,7 @@ function mainAsset(flags) {
       sheet: flags.sheet,
       outfit: flags.outfit,
       subject: flags.subject,
+      time: flags.time,
       expressions: flags.expressions && flags.expressions !== true ? String(flags.expressions) : undefined,
       providerId: flags.provider,
       model: flags.model && flags.model !== true ? flags.model : undefined,

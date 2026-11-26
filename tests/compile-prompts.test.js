@@ -665,8 +665,8 @@ function testSheets() {
 
     // --- character: wardrobe ------------------------------------------------
     const ward = assertSheetPackage(root, compileAsset(root, 'CHAR_MARA', { sheet: 'wardrobe' }), {
-      id: 'PP_CHAR_MARA_HARNESS-NATIVE-WARD',
-      file: 'characters/CHAR_MARA/refs/prompts/harness-native.wardrobe.yaml',
+      id: 'PP_CHAR_MARA_HARNESS-NATIVE-WARD-OILSKIN',
+      file: 'characters/CHAR_MARA/refs/prompts/harness-native.wardrobe.WARD_MARA_OILSKIN.yaml',
       asset: 'CHAR_MARA',
       references: [LOOK, MARA_ID],
       ratio: '1:1',
@@ -684,22 +684,26 @@ function testSheets() {
     fx.editYaml(root, 'characters/CHAR_MARA/wardrobe.yaml', (doc) => {
       doc.outfits.push({ id: 'WARD_MARA_SUNDAY', description: 'Dark wool suit, white shirt buttoned to the neck', accessories: ['brooch'], hands: 'gloved' });
     });
-    const sunday = compileAsset(root, 'CHAR_MARA', { sheet: 'wardrobe', outfit: 'WARD_MARA_SUNDAY' }).pkg;
+    const sundayResult = compileAsset(root, 'CHAR_MARA', { sheet: 'wardrobe', outfit: 'WARD_MARA_SUNDAY' });
+    const sunday = sundayResult.pkg;
+    assert.strictEqual(sundayResult.fileRel, 'characters/CHAR_MARA/refs/prompts/harness-native.wardrobe.WARD_MARA_SUNDAY.yaml',
+      'a second outfit gets its own package file');
     assert.deepStrictEqual(section(sunday.prompt, 'OUTFIT').split('\n'), [
       'OUTFIT',
       'The outfit on this sheet: Dark wool suit, white shirt buttoned to the neck.',
       'Accessories: brooch.',
       'Hands: gloved.',
     ]);
-    assert.strictEqual(sunday.id, 'PP_CHAR_MARA_HARNESS-NATIVE-WARD');
+    assert.strictEqual(sunday.id, 'PP_CHAR_MARA_HARNESS-NATIVE-WARD-SUNDAY');
+    assertSchemaValid(sunday);
     expectError(() => compileAsset(root, 'CHAR_MARA', { sheet: 'wardrobe', outfit: 'WARD_MARA_NONE' }), 'outfit_missing',
       /outfits on file: WARD_MARA_OILSKIN, WARD_MARA_SUNDAY/);
 
     // --- any entity: detail -------------------------------------------------
     const detail = assertSheetPackage(root,
       compileAsset(root, 'CHAR_OSKAR', { sheet: 'detail', subject: 'the cut on his left hand.' }), {
-        id: 'PP_CHAR_OSKAR_HARNESS-NATIVE-DETAIL',
-        file: 'characters/CHAR_OSKAR/refs/prompts/harness-native.detail.yaml',
+        id: 'PP_CHAR_OSKAR_HARNESS-NATIVE-DETAIL-CUT_ON_HIS_LEFT_HAND',
+        file: 'characters/CHAR_OSKAR/refs/prompts/harness-native.detail.cut-on-his-left-hand.yaml',
         asset: 'CHAR_OSKAR',
         references: [LOOK],
         ratio: '1:1',
@@ -707,7 +711,13 @@ function testSheets() {
     assert.ok(detail.prompt.includes('Detail sheet: a close study of one detail of Oskar: the cut on his left hand.\n'));
     expectError(() => compileAsset(root, 'CHAR_OSKAR', { sheet: 'detail' }), 'bad_arguments', /--subject/);
     assert.strictEqual(compileAsset(root, 'PROP_FLARE_GUN', { sheet: 'detail', subject: 'the lanyard ring' }).fileRel,
-      'props/PROP_FLARE_GUN/refs/prompts/harness-native.detail.yaml');
+      'props/PROP_FLARE_GUN/refs/prompts/harness-native.detail.lanyard-ring.yaml');
+    // A second detail of the same entity is a second package.
+    const fringe = compileAsset(root, 'CHAR_OSKAR', { sheet: 'detail', subject: 'His dark, uneven fringe' });
+    assert.strictEqual(fringe.fileRel, 'characters/CHAR_OSKAR/refs/prompts/harness-native.detail.his-dark-uneven-fringe.yaml');
+    assert.strictEqual(fringe.pkg.id, 'PP_CHAR_OSKAR_HARNESS-NATIVE-DETAIL-HIS_DARK_UNEVEN_FRINGE');
+    assertSchemaValid(fringe.pkg);
+    expectError(() => compileAsset(root, 'CHAR_OSKAR', { sheet: 'detail', subject: '?!' }), 'bad_arguments', /no letter or digit/);
 
     // --- location: plate ----------------------------------------------------
     const plate = assertSheetPackage(root, compileAsset(root, 'LOC_FERRY_DECK', { sheet: 'plate' }), {
@@ -759,7 +769,7 @@ function testSheets() {
 
     // --- prop ---------------------------------------------------------------
     const prop = assertSheetPackage(root, compileAsset(root, 'PROP_FLARE_GUN', { sheet: 'prop' }), {
-      id: 'PP_PROP_FLARE_GUN_HARNESS-NATIVE-PROP',
+      id: 'PP_PROP_FLARE_GUN_HARNESS-NATIVE-SHEET',
       file: 'props/PROP_FLARE_GUN/refs/prompts/harness-native.prop.yaml',
       asset: 'PROP_FLARE_GUN',
       references: [LOOK],
@@ -916,7 +926,7 @@ function testSheetCli() {
     const detail = spawnSync(process.execPath,
       [SCRIPT, '--asset', 'PROP_FLARE_GUN', '--sheet', 'detail', '--subject', 'the lanyard ring', '--root', root], { encoding: 'utf8' });
     assert.strictEqual(detail.status, 0, detail.stderr);
-    assert.ok(fs.readFileSync(fx.abs(root, 'props/PROP_FLARE_GUN/refs/prompts/harness-native.detail.yaml'), 'utf8').includes('the lanyard ring'));
+    assert.ok(fs.readFileSync(fx.abs(root, 'props/PROP_FLARE_GUN/refs/prompts/harness-native.detail.lanyard-ring.yaml'), 'utf8').includes('the lanyard ring'));
     const bad = spawnSync(process.execPath, [SCRIPT, '--asset', 'CHAR_MARA', '--sheet', 'plate', '--root', root], { encoding: 'utf8' });
     assert.strictEqual(bad.status, 1);
     assert.ok(/a CHAR entity takes/.test(bad.stderr), bad.stderr);
@@ -928,6 +938,107 @@ function testSheetCli() {
       { encoding: 'utf8', cwd: path.parse(root).root });
     assert.strictEqual(outside.status, 1);
     assert.ok(/--root <workspace>/.test(outside.stderr), outside.stderr);
+  });
+}
+
+function testSafeMarginAndPanelNotes() {
+  return fx.withWorkspace((root) => {
+    writePlan(root, fx.PAGE_1);
+    writePlan(root, fx.PAGE_2);
+    const MARGIN = 'Safe margin: keep every balloon, caption, and sound effect at least 4% of the page width away from the left and right edges, ' +
+      'and at least 3% of the page height away from the top and bottom edges.';
+
+    // Safe margin: 6 mm on a 168 x 260 mm trim, as shares of the page, rounded up.
+    const pkg = compile(root, fx.PAGE_2).pkg;
+    const lettering = section(pkg.prompt, 'LETTERING').split('\n');
+    assert.strictEqual(lettering[lettering.length - 1], MARGIN, 'the safe margin closes the lettering block');
+    assert.strictEqual(pkg.prompt.split('Safe margin:').length - 1, 1);
+
+    // Panel notes: a line in that panel's block, only when there is text.
+    const panels = section(pkg.prompt, 'PANELS, in reading order');
+    const block1 = panels.slice(panels.indexOf('Panel 1 of 4.'), panels.indexOf('Panel 2 of 4.'));
+    const block2 = panels.slice(panels.indexOf('Panel 2 of 4.'), panels.indexOf('Panel 3 of 4.'));
+    assert.ok(block1.includes('\nNote: Keep the ladder in frame so the change of level is drawn, not implied.\n'),
+      'a panel note becomes a line of its block');
+    assert.ok(block1.indexOf('Background:') < block1.indexOf('Note:') && block1.indexOf('Note:') < block1.indexOf('Characters drawn'));
+    assert.ok(!block2.includes('Note:'), 'an empty note adds nothing');
+    assert.strictEqual(pkg.prompt.split('\nNote: ').length - 1, 1, 'panels without notes get no line');
+    assert.deepStrictEqual(compile(root, fx.PAGE_2).pkg, pkg, 'still deterministic');
+
+    // The note travels with its panel into per-panel and repair prompts.
+    assert.ok(compile(root, fx.PAGE_2, { panel: 'PN_001_002_01' }).pkg.prompt.includes('Note: Keep the ladder in frame'));
+    const review = ws.loadReview(root, FLAGGED);
+    review.findings[0].panel = 'PN_001_002_01';
+    const repair = compile(root, fx.PAGE_2, { repairReview: review }).pkg.prompt;
+    assert.ok(section(repair, 'PLANNED CONTENT OF THE CHANGED PANELS').includes('Note: Keep the ladder in frame'));
+    // A panel image has no page edge, and a repair locks lettering: no margin line.
+    assert.ok(!compile(root, fx.PAGE_2, { panel: 'PN_001_002_02' }).pkg.prompt.includes('Safe margin:'));
+    assert.ok(!repair.includes('Safe margin:'));
+
+    // A whitespace-only note is no note; a new note changes the page hash.
+    fx.editYaml(root, `issues/ISS_001/pages/${fx.PAGE_2}/page.yaml`, (page) => { page.panels[1].notes = '   '; });
+    assert.strictEqual(compile(root, fx.PAGE_2).pkg.prompt, pkg.prompt);
+    fx.editYaml(root, `issues/ISS_001/pages/${fx.PAGE_2}/page.yaml`, (page) => { page.panels[1].notes = 'The gun never points at the boy'; });
+    const noted = compile(root, fx.PAGE_2).pkg;
+    assert.ok(noted.prompt.includes('\nNote: The gun never points at the boy.\n'));
+    assert.notStrictEqual(noted.source_hashes.page, pkg.source_hashes.page);
+
+    // No trim size: the distance alone. No safe margin: no line.
+    fx.editYaml(root, 'project.yaml', (project) => { delete project.page.trim_mm; });
+    assert.ok(section(compile(root, fx.PAGE_1).pkg.prompt, 'LETTERING')
+      .endsWith('Safe margin: keep every balloon, caption, and sound effect clear of the page edges, inside a margin of 6 mm on the printed page.'));
+    fx.editYaml(root, 'project.yaml', (project) => { delete project.page.safe_margin_mm; });
+    assert.ok(!compile(root, fx.PAGE_1).pkg.prompt.includes('Safe margin:'));
+    // Overlay lettering: nothing is lettered in the image, so no margin line.
+    fx.editYaml(root, 'project.yaml', (project) => {
+      project.page.safe_margin_mm = 6;
+      project.lettering.mode = 'overlay';
+    });
+    assert.ok(!compile(root, fx.PAGE_1).pkg.prompt.includes('Safe margin:'));
+  });
+}
+
+function testPlateTime() {
+  return fx.withWorkspace((root) => {
+    // The fixture location has two states: [night, dusk]. The first is the default.
+    const night = compileAsset(root, 'LOC_FERRY_DECK', { sheet: 'plate' });
+    assert.strictEqual(night.fileRel, 'locations/LOC_FERRY_DECK/refs/prompts/harness-native.plate.yaml');
+    assert.strictEqual(night.pkg.id, 'PP_LOC_FERRY_DECK_HARNESS-NATIVE-PLATE');
+    assert.ok(section(night.pkg.prompt, 'SHEET').includes('\nTime of day: night.\n'), 'the prompt states the time of day');
+    assert.deepStrictEqual(compileAsset(root, 'LOC_FERRY_DECK', { sheet: 'plate', time: 'night' }), night,
+      'naming the default state changes nothing');
+
+    const dusk = compileAsset(root, 'LOC_FERRY_DECK', { sheet: 'plate', time: 'dusk' });
+    assertSchemaValid(dusk.pkg);
+    assert.strictEqual(dusk.fileRel, 'locations/LOC_FERRY_DECK/refs/prompts/harness-native.plate.dusk.yaml',
+      'a non-default state is in the file name');
+    assert.strictEqual(dusk.pkg.id, 'PP_LOC_FERRY_DECK_HARNESS-NATIVE-PLATE-DUSK');
+    const brief = section(dusk.pkg.prompt, 'SHEET');
+    assert.ok(brief.includes('\nTime of day: dusk.\n'));
+    assert.ok(brief.includes("Lit by the location's own light sources as described below, at dusk."));
+    assert.ok(!dusk.pkg.prompt.includes('Time of day: night.'));
+
+    // The state must be one the location was designed for.
+    const err = expectError(() => compileAsset(root, 'LOC_FERRY_DECK', { sheet: 'plate', time: 'dawn' }), 'time_unknown',
+      /--time dawn is not one of the location's time_of_day_states \(night, dusk\)/);
+    assert.ok(/location\.yaml/.test(err.message));
+    expectError(() => compileAsset(root, 'CHAR_MARA', { sheet: 'turnaround', time: 'dusk' }), 'bad_arguments', /--time applies to --sheet plate only/);
+    expectError(() => compileAsset(root, 'LOC_FERRY_DECK', { sheet: 'detail', subject: 'the ladder', time: 'dusk' }), 'bad_arguments');
+
+    // CLI.
+    const cli = spawnSync(process.execPath, [SCRIPT, '--asset', 'LOC_FERRY_DECK', '--sheet', 'plate', '--time', 'dusk', '--root', root], { encoding: 'utf8' });
+    assert.strictEqual(cli.status, 0, cli.stderr);
+    assert.deepStrictEqual(yaml.parse(fs.readFileSync(fx.abs(root, dusk.fileRel), 'utf8')), dusk.pkg);
+    const bad = spawnSync(process.execPath, [SCRIPT, '--asset', 'LOC_FERRY_DECK', '--sheet', 'plate', '--time', 'noon', '--root', root], { encoding: 'utf8' });
+    assert.strictEqual(bad.status, 1);
+    assert.ok(/--time noon is not one of/.test(bad.stderr), bad.stderr);
+
+    // A location with no states on file compiles a plate with no time, and refuses --time.
+    fx.editYaml(root, 'locations/LOC_FERRY_DECK/location.yaml', (loc) => { delete loc.time_of_day_states; });
+    const timeless = compileAsset(root, 'LOC_FERRY_DECK', { sheet: 'plate' });
+    assert.ok(!timeless.pkg.prompt.includes('Time of day:'));
+    assert.strictEqual(timeless.fileRel, night.fileRel);
+    expectError(() => compileAsset(root, 'LOC_FERRY_DECK', { sheet: 'plate', time: 'night' }), 'time_unknown', /none on file/);
   });
 }
 
@@ -944,6 +1055,8 @@ async function main() {
   await testSheets();
   await testSheetRefusalsAndDeterminism();
   await testSheetCli();
+  await testSafeMarginAndPanelNotes();
+  await testPlateTime();
   console.log('compile-prompts: OK');
 }
 

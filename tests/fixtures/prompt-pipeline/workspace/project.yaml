@@ -9,6 +9,9 @@ page:
   aspect_ratio: "2:3"
   width_px: 2000
   height_px: 3000
+  trim_mm: { width: 168, height: 260 }
+  bleed_mm: 3
+  safe_margin_mm: 6
 color_mode: monochrome
 spot_colors:
   - name: signal red

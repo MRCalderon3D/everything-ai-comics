@@ -25,7 +25,8 @@
  * compile-prompts.js --asset) is recorded under generations/<ENTITY_ID>/
  * and targets the next free candidate in the entity's refs directory:
  * <ENTITY_ID>_<TAG>_V##.png, or references/style/<LOOK_ID>_V##.png for a
- * look. A candidate never takes the _MASTER name: promotion to master is an
+ * look. TAG carries the sheet's variant (the outfit of a wardrobe sheet,
+ * the subject of a detail), so each sheet has its own version sequence. A candidate never takes the _MASTER name: promotion to master is an
  * approval step, not something generation does.
  */
 
@@ -35,7 +36,7 @@ const { writeFileEnsuring, toPosix } = require('./lib/fsx');
 const { loadImageProvider, resolveProviderId } = require('./lib/providers');
 const { parseArgs, helpIfRequested } = require('./lib/cli');
 const {
-  pipelineError, loadPageContext, hashPage, hashText, validateDoc,
+  pipelineError, loadPageContext, hashPage, hashPlan, hashText, validateDoc,
 } = require('./lib/page-pipeline');
 const assetPaths = require('./lib/asset-paths');
 const ws = require('./lib/workspace');
@@ -72,7 +73,8 @@ Written under <workspace>/generations/<PAGE_ID or ENTITY_ID>/:
 Image targets, always the next free version, never an overwrite:
   page    <page dir>/renders/<PAGE_ID>_V##.png
   sheet   characters|locations|props/<ID>/refs/<ID>_<TAG>_V##.png
-          (TAG: TURN, EXPR, WARD, PLATE, PROP, DETAIL)
+          TAG: TURN, EXPR, WARD_<OUTFIT>, PLATE (PLATE_<STATE> for a
+          non-default time of day), SHEET (props), DETAIL_<SUBJECT>
   look    references/style/<LOOK_ID>_V##.png
 A sheet candidate never takes the _MASTER name; approval promotes it.
 `;
@@ -295,7 +297,7 @@ function writeNew(file, buffer) {
  * candidate version, never under a _MASTER name.
  * @param {object} record generation record (mutated)
  * @param {{root: string, page: string|null, fullPage: boolean, dir: string,
- *          sheet?: {entity: string, tag: string}, fetchImpl?: Function}} ctx
+ *          sheet?: {entity: string, stemTag: string}, fetchImpl?: Function}} ctx
  */
 async function persistMedia(record, ctx) {
   const inline = Array.isArray(record._media) ? record._media : null;
@@ -343,7 +345,7 @@ async function persistMedia(record, ctx) {
     } else if (ctx.sheet) {
       // nextCandidate counts every extension, so a taken version moves on.
       for (let tries = 0; tries < 5 && !file; tries++) {
-        const next = assetPaths.nextCandidate(ctx.root, ctx.sheet.entity, ctx.sheet.tag, ext);
+        const next = assetPaths.nextCandidate(ctx.root, ctx.sheet.entity, ctx.sheet.stemTag, ext);
         const candidate = ws.abs(ctx.root, next.rel);
         try {
           writeNew(candidate, buffer);
@@ -372,13 +374,25 @@ async function persistMedia(record, ctx) {
   return record;
 }
 
-/** Warnings about a package whose sources changed after it was compiled. */
+/**
+ * Warnings about a package whose sources changed after it was compiled:
+ * the page, its reference plan, or the frozen style block. Each is compared
+ * with the hash compile-prompts.js stored in source_hashes.
+ */
 function staleness(root, pkg) {
   const out = [];
   const hashes = pkg.source_hashes || {};
   if (pkg.page && hashes.page) {
     const page = ws.loadPage(root, pkg.page);
     if (page && hashPage(page) !== hashes.page) out.push(`${pkg.page}/page.yaml changed after this package was compiled`);
+  }
+  if (pkg.page && hashes.reference_plan && ws.ID.page.test(String(pkg.page))) {
+    const plan = ws.loadYaml(path.join(ws.pageDir(root, pkg.page), 'reference-plan.yaml'));
+    if (!plan) {
+      out.push(`${pkg.page}/reference-plan.yaml is gone, and this package was compiled from it`);
+    } else if (hashPlan(plan) !== hashes.reference_plan) {
+      out.push(`${pkg.page}/reference-plan.yaml changed after this package was compiled`);
+    }
   }
   if (hashes.style_block) {
     const block = ws.loadStyleBlock(root);
@@ -430,10 +444,10 @@ async function runPackage(item, options = {}) {
   // A compiled sheet package targets the next candidate in the entity's refs
   // directory; anything else without a page stays next to its record.
   const sheet = !target.page ? assetPaths.sheetOfPackage(pkg) : null;
-  const sheetTarget = sheet ? { entity: target.asset, tag: sheet.tag } : null;
+  const sheetTarget = sheet ? { entity: target.asset, stemTag: sheet.stemTag } : null;
   let outputFile = path.join(dir, `${recordId}.png`);
   if (fullPage) outputFile = path.join(ws.pageDir(root, target.page), 'renders', `${renderId}.png`);
-  else if (sheetTarget) outputFile = ws.abs(root, assetPaths.nextCandidate(root, sheetTarget.entity, sheetTarget.tag).rel);
+  else if (sheetTarget) outputFile = ws.abs(root, assetPaths.nextCandidate(root, sheetTarget.entity, sheetTarget.stemTag).rel);
   const outputPath = ws.rel(root, outputFile);
   const cost = estimateCost(Object.assign({}, pkg, { model: spec.model }), pkg.provider);
 
@@ -561,6 +575,7 @@ module.exports = {
   scopeOf,
   collectPackages,
   persistMedia,
+  staleness,
   runPackage,
   generateAssets,
 };

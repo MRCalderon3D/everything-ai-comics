@@ -130,7 +130,9 @@ free render, `<page dir>/renders/<PAGE_ID>_V##.png`. A sheet package compiled
 with `compile-prompts.js --asset <ENTITY_ID> --sheet <kind>` targets the next
 free candidate in the entity's `refs/` directory,
 `<ENTITY_ID>_<TAG>_V##.png` (`references/style/<LOOK_ID>_V##.png` for a look),
-and its record goes under `generations/<ENTITY_ID>/`. A candidate never takes
+and its record goes under `generations/<ENTITY_ID>/`. The tag names the kind
+and its variant: `TURN`, `EXPR`, `WARD_<OUTFIT>`, `PLATE`, `SHEET` for a
+prop, `DETAIL_<SUBJECT>`. A candidate never takes
 the `_MASTER` name; approval promotes it.
 
 Use `harness-native` when the coding assistant has its own image tool (Codex

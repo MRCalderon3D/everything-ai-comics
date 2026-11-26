@@ -35,9 +35,9 @@ assets:
     path: locations/LOC_FERRY_DECK/refs/LOC_FERRY_DECK_PLATE_MASTER_V01.png
     status: approved
     default_role: spatial_continuity
-  - id: PROP_FLARE_GUN_REF_MASTER_V01
+  - id: PROP_FLARE_GUN_SHEET_MASTER_V01
     entity: PROP_FLARE_GUN
     kind: prop
-    path: props/PROP_FLARE_GUN/refs/PROP_FLARE_GUN_REF_MASTER_V01.png
+    path: props/PROP_FLARE_GUN/refs/PROP_FLARE_GUN_SHEET_MASTER_V01.png
     status: approved
     default_role: prop_consistency

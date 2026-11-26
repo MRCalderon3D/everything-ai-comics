@@ -450,14 +450,14 @@ function testSheets() {
         { id: 'CHAR_MARA_TURN_V02', version: 2, rel: 'characters/CHAR_MARA/refs/CHAR_MARA_TURN_V02.png' },
         'CHAR_MARA_TURN_MASTER_V01 exists, so the next candidate is V02');
       assert.strictEqual(assetPaths.nextCandidate(root, 'CHAR_MARA', 'EXPR').id, 'CHAR_MARA_EXPR_V01');
-      assert.strictEqual(assetPaths.nextCandidate(root, 'CHAR_MARA', 'WARD').rel,
-        'characters/CHAR_MARA/refs/CHAR_MARA_WARD_V01.png');
+      assert.strictEqual(assetPaths.nextCandidate(root, 'CHAR_MARA', 'WARD_OILSKIN').rel,
+        'characters/CHAR_MARA/refs/CHAR_MARA_WARD_OILSKIN_V01.png');
       assert.strictEqual(assetPaths.nextCandidate(root, 'LOC_FERRY_DECK', 'PLATE').rel,
         'locations/LOC_FERRY_DECK/refs/LOC_FERRY_DECK_PLATE_V02.png');
-      assert.strictEqual(assetPaths.nextCandidate(root, 'PROP_FLARE_GUN', 'PROP').rel,
-        'props/PROP_FLARE_GUN/refs/PROP_FLARE_GUN_PROP_V01.png');
-      assert.strictEqual(assetPaths.nextCandidate(root, 'PROP_FLARE_GUN', 'DETAIL', '.jpg').rel,
-        'props/PROP_FLARE_GUN/refs/PROP_FLARE_GUN_DETAIL_V01.jpg');
+      assert.strictEqual(assetPaths.nextCandidate(root, 'PROP_FLARE_GUN', 'SHEET').rel,
+        'props/PROP_FLARE_GUN/refs/PROP_FLARE_GUN_SHEET_V02.png', 'PROP_FLARE_GUN_SHEET_MASTER_V01 is counted');
+      assert.strictEqual(assetPaths.nextCandidate(root, 'PROP_FLARE_GUN', 'DETAIL_LANYARD_RING', '.jpg').rel,
+        'props/PROP_FLARE_GUN/refs/PROP_FLARE_GUN_DETAIL_LANYARD_RING_V01.jpg');
       assert.strictEqual(assetPaths.nextCandidate(root, 'LOOK_NOIR_INK', 'LOOK').rel,
         'references/style/LOOK_NOIR_INK_V02.png', 'a look has no tag; the master V01 is counted');
       assert.strictEqual(assetPaths.nextCandidate(root, 'LOOK_DAWN_WASH', 'LOOK').rel,
@@ -507,7 +507,7 @@ function testSheets() {
         'PP_CHAR_MARA_GEMINI-EXPR',
         'PP_CHAR_MARA_HARNESS-NATIVE-EXPR',
         'PP_CHAR_MARA_HARNESS-NATIVE-TURN',
-        'PP_CHAR_MARA_HARNESS-NATIVE-WARD',
+        'PP_CHAR_MARA_HARNESS-NATIVE-WARD-OILSKIN',
       ]);
       assert.deepStrictEqual(all.results.map((r) => r.record.id),
         ['GEN_CHAR_MARA_03', 'GEN_CHAR_MARA_04', 'GEN_CHAR_MARA_05', 'GEN_CHAR_MARA_06']);
@@ -540,7 +540,7 @@ function testSheets() {
       assert.strictEqual(plate.results[0].record.id, 'GEN_LOC_FERRY_DECK_01');
       assert.ok(plate.results[0].record.notes.includes('locations/LOC_FERRY_DECK/refs/LOC_FERRY_DECK_PLATE_V02.png'));
       const prop = await gen.generateAssets({ package: prepareSheet(root, 'PROP_FLARE_GUN', { sheet: 'prop' }).file, log: quiet });
-      assert.ok(prop.results[0].record.notes.includes('props/PROP_FLARE_GUN/refs/PROP_FLARE_GUN_PROP_V01.png'));
+      assert.ok(prop.results[0].record.notes.includes('props/PROP_FLARE_GUN/refs/PROP_FLARE_GUN_SHEET_V02.png'));
 
       // A live result is saved as the next candidate; each attempt is a new
       // version, and the approved master is never touched.
@@ -605,6 +605,138 @@ function testSheetCli() {
   });
 }
 
+function testStaleReferencePlan() {
+  return fx.withWorkspace(async (root) => {
+    const network = fx.blockNetwork();
+    const savedKey = process.env.GOOGLE_API_KEY;
+    process.env.GOOGLE_API_KEY = 'test-key-not-real';
+    try {
+      const { pkg } = prepare(root, fx.PAGE_2, 'gemini');
+      const pageFile = fx.pageFile(root, fx.PAGE_2);
+      const planFile = path.join(fx.pageDir(root, fx.PAGE_2), 'reference-plan.yaml');
+      assert.deepStrictEqual(gen.staleness(root, pkg), [], 'a fresh package is not stale');
+
+      // The same plan rebuilt on another day is the same plan.
+      const page = ws.loadPage(root, fx.PAGE_2);
+      const later = buildReferencePlan(root, page, { now: new Date('2027-03-01T00:00:00Z'), providerId: 'gemini' }).doc;
+      fs.writeFileSync(planFile, yaml.stringify(later));
+      assert.deepStrictEqual(gen.staleness(root, pkg), [], 'created_at alone does not make a package stale');
+
+      // The plan changes after compiling: an asset loses its approval and
+      // the plan is rebuilt without it.
+      fs.unlinkSync(ws.reviewFile(root, 'PG_001_001_V01'));
+      const changed = buildReferencePlan(root, page, { now: NOW, providerId: 'gemini' }).doc;
+      assert.notDeepStrictEqual(changed.exclude, later.exclude);
+      fs.writeFileSync(planFile, yaml.stringify(changed));
+      assert.deepStrictEqual(gen.staleness(root, pkg),
+        ['PG_001_002/reference-plan.yaml changed after this package was compiled']);
+
+      // A dry run warns and still writes its record...
+      const dry = await gen.generateAssets({ page: pageFile, provider: 'gemini', log: quiet });
+      assert.strictEqual(dry.results[0].record.status, 'dry_run');
+      assert.ok(dry.results[0].warnings.some((w) => /reference-plan\.yaml changed after this package was compiled; re-run compile-prompts/.test(w)),
+        'a stale reference plan is reported like a stale page');
+      // ...a live run refuses before any request.
+      const live = await gen.generateAssets({ page: pageFile, provider: 'gemini', live: true, yes: true, log: quiet });
+      assert.strictEqual(live.results.length, 0);
+      assert.ok(/reference-plan\.yaml changed after this package was compiled\. Re-run compile-prompts\.js before a live run/.test(live.failures[0]),
+        live.failures[0]);
+      assert.strictEqual(network.calls, 0);
+
+      // Recompiling clears it.
+      const fresh = prepare(root, fx.PAGE_2, 'gemini').pkg;
+      assert.deepStrictEqual(gen.staleness(root, fresh), []);
+      assert.notStrictEqual(fresh.source_hashes.reference_plan, pkg.source_hashes.reference_plan);
+
+      // A deleted plan is reported too.
+      fs.unlinkSync(planFile);
+      assert.deepStrictEqual(gen.staleness(root, fresh),
+        ['PG_001_002/reference-plan.yaml is gone, and this package was compiled from it']);
+      // Asset packages have no reference plan and are not affected.
+      assert.deepStrictEqual(gen.staleness(root, compileAsset(root, 'CHAR_MARA', { sheet: 'turnaround' }).pkg), []);
+    } finally {
+      if (savedKey === undefined) delete process.env.GOOGLE_API_KEY;
+      else process.env.GOOGLE_API_KEY = savedKey;
+      network.restore();
+    }
+  });
+}
+
+function testSheetVariants() {
+  return fx.withWorkspace(async (root) => {
+    const network = fx.blockNetwork();
+    try {
+      assert.strictEqual(assetPaths.subjectSlug('The cut on his left hand.'), 'cut-on-his-left-hand');
+      assert.strictEqual(assetPaths.subjectSlug('  Lanyard   RING!! '), 'lanyard-ring');
+      assert.strictEqual(assetPaths.subjectSlug('the'), 'the', 'a lone article is the subject');
+      assert.ok(assetPaths.subjectSlug('a very long description of a detail that goes on and on and on').length <= 40);
+      assert.strictEqual(assetPaths.subjectSlug('?!'), '');
+      assert.deepStrictEqual(assetPaths.sheetVariant('CHAR_MARA', 'wardrobe', { outfit: 'WARD_MARA_OILSKIN' }),
+        { file: 'WARD_MARA_OILSKIN', token: 'OILSKIN' });
+      assert.deepStrictEqual(assetPaths.sheetVariant('CHAR_MARA', 'wardrobe', { outfit: 'WARD_BORROWED_COAT' }),
+        { file: 'WARD_BORROWED_COAT', token: 'BORROWED_COAT' });
+      assert.strictEqual(assetPaths.sheetVariant('CHAR_MARA', 'turnaround', {}), null);
+      assert.strictEqual(assetPaths.sheetVariant('LOC_FERRY_DECK', 'plate', { time: 'night', defaultTime: 'night' }), null);
+      assert.deepStrictEqual(assetPaths.sheetOfPackage({ id: 'PP_CHAR_MARA_FAL-WARD-OILSKIN', asset: 'CHAR_MARA', provider: 'fal' }),
+        { kind: 'wardrobe', tag: 'WARD', variant: 'OILSKIN', stemTag: 'WARD_OILSKIN' });
+      assert.deepStrictEqual(assetPaths.sheetOfPackage({ id: 'PP_PROP_FLARE_GUN_HARNESS-NATIVE-SHEET', asset: 'PROP_FLARE_GUN', provider: 'harness-native' }),
+        { kind: 'prop', tag: 'SHEET', variant: null, stemTag: 'SHEET' });
+      assert.strictEqual(assetPaths.sheetOfPackage({ id: 'PP_PROP_FLARE_GUN_FAL-PROP', asset: 'PROP_FLARE_GUN', provider: 'fal' }), null,
+        'PROP is not a sheet tag');
+
+      // Two outfits and two details of one character: four packages, none
+      // overwritten, and --asset finds every one of them.
+      fx.editYaml(root, 'characters/CHAR_MARA/wardrobe.yaml', (doc) => {
+        doc.outfits.push({ id: 'WARD_MARA_SUNDAY', description: 'Dark wool suit, white shirt buttoned to the neck' });
+      });
+      const files = [
+        prepareSheet(root, 'CHAR_MARA', { sheet: 'wardrobe' }),
+        prepareSheet(root, 'CHAR_MARA', { sheet: 'wardrobe', outfit: 'WARD_MARA_SUNDAY' }),
+        prepareSheet(root, 'CHAR_MARA', { sheet: 'detail', subject: 'the torn left cuff' }),
+        prepareSheet(root, 'CHAR_MARA', { sheet: 'detail', subject: 'her broken nose, in profile' }),
+      ];
+      assert.deepStrictEqual(files.map((f) => f.fileRel), [
+        'characters/CHAR_MARA/refs/prompts/harness-native.wardrobe.WARD_MARA_OILSKIN.yaml',
+        'characters/CHAR_MARA/refs/prompts/harness-native.wardrobe.WARD_MARA_SUNDAY.yaml',
+        'characters/CHAR_MARA/refs/prompts/harness-native.detail.torn-left-cuff.yaml',
+        'characters/CHAR_MARA/refs/prompts/harness-native.detail.her-broken-nose-in-profile.yaml',
+      ]);
+      assert.strictEqual(new Set(files.map((f) => f.pkg.id)).size, 4, 'four distinct package IDs');
+      assert.strictEqual(listFiles(fx.abs(root, 'characters/CHAR_MARA/refs/prompts')).length, 4);
+
+      const all = await gen.generateAssets({ asset: 'CHAR_MARA', root, log: quiet });
+      assert.strictEqual(all.results.length, 4, '--asset finds every package');
+      const targets = {};
+      for (const r of all.results) {
+        assertRecordValid(r.record);
+        assert.strictEqual(r.record.asset, 'CHAR_MARA');
+        targets[r.record.prompt_package] = JSON.parse(fs.readFileSync(r.requestFile, 'utf8')).body.output.path;
+      }
+      assert.deepStrictEqual(targets, {
+        'PP_CHAR_MARA_HARNESS-NATIVE-DETAIL-HER_BROKEN_NOSE_IN_PROFILE': 'characters/CHAR_MARA/refs/CHAR_MARA_DETAIL_HER_BROKEN_NOSE_IN_PROFILE_V01.png',
+        'PP_CHAR_MARA_HARNESS-NATIVE-DETAIL-TORN_LEFT_CUFF': 'characters/CHAR_MARA/refs/CHAR_MARA_DETAIL_TORN_LEFT_CUFF_V01.png',
+        'PP_CHAR_MARA_HARNESS-NATIVE-WARD-OILSKIN': 'characters/CHAR_MARA/refs/CHAR_MARA_WARD_OILSKIN_V01.png',
+        'PP_CHAR_MARA_HARNESS-NATIVE-WARD-SUNDAY': 'characters/CHAR_MARA/refs/CHAR_MARA_WARD_SUNDAY_V01.png',
+      }, 'each sheet has its own candidate name and version sequence');
+      for (const target of Object.values(targets)) {
+        assert.ok(ws.ID.asset.test(path.basename(target, '.png')), `${target} is a valid asset ID`);
+      }
+
+      // A plate at a non-default time of day, and the prop sheet tag.
+      const dusk = await gen.generateAssets({ package: prepareSheet(root, 'LOC_FERRY_DECK', { sheet: 'plate', time: 'dusk' }).file, log: quiet });
+      assert.ok(dusk.results[0].record.notes.includes('locations/LOC_FERRY_DECK/refs/LOC_FERRY_DECK_PLATE_DUSK_V01.png'));
+      const night = await gen.generateAssets({ package: prepareSheet(root, 'LOC_FERRY_DECK', { sheet: 'plate' }).file, log: quiet });
+      assert.ok(night.results[0].record.notes.includes('locations/LOC_FERRY_DECK/refs/LOC_FERRY_DECK_PLATE_V02.png'));
+      const prop = await gen.generateAssets({ package: prepareSheet(root, 'PROP_FLARE_GUN', { sheet: 'prop' }).file, log: quiet });
+      assert.strictEqual(prop.results[0].record.prompt_package, 'PP_PROP_FLARE_GUN_HARNESS-NATIVE-SHEET');
+      assert.ok(prop.results[0].record.notes.includes('props/PROP_FLARE_GUN/refs/PROP_FLARE_GUN_SHEET_V02.png'));
+      assert.strictEqual(network.calls, 0);
+    } finally {
+      network.restore();
+    }
+  });
+}
+
 async function main() {
   testEstimates();
   await testDryRun();
@@ -614,6 +746,8 @@ async function main() {
   await testIssueAndAssetScope();
   await testSheets();
   await testSheetCli();
+  await testStaleReferencePlan();
+  await testSheetVariants();
   await testCli();
   console.log('generate-assets: OK');
 }

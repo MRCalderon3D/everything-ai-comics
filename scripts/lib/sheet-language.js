@@ -115,6 +115,7 @@ function sheetBrief(kind, ctx) {
         `Establishing plate of one location: ${name}.`,
         'One wide view of the whole place, empty: no characters, no figures, no silhouettes.',
         'Seen from the viewpoint of the side convention below, with every landmark visible on its own side and level.',
+        ...(ctx.time ? [`Time of day: ${ctx.time}.`] : []),
         `Lit by the location's own light sources as described below${ctx.time ? `, at ${ctx.time}` : ''}. What lies beyond the place is drawn as described, not invented.`,
         IN_STYLE,
       ];
