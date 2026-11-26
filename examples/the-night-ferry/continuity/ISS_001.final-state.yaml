@@ -1,0 +1,42 @@
+# Schema: schemas/continuity-state.schema.json
+# Where everyone and everything is after the last panel of PG_001_002.
+
+issue: ISS_001
+after_page: PG_001_002
+
+characters:
+  CHAR_MARA:
+    location: LOC_FERRY_DECK
+    position: { level: deck, side: left, landmark: crates }
+    wardrobe: WARD_MARA_OILSKIN
+    state: []
+    holding: [PROP_FLARE_GUN]
+    notes: Standing over the crates, facing astern. She has not signalled.
+  CHAR_OSKAR:
+    location: LOC_FERRY_DECK
+    position: { level: deck, side: left, landmark: crates }
+    wardrobe: WARD_OSKAR_HOODED_JACKET
+    state: [cut_left_hand]
+    holding: []
+    notes: Under the tarpaulin again, face at the gap.
+
+props:
+  PROP_FLARE_GUN:
+    custody: CHAR_MARA
+    location: LOC_FERRY_DECK
+    state: []
+  PROP_TARPAULIN:
+    custody: null
+    location: LOC_FERRY_DECK
+    state: []
+
+open_threads:
+  - The patrol launch has not reached the ferry yet.
+  - Nobody is at the wheel while Mara is on deck.
+
+open_issues:
+  - severity: minor
+    page: null
+    description: Wheelhouse lamp is unstated after page 1.
+
+last_validated: "2026-11-26"

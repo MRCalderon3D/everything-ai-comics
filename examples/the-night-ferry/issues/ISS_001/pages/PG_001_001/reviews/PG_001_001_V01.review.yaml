@@ -1,0 +1,72 @@
+# Schema: schemas/visual-review.schema.json
+
+page: PG_001_001
+render: PG_001_001_V01
+supersedes: null
+reviewer: visual-reviewer
+independent: true
+
+compared_against:
+  references: [LOOK_NOIR_INK_MASTER_V01, CHAR_MARA_TURN_MASTER_V01, LOC_FERRY_DECK_PLATE_MASTER_V01]
+  neighbors: []
+
+checks:
+  identity:
+    result: pass
+    evidence: Broken nose and cropped grey hair match the sheet in panels 2 and 4. In panel 1 Mara is a small figure in the lit window.
+  cast_count:
+    result: pass
+    evidence: One Mara in panels 1, 2 and 4. Nobody is drawn in panel 3, and no second figure stands on the deck.
+  position:
+    result: pass
+    evidence: Mara is inside the wheelhouse in panels 1, 2 and 4. The tarpaulin lies over the crates near the bow.
+  movement:
+    result: not_applicable
+    evidence: Nobody changes position on this page.
+  role_causality:
+    result: pass
+    evidence: Mara's own right hand lifts the flare gun in panel 4.
+  object_identity:
+    result: pass
+    evidence: The flare gun has the wide stubby barrel and the lanyard ring in panels 2 and 4.
+  object_custody:
+    result: pass
+    evidence: The gun hangs on its hook by the door in panel 2 and is in Mara's right hand in panel 4.
+  physical_state:
+    result: not_applicable
+    evidence: No drawn character carries a state tag on this page.
+  wardrobe:
+    result: pass
+    evidence: Oilskin coat and bare head in panels 2 and 4. The left cuff is torn in panel 2.
+  spatial_logic:
+    result: pass
+    evidence: The bow points screen left in panel 1 and the crates sit at screen left in panel 3.
+  drawing_clarity:
+    result: pass
+    evidence: Both of Mara's hands are separate and readable in panels 2 and 4.
+  lettering:
+    result: pass
+    evidence: All four strings are exact. The one balloon tail points to Mara in panel 4, and the sound effect sits over the tarpaulin.
+  page_structure:
+    result: pass
+    evidence: Four panels in three tiers, 1 / 2 / 1.
+  style_fidelity:
+    result: pass
+    evidence: Heavy spotted blacks, hard shadow edges and no grey tone, as in the look master.
+
+findings: []
+
+gates:
+  style_fidelity: pass
+  narrative_continuity: pass
+
+verdict: pass
+repair_cycle: 0
+reviewed_at: "2026-11-26"
+
+human_approval:
+  status: pending
+  by: null
+  at: null
+
+notes: Example data. The file on disk is a flat placeholder, so this evidence shows the form of a review and describes no real drawing.

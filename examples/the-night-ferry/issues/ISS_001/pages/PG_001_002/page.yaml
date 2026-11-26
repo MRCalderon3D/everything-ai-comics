@@ -1,0 +1,255 @@
+# Schema: schemas/page.schema.json
+# The ledger does three things on this page: Mara changes level (moved), the tarpaulin
+# changes custody twice (transfers), and Oskar's cut hand stays on every row (state).
+
+id: PG_001_002
+issue: ISS_001
+number: 2
+scene: SC_001_01
+side: left
+spread_with: null
+purpose: Mara goes down armed, uncovers the boy, and chooses not to signal the patrol.
+page_turn: none
+
+layout:
+  grid: "two tiers, 2 / 2"
+  tiers: [2, 2]
+  reading_order: [1, 2, 3, 4]
+  notes: Four equal panels. The even rhythm keeps the page quiet until the last balloon.
+
+panels:
+  - id: PN_001_002_01
+    order: 1
+    tier: 1
+    size: medium
+    framing:
+      shot_size: full
+      angle: low_angle
+      view: three_quarter
+      composition: Mara on the ladder at right. The deck runs away to screen left toward the crates.
+    moment: Mara climbs down the ladder to the deck with the flare gun in her right hand.
+    location: LOC_FERRY_DECK
+    transition_in: action
+    ellipsis: null
+    background: Wheelhouse wall behind the ladder, the crates small in the distance at left.
+    cast:
+      - character: CHAR_MARA
+        off_panel: false
+        position: { level: deck, side: right, landmark: ladder }
+        facing: left
+        action: Climbs down the last rungs, left hand on the rail, flare gun in her right hand.
+        acting: Weight low, head turned toward the bow.
+        wardrobe: WARD_MARA_OILSKIN
+        state: []
+        state_changes: { adds: [], resolves: [] }
+        holding: [PROP_FLARE_GUN]
+        carrying: null
+        moved: Climbed down the ladder from the wheelhouse.
+        wardrobe_change: null
+      - character: CHAR_OSKAR
+        off_panel: true
+        position: { level: deck, side: left, landmark: crates }
+        action: Holds still under the tarpaulin.
+        wardrobe: WARD_OSKAR_HOODED_JACKET
+        state: [cut_left_hand]
+        state_changes: { adds: [], resolves: [] }
+        holding: []
+        carrying: null
+        moved: null
+        wardrobe_change: null
+    props:
+      - prop: PROP_TARPAULIN
+        position: { level: deck, side: left, landmark: crates }
+        state: []
+        visible: true
+    transfers: []
+    lettering:
+      - id: L01
+        type: caption
+        speaker: null
+        text: The deck should have been empty.
+        order: 1
+    notes: The descent is drawn so the change of level is never left to the gutter.
+
+  - id: PN_001_002_02
+    order: 2
+    tier: 1
+    size: medium
+    framing:
+      shot_size: medium_wide
+      angle: eye_level
+      view: profile
+      composition: Mara at right of frame facing screen left. The covered crates fill the left half.
+    moment: Mara stands at the crates and levels the flare gun at the tarpaulin.
+    location: LOC_FERRY_DECK
+    transition_in: action
+    ellipsis: null
+    background: Low bulwark and black water beyond the bow.
+    cast:
+      - character: CHAR_MARA
+        off_panel: false
+        position: { level: deck, side: left, landmark: crates }
+        facing: left
+        action: Levels the flare gun at the tarpaulin with her right hand.
+        acting: Feet apart, left hand open at her side, chin down.
+        wardrobe: WARD_MARA_OILSKIN
+        state: []
+        state_changes: { adds: [], resolves: [] }
+        holding: [PROP_FLARE_GUN]
+        carrying: null
+        moved: Walked forward along the deck from the ladder to the crates.
+        wardrobe_change: null
+      - character: CHAR_OSKAR
+        off_panel: true
+        position: { level: deck, side: left, landmark: crates }
+        action: Holds still under the tarpaulin.
+        wardrobe: WARD_OSKAR_HOODED_JACKET
+        state: [cut_left_hand]
+        state_changes: { adds: [], resolves: [] }
+        holding: []
+        carrying: null
+        moved: null
+        wardrobe_change: null
+    props:
+      - prop: PROP_TARPAULIN
+        position: { level: deck, side: left, landmark: crates }
+        state: []
+        visible: true
+    transfers: []
+    lettering:
+      - id: L02
+        type: balloon
+        speaker: CHAR_MARA
+        text: "I know you're under there."
+        order: 2
+    notes: ""
+
+  - id: PN_001_002_03
+    order: 3
+    tier: 2
+    size: medium
+    framing:
+      shot_size: medium
+      angle: high_angle
+      view: three_quarter
+      composition: Seen from over Mara's shoulder. Oskar low between the crates at left, looking up.
+    moment: Mara lifts a corner of the tarpaulin and uncovers Oskar crouched between the crates.
+    location: LOC_FERRY_DECK
+    transition_in: action
+    ellipsis: null
+    background: Crate slats and lashing rope.
+    cast:
+      - character: CHAR_MARA
+        off_panel: false
+        position: { level: deck, side: left, landmark: crates }
+        facing: left
+        action: Lifts a corner of the tarpaulin with her left hand, flare gun in her right.
+        acting: Leans in from above. The torn left cuff rides up her wrist.
+        wardrobe: WARD_MARA_OILSKIN
+        state: []
+        state_changes: { adds: [], resolves: [] }
+        holding: [PROP_FLARE_GUN, PROP_TARPAULIN]   # two props, one hand each: the hands budget is full
+        carrying: null
+        moved: null
+        wardrobe_change: null
+      - character: CHAR_OSKAR
+        off_panel: false
+        position: { level: deck, side: left, landmark: crates }
+        facing: right
+        action: Crouches between the crates with his cut left hand held against his chest.
+        acting: Hood up, round face tilted up, eyes on the flare gun and not on Mara.
+        wardrobe: WARD_OSKAR_HOODED_JACKET
+        state: [cut_left_hand]
+        state_changes: { adds: [], resolves: [] }
+        holding: []
+        carrying: null
+        moved: null
+        wardrobe_change: null
+    props: []
+    transfers:
+      - prop: PROP_TARPAULIN
+        from: null
+        to: CHAR_MARA
+        how: pickup
+    lettering:
+      - id: L03
+        type: whisper
+        speaker: CHAR_OSKAR
+        text: "Please. Don't signal them."
+        order: 3
+    notes: First drawn appearance of Oskar. The prompt states how he differs from Mara.
+
+  - id: PN_001_002_04
+    order: 4
+    tier: 2
+    size: medium
+    framing:
+      shot_size: medium_close_up
+      angle: eye_level
+      view: profile
+      composition: Mara standing at center, turned to screen right. Oskar's face low at left in the gap under the tarpaulin.
+    moment: Mara stands over the lowered tarpaulin with the flare gun pointed at the deck while Oskar watches from the gap she left.
+    location: LOC_FERRY_DECK
+    transition_in: action
+    ellipsis: null
+    background: Far astern at screen right, a searchlight sweeps the water.
+    cast:
+      - character: CHAR_MARA
+        off_panel: false
+        position: { level: deck, side: left, landmark: crates }
+        facing: right
+        action: Stands over the crates with the flare gun lowered at her right side.
+        acting: Head turned toward the searchlight astern, shoulders squared between it and the boy.
+        wardrobe: WARD_MARA_OILSKIN
+        state: []
+        state_changes: { adds: [], resolves: [] }
+        holding: [PROP_FLARE_GUN]
+        carrying: null
+        moved: null
+        wardrobe_change: null
+      - character: CHAR_OSKAR
+        off_panel: false
+        position: { level: deck, side: left, landmark: crates }
+        facing: right
+        action: Looks out from the gap under the tarpaulin, cut left hand gripping the crate lashing.
+        acting: Only the round face, the hood, and the hand show.
+        wardrobe: WARD_OSKAR_HOODED_JACKET
+        state: [cut_left_hand]
+        state_changes: { adds: [], resolves: [] }
+        holding: []
+        carrying: null
+        moved: null
+        wardrobe_change: null
+    props:
+      - prop: PROP_TARPAULIN
+        position: { level: deck, side: left, landmark: crates }
+        state: []
+        visible: true
+    transfers:
+      - prop: PROP_TARPAULIN
+        from: CHAR_MARA
+        to: null
+        how: set_down
+    lettering:
+      - id: L04
+        type: balloon
+        speaker: CHAR_MARA
+        text: Stay down. Not a sound.
+        order: 4
+    notes: The searchlight is the first sign of the patrol. It stays at screen right.
+
+references:
+  required: [LOOK_NOIR_INK_MASTER_V01, CHAR_MARA_TURN_MASTER_V01, CHAR_OSKAR_TURN_MASTER_V01]
+  optional: [LOC_FERRY_DECK_PLATE_MASTER_V01]
+
+continuity:
+  enters_from: PG_001_001
+  exits_to: null
+  attach_previous_render: true
+
+generation:
+  provider: harness-native
+  mode: full_page
+
+status: reviewed
+current_render: PG_001_002_V02

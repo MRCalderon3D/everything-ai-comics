@@ -1,0 +1,33 @@
+# Schema: schemas/character.schema.json
+
+id: CHAR_MARA
+name: Mara
+aliases: []
+role: protagonist
+
+description:
+  summary: Ferry pilot in her fifties, weathered, economical in movement.
+  age: fifties
+  build: wiry, slightly stooped
+  hair: grey, cropped
+  face: long face, deep-set eyes, broken nose
+  skin: weathered
+  distinguishing_features:
+    - broken nose
+    - grey cropped hair
+    - oilskin coat with a torn left cuff
+
+prompt_summary: Wiry woman in her fifties with cropped grey hair, a broken nose and an oilskin coat torn at the left cuff.
+visually_adjacent_to: [CHAR_OSKAR]     # added after finding F01 on PG_001_002_V01
+personality: Says little, notices everything.
+voice: Short sentences. No questions unless she needs the answer.
+arc: From avoiding trouble to choosing it.
+first_appearance: PG_001_001
+default_wardrobe: WARD_MARA_OILSKIN
+wardrobe_file: wardrobe.yaml
+
+references:
+  - CHAR_MARA_TURN_MASTER_V01
+
+status: approved
+notes: Against Oskar she is the tall one with the long face, the bare grey head, and no hood.

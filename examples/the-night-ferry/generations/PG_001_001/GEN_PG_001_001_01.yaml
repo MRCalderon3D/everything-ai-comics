@@ -1,0 +1,32 @@
+# Schema: schemas/generation-record.schema.json
+
+id: GEN_PG_001_001_01
+page: PG_001_001
+asset: null
+provider: harness-native
+model: unreported
+kind: image
+prompt_package: PP_PG_001_001_HARNESS-NATIVE
+output_render: PG_001_001_V01
+
+request:
+  summary: Handoff to the harness image tool.
+  endpoint: null
+
+response:
+  summary: One image returned.
+  provider_job_id: null
+  error: null
+
+media_files: [issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V01.png]
+
+cost:
+  currency: USD
+  amount: null
+  estimated: false
+  reported: false
+
+seed: null
+metadata_unavailable: [model, cost, seed]
+status: succeeded
+created_at: "2026-11-26T10:00:00Z"

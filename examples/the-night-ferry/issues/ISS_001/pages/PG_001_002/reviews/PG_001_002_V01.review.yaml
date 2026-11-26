@@ -1,0 +1,85 @@
+# Schema: schemas/visual-review.schema.json
+# First render of the page. One blocking identity finding, so the verdict is flagged.
+
+page: PG_001_002
+render: PG_001_002_V01
+supersedes: null
+reviewer: visual-reviewer
+independent: true
+
+compared_against:
+  references: [LOOK_NOIR_INK_MASTER_V01, CHAR_MARA_TURN_MASTER_V01, CHAR_OSKAR_TURN_MASTER_V01]
+  neighbors: [PG_001_001_V01]
+
+checks:
+  identity:
+    result: fail
+    evidence: The crouching figure in panels 3 and 4 has Mara's long face, deep-set eyes and cropped grey hair, and no hood.
+  cast_count:
+    result: pass
+    evidence: One adult in panels 1 and 2. One adult and one smaller figure in panels 3 and 4.
+  position:
+    result: pass
+    evidence: Mara on the ladder in panel 1 and at the crates in panels 2 to 4. The smaller figure is between the crates.
+  movement:
+    result: pass
+    evidence: The ladder descent is shown in panel 1.
+  role_causality:
+    result: pass
+    evidence: The standing adult lifts the tarpaulin in panel 3. The crouching figure does not touch it.
+  object_identity:
+    result: pass
+    evidence: The flare gun keeps its wide barrel and lanyard ring in all four panels.
+  object_custody:
+    result: pass
+    evidence: The gun is in the standing adult's right hand in all four panels. The tarpaulin corner is in her left hand in panel 3 only.
+  physical_state:
+    result: pass
+    evidence: A dark cut shows on the smaller figure's left hand in panels 3 and 4.
+  wardrobe:
+    result: pass
+    evidence: Mara's coat has the torn left cuff in panels 1 to 4. The smaller figure's missing hood is recorded under F01.
+  spatial_logic:
+    result: pass
+    evidence: The bow stays screen left. The searchlight in panel 4 is at screen right.
+  drawing_clarity:
+    result: pass
+    evidence: Hands are separate and readable, including the two-handed pose in panel 3.
+  lettering:
+    result: pass
+    evidence: All four strings are exact. The whisper balloon in panel 3 points to the crouching figure.
+  page_structure:
+    result: pass
+    evidence: Four panels in a 2 / 2 grid.
+  style_fidelity:
+    result: pass
+    evidence: Line weight and black placement match the look master.
+
+findings:
+  - id: F01
+    panel: PN_001_002_03
+    check: identity
+    expected: Oskar has a round face, wide-set eyes, a small build, and a hooded jacket with the hood up.
+    visible: The boy in panel 3 has Mara's long face and cropped grey hair and no hood. Panel 4 repeats it.
+    severity: blocking
+    repair: Regenerate panels 3 and 4 as a sibling version with Oskar's sheet attached and his difference from Mara stated. Lock the lettering, the borders, and Mara.
+    status: open
+
+gates:
+  style_fidelity: pass
+  narrative_continuity: fail
+
+verdict: flagged
+repair_cycle: 0
+reviewed_at: "2026-11-26"
+
+human_approval:
+  status: pending
+  by: null
+  at: null
+
+notes: >
+  Example data. The file on disk is a flat placeholder, so this evidence shows
+  the form of a review and describes no real drawing. Upstream cause of F01:
+  Oskar's sheet was not attached, and neither character listed the other under
+  visually_adjacent_to. Both were corrected before the repair was compiled.

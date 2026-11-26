@@ -1,0 +1,16 @@
+# Schema: schemas/location.schema.json
+
+id: LOC_FERRY_DECK
+name: Ferry deck
+
+description:
+  summary: Open steel car deck of a small river ferry, wheelhouse raised aft.
+  architecture: Flat deck, low bulwarks, a steel ladder up to the wheelhouse.
+  dressing: Coiled mooring lines, two crates lashed near the bow under a tarpaulin, a fire bucket.
+  light: One shielded lamp in the wheelhouse. Otherwise moonlight.
+
+prompt_summary: Open steel deck of a small river ferry at night with a raised wheelhouse aft and two lashed crates under a tarpaulin near the bow.
+time_of_day_states: [night]
+map_file: map.yaml
+references: [LOC_FERRY_DECK_PLATE_MASTER_V01]
+status: approved

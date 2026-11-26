@@ -1,0 +1,25 @@
+# Schema: schemas/scene.schema.json
+
+id: SC_001_01
+issue: ISS_001
+location: LOC_FERRY_DECK
+time_of_day: night
+cast: [CHAR_MARA, CHAR_OSKAR]
+summary: Mara hears the crates shift, goes down with the flare gun, and finds the boy.
+
+geography:
+  travel_direction: right_to_left      # the ferry heads bow first, and the bow is screen left
+  threat_direction: right_to_left      # the patrol launch comes up from the stern, screen right
+  notes: >
+    Mara walks from the wheelhouse (right) to the crates (left) with the threat
+    behind her. The searchlight only ever appears at screen right.
+
+beats:
+  - id: BT_001_01_01
+    summary: Mara crosses alone and hears something shift on deck.
+    pages: [PG_001_001]
+  - id: BT_001_01_02
+    summary: Mara goes down armed, uncovers the boy, and chooses not to signal.
+    pages: [PG_001_002]
+
+pages: [PG_001_001, PG_001_002]

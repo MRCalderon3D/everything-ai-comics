@@ -1,0 +1,37 @@
+# Schema: schemas/location-map.schema.json
+
+location: LOC_FERRY_DECK
+
+levels:
+  - id: deck
+    description: Car deck, at water level.
+  - id: wheelhouse
+    description: Raised cabin aft, reached by the ladder.
+
+sides:
+  convention: Bow is screen left, stern is screen right when facing port.
+  left: bow
+  right: stern
+
+landmarks:
+  - id: crates
+    level: deck
+    side: left
+    description: Two lashed crates near the bow, covered by a tarpaulin.
+  - id: ladder
+    level: deck
+    side: right
+    description: Steel ladder to the wheelhouse.
+
+exits:
+  - id: gangway
+    level: deck
+    side: left
+    leads_to: null
+
+connections:
+  - from: deck
+    to: wheelhouse
+    via: ladder
+
+notes: The wheelhouse sits over the stern, so a character in it is always at side right.

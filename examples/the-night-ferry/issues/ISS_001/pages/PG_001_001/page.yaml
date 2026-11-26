@@ -1,0 +1,266 @@
+# Schema: schemas/page.schema.json
+# Oskar is under the tarpaulin for this whole page. He is never drawn, but every panel
+# keeps his row so his position and his cut hand cannot reset before page 2.
+
+id: PG_001_001
+issue: ISS_001
+number: 1
+scene: SC_001_01
+side: right
+spread_with: null
+purpose: Establish the ferry, Mara alone, and the sound that breaks the routine.
+page_turn: reveal
+
+layout:
+  grid: "three tiers, 1 / 2 / 1"
+  tiers: [1, 2, 1]
+  reading_order: [1, 2, 3, 4]
+  notes: Wide panels top and bottom frame the two smaller ones.
+
+panels:
+  - id: PN_001_001_01
+    order: 1
+    tier: 1
+    size: wide
+    framing:
+      shot_size: extreme_wide
+      angle: high_angle
+      view: three_quarter
+      composition: Ferry small in a wide black river, bow pointing screen left.
+    moment: The ferry crosses dark water with one shielded lamp lit.
+    location: LOC_FERRY_DECK
+    transition_in: null
+    ellipsis: null
+    background: River, far bank without lights.
+    cast:
+      - character: CHAR_MARA
+        off_panel: false
+        position:
+          level: wheelhouse
+          side: right
+          landmark: null
+        facing: left
+        action: Steers with one hand.
+        acting: Shoulders loose, eyes ahead. A small figure behind the lit window.
+        wardrobe: WARD_MARA_OILSKIN
+        state: []
+        state_changes:
+          adds: []
+          resolves: []
+        holding: []
+        carrying: null
+        moved: null
+        wardrobe_change: null
+      - character: CHAR_OSKAR
+        off_panel: true
+        position: { level: deck, side: left, landmark: crates }
+        action: Hides under the tarpaulin between the crates.
+        wardrobe: WARD_OSKAR_HOODED_JACKET
+        state: [cut_left_hand]
+        state_changes: { adds: [], resolves: [] }
+        holding: []
+        carrying: null
+        moved: null
+        wardrobe_change: null
+    props:
+      - prop: PROP_FLARE_GUN
+        position: { level: wheelhouse, side: right, landmark: null }
+        state: []
+        visible: false
+      - prop: PROP_TARPAULIN
+        position: { level: deck, side: left, landmark: crates }
+        state: []
+        visible: true
+    transfers: []
+    lettering:
+      - id: L01
+        type: caption
+        speaker: null
+        text: Last crossing of the night.
+        order: 1
+    notes: ""
+
+  - id: PN_001_001_02
+    order: 2
+    tier: 2
+    size: medium
+    framing:
+      shot_size: medium
+      angle: eye_level
+      view: three_quarter
+      composition: Mara right of center at the wheel, the flare gun on its hook by the door behind her.
+    moment: Mara steers alone, right hand on the wheel, left hand in her coat pocket.
+    location: LOC_FERRY_DECK
+    transition_in: subject
+    ellipsis: null
+    background: Wheelhouse interior, shielded lamp overhead, black windows.
+    cast:
+      - character: CHAR_MARA
+        off_panel: false
+        position: { level: wheelhouse, side: right, landmark: null }
+        facing: left
+        action: Steers with her right hand, left hand in her coat pocket.
+        acting: Jaw set, eyes on the dark ahead. The broken nose reads in three-quarter view.
+        wardrobe: WARD_MARA_OILSKIN
+        state: []
+        state_changes: { adds: [], resolves: [] }
+        holding: []
+        carrying: null
+        moved: null
+        wardrobe_change: null
+      - character: CHAR_OSKAR
+        off_panel: true
+        position: { level: deck, side: left, landmark: crates }
+        action: Hides under the tarpaulin between the crates.
+        wardrobe: WARD_OSKAR_HOODED_JACKET
+        state: [cut_left_hand]
+        state_changes: { adds: [], resolves: [] }
+        holding: []
+        carrying: null
+        moved: null
+        wardrobe_change: null
+    props:
+      - prop: PROP_FLARE_GUN
+        position: { level: wheelhouse, side: right, landmark: null }
+        state: []
+        visible: true
+      - prop: PROP_TARPAULIN
+        position: { level: deck, side: left, landmark: crates }
+        state: []
+        visible: false
+    transfers: []
+    lettering:
+      - id: L02
+        type: caption
+        speaker: null
+        text: Nine years on the night run. Always alone.
+        order: 2
+    notes: The flare gun is planted here so its pickup in panel 4 is not a surprise.
+
+  - id: PN_001_001_03
+    order: 3
+    tier: 2
+    size: medium
+    framing:
+      shot_size: insert
+      angle: high_angle
+      view: front
+      composition: The tarpaulin over the crates fills the frame. One corner lifts a little.
+    moment: The tarpaulin over the crates shifts.
+    location: LOC_FERRY_DECK
+    transition_in: subject
+    ellipsis: null
+    background: Wet deck plating around the crates.
+    cast:
+      - character: CHAR_MARA
+        off_panel: true
+        position: { level: wheelhouse, side: right, landmark: null }
+        action: Steers, out of frame.
+        wardrobe: WARD_MARA_OILSKIN
+        state: []
+        state_changes: { adds: [], resolves: [] }
+        holding: []
+        carrying: null
+        moved: null
+        wardrobe_change: null
+      - character: CHAR_OSKAR
+        off_panel: true
+        position: { level: deck, side: left, landmark: crates }
+        action: Shifts his weight under the tarpaulin.
+        wardrobe: WARD_OSKAR_HOODED_JACKET
+        state: [cut_left_hand]
+        state_changes: { adds: [], resolves: [] }
+        holding: []
+        carrying: null
+        moved: null
+        wardrobe_change: null
+    props:
+      - prop: PROP_FLARE_GUN
+        position: { level: wheelhouse, side: right, landmark: null }
+        state: []
+        visible: false
+      - prop: PROP_TARPAULIN
+        position: { level: deck, side: left, landmark: crates }
+        state: []
+        visible: true
+    transfers: []
+    lettering:
+      - id: L03
+        type: sfx
+        speaker: null
+        text: SKRRT
+        order: 3
+    notes: Nobody is drawn. The reader sees the canvas move and nothing else.
+
+  - id: PN_001_001_04
+    order: 4
+    tier: 3
+    size: wide
+    framing:
+      shot_size: medium_close_up
+      angle: eye_level
+      view: profile
+      composition: Mara in profile at right, looking screen left toward the deck window. Her right hand and the hook by the door are in frame.
+    moment: Mara, head turned toward the deck, lifts the flare gun off its hook by the wheelhouse door.
+    location: LOC_FERRY_DECK
+    transition_in: action
+    ellipsis: null
+    background: Dark deck window, the edge of the wheel.
+    cast:
+      - character: CHAR_MARA
+        off_panel: false
+        position: { level: wheelhouse, side: right, landmark: null }
+        facing: left
+        action: Lifts the flare gun off its hook with her right hand.
+        acting: Head turned toward the deck window, eyes narrowed, left hand still on the wheel.
+        wardrobe: WARD_MARA_OILSKIN
+        state: []
+        state_changes: { adds: [], resolves: [] }
+        holding: [PROP_FLARE_GUN]
+        carrying: null
+        moved: null
+        wardrobe_change: null
+      - character: CHAR_OSKAR
+        off_panel: true
+        position: { level: deck, side: left, landmark: crates }
+        action: Holds still under the tarpaulin.
+        wardrobe: WARD_OSKAR_HOODED_JACKET
+        state: [cut_left_hand]
+        state_changes: { adds: [], resolves: [] }
+        holding: []
+        carrying: null
+        moved: null
+        wardrobe_change: null
+    props:
+      - prop: PROP_TARPAULIN
+        position: { level: deck, side: left, landmark: crates }
+        state: []
+        visible: false
+    transfers:
+      - prop: PROP_FLARE_GUN
+        from: null
+        to: CHAR_MARA
+        how: pickup
+    lettering:
+      - id: L04
+        type: balloon
+        speaker: CHAR_MARA
+        text: "Rats don't weigh that much."
+        order: 4
+    notes: ""
+
+references:
+  required: [LOOK_NOIR_INK_MASTER_V01, CHAR_MARA_TURN_MASTER_V01]
+  optional: [LOC_FERRY_DECK_PLATE_MASTER_V01]
+
+continuity:
+  enters_from: null
+  exits_to: PG_001_002
+  attach_previous_render: false        # first page of the issue: there is no previous render
+
+generation:
+  provider: harness-native
+  mode: full_page
+
+status: reviewed
+current_render: PG_001_001_V01

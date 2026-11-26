@@ -1,0 +1,12 @@
+# Schema: schemas/issue.schema.json
+
+id: ISS_001
+number: 1
+title: Crossing
+source_span: story/source/night-ferry.txt#p1-p9
+summary: Mara finds Oskar and decides not to hand him over.
+scenes: [SC_001_01]
+page_count: 2
+panel_count: 8
+opens_from: null
+status: review

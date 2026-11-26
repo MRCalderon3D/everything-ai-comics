@@ -1,0 +1,128 @@
+# The Night Ferry: canon
+# Schema: schemas/story-bible.schema.json
+
+title: The Night Ferry
+premise: >
+  Mara pilots the last river ferry of the night, alone, an hour after curfew.
+  Halfway across she finds a boy hiding on her deck, the same boy the harbour
+  patrol has been asking every vessel to report. She has a flare gun in her
+  hand and a searchlight coming up astern, and she decides not to use the one
+  to call the other.
+tone: Dry, tense, quiet.
+
+world_rules:
+  - After curfew the ferry runs dark, with one shielded lamp over the wheel.
+  - The harbour patrol works from a launch with a searchlight and always comes up from astern.
+  - A flare brings the patrol alongside within minutes.
+
+facts:
+  - id: FACT_001
+    statement: Mara pilots the last night ferry alone and has done so for nine years.
+    provenance: source
+    source_ref: story/source/night-ferry.txt#p2
+    replaces: null
+    affects: [CHAR_MARA]
+  - id: FACT_002
+    statement: Mara is past fifty, with short grey hair and a broken nose.
+    provenance: source
+    source_ref: story/source/night-ferry.txt#p2
+    replaces: null
+    affects: [CHAR_MARA]
+  - id: FACT_003
+    statement: The ferry crosses after curfew with no cars on deck and one shielded lamp over the wheel.
+    provenance: source
+    source_ref: story/source/night-ferry.txt#p1
+    replaces: null
+    affects: [LOC_FERRY_DECK]
+  - id: FACT_004
+    statement: The harbour patrol is looking for a boy of about twelve and has told every vessel to signal if it sees him.
+    provenance: source
+    source_ref: story/source/night-ferry.txt#p3
+    replaces: null
+    affects: [CHAR_OSKAR]
+  - id: FACT_005
+    statement: Two crates are lashed on the deck near the bow.
+    provenance: source
+    source_ref: story/source/night-ferry.txt#p4
+    replaces: null
+    affects: [LOC_FERRY_DECK]
+  - id: FACT_006
+    statement: A flare pistol hangs on a hook by the wheelhouse door. Mara takes it and carries it down the ladder.
+    provenance: source
+    source_ref: story/source/night-ferry.txt#p5
+    replaces: null
+    affects: [PROP_FLARE_GUN, CHAR_MARA]
+  - id: FACT_007
+    statement: The boy hides in the chain locker beside the crates, under a hatch that Mara lifts.
+    provenance: source
+    source_ref: story/source/night-ferry.txt#p6-p7
+    replaces: null
+    affects: [CHAR_OSKAR, LOC_FERRY_DECK]
+  - id: FACT_008
+    statement: The boy has a round face, wears a hood, and has cut his left hand on the fence wire.
+    provenance: source
+    source_ref: story/source/night-ferry.txt#p7
+    replaces: null
+    affects: [CHAR_OSKAR]
+  - id: FACT_009
+    statement: Mara does not signal the patrol. She covers the boy again and tells him to stay down.
+    provenance: source
+    source_ref: story/source/night-ferry.txt#p9
+    replaces: null
+    affects: [CHAR_MARA, CHAR_OSKAR]
+  - id: FACT_010
+    statement: The boy hides under a tarpaulin lashed over the two crates. There is no chain locker and no hatch.
+    provenance: user_change            # asked for so the hiding place is visible on the open deck from page 1
+    replaces: FACT_007
+    affects: [CHAR_OSKAR, LOC_FERRY_DECK, PROP_TARPAULIN]
+  - id: FACT_011
+    statement: The boy is called Oskar. Nobody says his name in ISS_001.
+    provenance: addition
+    replaces: null
+    affects: [CHAR_OSKAR]
+  - id: FACT_012
+    statement: Mara's oilskin coat is torn at the left cuff.
+    provenance: addition
+    replaces: null
+    affects: [CHAR_MARA]
+  - id: FACT_013
+    statement: The flare pistol is orange, fires one flare, and has a wide stubby barrel and a lanyard ring.
+    provenance: addition
+    replaces: null
+    affects: [PROP_FLARE_GUN]
+
+characters:
+  - id: CHAR_MARA
+    role: protagonist
+    arc: From avoiding trouble to choosing it.
+  - id: CHAR_OSKAR
+    role: supporting
+    arc: From hiding from everyone to trusting one person.
+
+timeline:
+  - order: 1
+    event: A boy goes over the fence at the bonded sheds and cuts his left hand on the wire.
+  - order: 2
+    event: The boy hides under the tarpaulin on the ferry at the east dock.
+  - order: 3
+    event: Mara leaves the east dock an hour after curfew.
+    issue: ISS_001
+  - order: 4
+    event: Mara hears the crates shift, takes the flare gun, and goes down to the deck.
+    issue: ISS_001
+  - order: 5
+    event: Mara uncovers the boy and does not signal the patrol.
+    issue: ISS_001
+
+open_questions:
+  - question: Does the patrol know the boy's name?
+    blocking: false
+    resolution: null
+  - question: Is the wheelhouse lamp still lit while Mara is on deck?
+    blocking: false
+    resolution: null
+  - question: Who steers while Mara is on deck?
+    blocking: false
+    resolution: The source does not say. The wheel is taken to be lashed, and ISS_001 never shows it.
+
+notes: FACT_010 changes the dialogue as well. "I know you're in there" becomes "I know you're under there" on PG_001_002.

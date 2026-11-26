@@ -1,0 +1,15 @@
+# Schema: schemas/prop.schema.json
+
+id: PROP_FLARE_GUN
+name: Flare gun
+
+description:
+  summary: Orange single-shot flare pistol with a wide barrel.
+  distinguishing_features: [wide stubby barrel, lanyard ring]
+
+prompt_summary: Orange single-shot flare pistol with a wide stubby barrel.
+hands_required: 1
+plot_relevant: true
+references: []
+status: draft
+notes: Hangs on a hook by the wheelhouse door until Mara takes it. On these monochrome pages it is drawn in outline with a black grip.

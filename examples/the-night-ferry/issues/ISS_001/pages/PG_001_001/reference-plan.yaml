@@ -1,0 +1,31 @@
+# Schema: schemas/reference-plan.schema.json
+
+page: PG_001_001
+provider: harness-native
+budget: 4
+
+required:
+  - asset_id: LOOK_NOIR_INK_MASTER_V01
+    entity: LOOK_NOIR_INK
+    role: style
+    priority: critical
+    reason: Fixed drawing style for every request.
+    omission_risk: Style drifts toward the model's default.
+  - asset_id: CHAR_MARA_TURN_MASTER_V01
+    entity: CHAR_MARA
+    role: identity
+    priority: critical
+    reason: Mara is drawn in panels 1, 2 and 4.
+    omission_risk: The broken nose and the cropped hair change from panel to panel.
+
+optional:
+  - asset_id: LOC_FERRY_DECK_PLATE_MASTER_V01
+    entity: LOC_FERRY_DECK
+    role: spatial_continuity
+    priority: high
+    reason: Panel 1 establishes the ferry, with the wheelhouse aft and the crates near the bow.
+    omission_risk: The wheelhouse and the crates end up on the wrong sides.
+
+exclude: [CHAR_OSKAR_TURN_MASTER_V01]
+created_at: "2026-11-26"
+notes: Oskar is off-panel in all four panels. His sheet is left out so the model has no reason to draw him.

@@ -1,0 +1,12 @@
+# Schema: schemas/wardrobe.schema.json
+
+character: CHAR_OSKAR
+
+outfits:
+  - id: WARD_OSKAR_HOODED_JACKET
+    description: Dark hooded canvas jacket two sizes too big with the hood up, shirt, wet trousers, laced boots.
+    layers: [hooded jacket, shirt, trousers, laced boots]
+    accessories: []
+    hands: bare
+    references: [CHAR_OSKAR_TURN_MASTER_V01]
+    used_in: [ISS_001]

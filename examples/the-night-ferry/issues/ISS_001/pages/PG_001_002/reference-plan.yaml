@@ -1,0 +1,41 @@
+# Schema: schemas/reference-plan.schema.json
+
+page: PG_001_002
+provider: harness-native
+budget: 4
+
+required:
+  - asset_id: LOOK_NOIR_INK_MASTER_V01
+    entity: LOOK_NOIR_INK
+    role: style
+    priority: critical
+    reason: Fixed drawing style for every request.
+    omission_risk: Style drifts toward the model's default.
+  - asset_id: CHAR_MARA_TURN_MASTER_V01
+    entity: CHAR_MARA
+    role: identity
+    priority: critical
+    reason: Mara is drawn in all four panels.
+    omission_risk: Her face changes between this page and page 1.
+  - asset_id: CHAR_OSKAR_TURN_MASTER_V01
+    entity: CHAR_OSKAR
+    role: identity
+    priority: critical
+    reason: Oskar is drawn for the first time, in panels 3 and 4, next to Mara.
+    omission_risk: He is drawn with Mara's face. That is finding F01 on PG_001_002_V01.
+
+optional:
+  - asset_id: PG_001_001_V01
+    entity: null
+    role: spatial_continuity
+    priority: high
+    reason: The reviewed previous page fixes the ferry, the crates, and the flare gun as drawn.
+    omission_risk: The deck and the gun are redesigned between pages.
+
+exclude: [LOC_FERRY_DECK_PLATE_MASTER_V01]
+created_at: "2026-11-26"
+notes: >
+  Revised after the review of PG_001_002_V01. The first plan put the location
+  plate ahead of Oskar's sheet, and the sheet did not fit the budget of four.
+  Oskar's sheet is now required. The plate is left out, because the previous
+  page already shows the deck and the fourth slot goes to that page.

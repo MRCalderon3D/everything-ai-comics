@@ -1,0 +1,23 @@
+# Schema: schemas/edition.schema.json
+# Draft edition. It ships V02 of page 2, the repaired render. V01 stays on disk and out of the edition.
+
+id: ED_001_01
+issue: ISS_001
+title: The Night Ferry - Crossing
+label: first edition
+status: draft
+supersedes: null
+changes: []
+
+pages:
+  - page: PG_001_001
+    render: PG_001_001_V01
+    file: issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V01.png
+    lettered_file: null
+  - page: PG_001_002
+    render: PG_001_002_V02
+    file: issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V02.png
+    lettered_file: null
+
+exports: []
+created_at: "2026-11-26"

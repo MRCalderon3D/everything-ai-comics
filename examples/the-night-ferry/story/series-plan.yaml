@@ -1,0 +1,13 @@
+# The Night Ferry: series plan
+# Schema: schemas/series-plan.schema.json
+
+title: The Night Ferry
+
+issues:
+  - id: ISS_001
+    number: 1
+    title: Crossing
+    source_span: story/source/night-ferry.txt#p1-p9
+    summary: Mara finds Oskar and decides not to hand him over.
+    page_budget: 2
+    status: review

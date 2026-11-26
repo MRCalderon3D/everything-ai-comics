@@ -1,0 +1,36 @@
+# Schema: schemas/character.schema.json
+
+id: CHAR_OSKAR
+name: Oskar
+aliases: [the boy]
+role: supporting
+
+description:
+  summary: Stowaway boy of about twelve, small for his age, who keeps very still and watches hands.
+  age: about twelve
+  build: slight, narrow shoulders, child-sized next to Mara
+  hair: dark, short, mostly hidden by the hood
+  face: round face, wide-set eyes, small chin
+  skin: pale, smudged
+  distinguishing_features:
+    - round face with wide-set eyes
+    - hooded jacket with the hood up
+    - child-sized build, a head and a half shorter than Mara
+
+prompt_summary: Boy of about twelve with a round face and wide-set eyes, a small build, and a dark hooded jacket with the hood up.
+visually_adjacent_to: [CHAR_MARA]      # added after finding F01 on PG_001_002_V01
+personality: Quiet and watchful. Asks for one thing and then stops talking.
+voice: Whispers. Very few words.
+arc: From hiding from everyone to trusting one person.
+first_appearance: PG_001_002
+default_wardrobe: WARD_OSKAR_HOODED_JACKET
+wardrobe_file: wardrobe.yaml
+
+references:
+  - CHAR_OSKAR_TURN_MASTER_V01
+
+status: approved
+notes: >
+  The cut on his left hand is a state, not part of his identity. It is carried
+  as the tag cut_left_hand in every ledger row of ISS_001 and does not appear
+  on the turnaround sheet.

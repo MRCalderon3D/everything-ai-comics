@@ -1,0 +1,15 @@
+# Schema: schemas/prop.schema.json
+
+id: PROP_TARPAULIN
+name: Tarpaulin
+
+description:
+  summary: Heavy canvas tarpaulin lashed over the two crates near the bow.
+  distinguishing_features: [rope eyelets along the hem, one corner left loose]
+
+prompt_summary: Heavy canvas tarpaulin with rope eyelets along the hem, lashed over two crates with one corner loose.
+hands_required: 1
+plot_relevant: true
+references: []
+status: draft
+notes: Lifting the loose corner takes one hand. It never leaves the crates.
