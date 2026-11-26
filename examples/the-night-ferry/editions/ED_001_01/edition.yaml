@@ -1,5 +1,6 @@
 # Schema: schemas/edition.schema.json
 # Draft edition. It ships V02 of page 2, the repaired render. V01 stays on disk and out of the edition.
+# The approved cover goes first in every export.
 
 id: ED_001_01
 issue: ISS_001
@@ -8,6 +9,11 @@ label: first edition
 status: draft
 supersedes: null
 changes: []
+
+cover:
+  render: CV_001_V01
+  file: issues/ISS_001/cover/renders/CV_001_V01.png
+  lettered_file: null
 
 pages:
   - page: PG_001_001

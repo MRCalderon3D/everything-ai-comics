@@ -130,7 +130,7 @@
       "description": "Default generation backend per kind.",
       "properties": {
         "image": {
-          "enum": ["fal", "replicate", "comfyui", "gemini", "harness-native", "manual"],
+          "enum": ["fal", "replicate", "comfyui", "gemini", "harness-native", "codex-cli", "manual"],
           "description": "Default image provider; one of the provider roster."
         }
       }
@@ -144,7 +144,7 @@
         "required": ["target"],
         "properties": {
           "target": {
-            "enum": ["pdf", "cbz", "web", "social-carousel", "print"],
+            "enum": ["pdf", "cbz", "web", "images", "epub", "social-carousel", "print"],
             "description": "Delivery target."
           },
           "notes": { "type": "string", "description": "What this deliverable is for." }

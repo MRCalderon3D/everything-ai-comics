@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://everything-ai-comics.dev/schemas/edition.schema.json",
   "title": "Edition",
-  "description": "One edition of an issue (production/editions/<ED_ID>/edition.yaml): the exact render of every page and the exports built from them. Only renders reviewed pass or fixed enter a non-draft edition; exports are never overwritten.",
+  "description": "One edition of an issue (production/editions/<ED_ID>/edition.yaml): the exact render of every page, an optional cover render, and the exports built from them. Only renders reviewed pass or fixed enter a non-draft edition; exports are never overwritten.",
   "type": "object",
   "additionalProperties": false,
   "required": ["id", "issue", "title", "label", "status", "pages", "exports"],
@@ -25,6 +25,28 @@
       "type": "array",
       "description": "What changed since the superseded edition.",
       "items": { "type": "string", "minLength": 1 }
+    },
+    "cover": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["render", "file"],
+      "description": "The cover render that ships as the first page of every export, or null for an edition without a cover.",
+      "properties": {
+        "render": {
+          "type": "string",
+          "pattern": "^CV_\\d{3}_V\\d{2}$",
+          "description": "The exact cover render that ships."
+        },
+        "file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path of the cover render file, relative to the workspace root."
+        },
+        "lettered_file": {
+          "type": ["string", "null"],
+          "description": "Overlay mode: path of the lettered cover. Else null."
+        }
+      }
     },
     "pages": {
       "type": "array",
@@ -60,7 +82,7 @@
         "additionalProperties": false,
         "required": ["format", "file"],
         "properties": {
-          "format": { "enum": ["pdf", "cbz", "web"], "description": "Export format." },
+          "format": { "enum": ["pdf", "cbz", "web", "images", "epub"], "description": "Export format." },
           "file": {
             "type": "string",
             "minLength": 1,

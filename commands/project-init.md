@@ -45,8 +45,8 @@ silently.
 - `lettering_mode` (enum, required): `in_image` | `overlay`.
 - `image_provider` (string, optional, default `harness-native`): an ID from
   `manifests/image-providers.json`.
-- `deliverables` (list, optional): `pdf` | `cbz` | `web` | `social-carousel` |
-  `print`.
+- `deliverables` (list, optional): `pdf` | `cbz` | `web` | `images` | `epub` |
+  `social-carousel` | `print`.
 - `rating` and `violence_treatment` (optional): written to `content`.
 - `max_repair_cycles` (int, optional, default 2): `repair_policy.max_cycles`.
 - `--force` (flag, optional): overwrite an existing `project.yaml`. Starter

@@ -1,0 +1,34 @@
+# production/issues/ISS_001/cover/cover.yaml: the front cover of one issue
+# Schema: schemas/cover.schema.json
+# One image, no panels. compile-prompts.js --cover ISS_001 compiles it; renders and reviews go beside it.
+
+id: CV_001                             # CV_<issue number>. One cover per issue
+issue: ISS_001
+
+concept: "TODO: the one image the cover shows, as a drawable moment."
+composition: "TODO: framing, who is large and who is small, and where the title sits."
+location: LOC_EXAMPLE                  # LOC id, or null for a cover with no setting
+time_of_day: night                     # dawn | day | dusk | night
+
+cast:                                  # characters drawn on the cover, once each. May be empty
+  - character: CHAR_EXAMPLE
+    wardrobe: WARD_EXAMPLE_DEFAULT     # default: the character's default_wardrobe
+    action: "TODO: the visible pose or action."
+    acting: "TODO: expression and body language."
+    state: []                          # physical state tags visible on the cover
+    holding: [PROP_EXAMPLE]            # props in this character's hands
+
+props: []                              # props in view that nobody holds
+
+lettering:
+  mode: in_image                       # in_image | overlay. Default: lettering.mode of project.yaml
+  title: "TODO: exact words of the title"
+  issue_line: null                     # exact words of the issue line, or null
+  tagline: null
+  credits: null
+
+generation:
+  provider: harness-native             # default: default_providers.image of project.yaml
+
+status: draft                          # draft | approved
+approved_render: null                  # CV_001_V##, set together with status approved, after a review with verdict pass or fixed

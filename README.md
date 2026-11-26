@@ -8,11 +8,11 @@
 
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 ![agents](https://img.shields.io/badge/agents-16-blueviolet)
-![commands](https://img.shields.io/badge/commands-26-orange)
+![commands](https://img.shields.io/badge/commands-27-orange)
 ![skills](https://img.shields.io/badge/skills-29-brightgreen)
 ![rules](https://img.shields.io/badge/rules-35-yellow)
-![schemas](https://img.shields.io/badge/schemas-18-red)
-![providers](https://img.shields.io/badge/providers-6-00b4c8)
+![schemas](https://img.shields.io/badge/schemas-19-red)
+![providers](https://img.shields.io/badge/providers-7-00b4c8)
 ![harnesses](https://img.shields.io/badge/harnesses-5-8b5e3c)
 ![formats](https://img.shields.io/badge/formats-paged%20%7C%20webtoon-9b30ff)
 
@@ -59,6 +59,7 @@ source text            story/source/
   → visual review      /visual-review                     reviews/<RENDER_ID>.review.yaml
   → repair             /repair-page                       the next _V##, with its own review
   → lettering          /lettering                         lettering.yaml, <RENDER_ID>.lettered.svg
+  → cover (optional)   /cover                             cover/cover.yaml, cover/renders/CV_###_V##.png
   → continuity review  /continuity-review                 continuity/<ISS_ID>.final-state.yaml
   → edition            /build-edition                     editions/<ED_ID>/edition.yaml, exports/
 ```
@@ -117,7 +118,8 @@ The commands a newcomer meets first:
 | `/generate-pages` | Generates pages one at a time. Dry-run by default. |
 | `/visual-review` | Reviews a rendered page against the plan and the references. |
 | `/repair-page` | Repairs a flagged page as a sibling version. |
-| `/build-edition` | Assembles reviewed pages and exports PDF, CBZ, and a web reader. |
+| `/cover` | Plans, generates, and reviews the issue's cover, and records the approved render. Optional. |
+| `/build-edition` | Assembles reviewed pages and exports PDF, CBZ, a web reader, numbered images, and EPUB. |
 
 The full walkthrough is [docs/getting-started.md](docs/getting-started.md).
 Every command is listed in pipeline order in
@@ -247,6 +249,11 @@ builds anyway, puts `-DRAFT` in every file name, and stamps every PDF page.
 `--force` replaces an export only while the edition is a draft. A corrected
 release is a new edition ID with `supersedes` and `changes` filled in.
 
+An edition can also name a cover render under `cover:`. The cover passes the
+same review gate, and it becomes the first page of every export:
+`000-cover` ahead of `001`. The formats are `pdf`, `cbz`, `web`, `images`
+(a folder and a zip of numbered images), and `epub` (EPUB 3, fixed layout).
+
 ### Records do not invent metadata
 
 Every generation attempt gets a record. When the tool does not report the
@@ -309,10 +316,11 @@ Every script takes `--help`. Pass arguments to an npm alias after `--`.
 | `validate-workspace.js` | `npm run validate:workspace` | Checks a workspace: schemas, cross-references, review and edition rules, and the ledger audit. Exit 1 on errors. |
 | `check-continuity.js` | `npm run check:continuity` | Audits the panel ledger. Exit 1 on errors. |
 | `build-reference-plan.js` | `npm run build:reference-plan` | Writes `reference-plan.yaml` for a page within the provider's image budget. |
-| `compile-prompts.js` | `npm run compile:prompts` | Compiles a page, a repair, or a reference sheet into a prompt package. |
+| `compile-prompts.js` | `npm run compile:prompts` | Compiles a page, a cover (`--cover <ISS_ID>`), a repair, or a reference sheet into a prompt package. |
 | `generate-assets.js` | `npm run generate:assets` | Runs prompt packages through a provider. Dry-run by default. |
-| `letter-pages.js` | `npm run letter` | Writes the SVG lettering overlay for a page (overlay mode). |
-| `build-edition.js` | `npm run build:edition` | Exports an edition as PDF, CBZ, and a web reader. |
+| `approve-asset.js` | `npm run approve:asset` | Records the approval of a reference candidate: copies it to its `_MASTER` name and registers it. `--supersede` replaces an earlier master. |
+| `letter-pages.js` | `npm run letter` | Writes the SVG lettering overlay for a page (overlay mode). `--register-lettered` files the PNG exported from it and sets `lettered_file` in the draft editions. |
+| `build-edition.js` | `npm run build:edition` | Exports an edition as PDF, CBZ, a web reader, numbered images, and EPUB, with the cover first when the edition names one. |
 | `build-board.js` | `npm run board` | Writes a one-page HTML board of an issue: plans, statuses, render thumbnails, recorded verdicts. |
 | `validate.js` | `npm run validate` | The scaffold's own gate: manifests, rosters, file formats, schemas, the example, wrapper drift. |
 | `sync-harnesses.js` | `npm run sync:harnesses` | Regenerates the harness wrapper directories. |
@@ -336,7 +344,19 @@ the entity's `refs/prompts/` (look pages under `references/style/prompts/`);
 each outfit and each detail subject gets its own file. The generated file is
 the next versioned candidate, such as `CHAR_OSKAR_EXPR_V01.png` or
 `PROP_FLARE_GUN_SHEET_V01.png`. It never takes
-the `_MASTER` name: promotion to master is an approval step.
+the `_MASTER` name: promotion to master is an approval step. Once you have
+looked at a candidate and approved it, one command records that:
+
+```bash
+node scripts/approve-asset.js --candidate CHAR_OSKAR_EXPR_V01 --root production
+```
+
+It copies the file to `CHAR_OSKAR_EXPR_MASTER_V01.png`, registers the master
+in `references/manifest.yaml` with the generation record it came from, and
+adds it to the character's `references`. For a look page it also sets
+`style.look_refs` in `project.yaml`, which freezes the style block. A sheet
+that already has a master needs `--supersede`; the old file stays on disk
+and its entry becomes `superseded`.
 
 ## Providers and keys
 
@@ -348,6 +368,7 @@ the environment only. Never commit them.
 | Provider | Variable | Reference images | Edits an image | Notes |
 |---|---|---|---|---|
 | `harness-native` | none | 4 | yes | Hands the request to the assistant's own image tool. No network call from the scripts. The default. |
+| `codex-cli` | none | 4 | yes | Runs the Codex command-line tool (`codex exec`) and saves the image it draws. Needs the `codex` binary and a signed-in Codex account. |
 | `manual` | none | 4 | yes | Hands the request to a person working in any image UI. No network call. |
 | `gemini` | `GOOGLE_API_KEY` | 3 | yes | Reads inline images and edits a given image. |
 | `fal` | `FAL_KEY` | 4 | yes | The default model is text-to-image and reads no input images. Pin a multi-image model for page work. |
@@ -362,6 +383,12 @@ repair. The alternative is overlay mode: the art is generated without text
 and `letter-pages.js` sets the lettering on top from `lettering.yaml`, which
 costs nothing to redo. Choose the mode in `project.yaml` before the first
 page is rendered.
+
+`codex-cli` reads three optional settings from the environment, and none is
+a key: `CODEX_BIN` (path of the `codex` executable when it is not on `PATH`),
+`CODEX_IMAGE_TIMEOUT_MS` (limit for one image, default 900000), and
+`CODEX_IMAGE_MODEL` (model for the Codex session). A live run still needs
+`--live` and `--yes`. `npm run doctor` reports whether `codex` is found.
 
 Capabilities and the provider interface are documented in
 [providers/README.md](providers/README.md).
@@ -414,7 +441,8 @@ hook API, so there the same checks run as batch gates:
   webtoon slices, and print files are prepared by hand from the edition.
 - No real provider API has been called by the test suite. The tests cover dry
   runs, the confirmation gate, the refusal without a key, and the save path
-  with a stand-in provider.
+  with a stand-in provider. The `codex-cli` tests run a stub in place of the
+  `codex` binary.
 - It produces no video, audio, or motion comics.
 
 ## Sibling repositories

@@ -9,13 +9,13 @@
   "properties": {
     "id": {
       "type": "string",
-      "pattern": "^GEN_(PG_\\d{3}_\\d{3}|(CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*)_\\d{2}$",
-      "description": "Record ID: GEN_<page or asset id>_<attempt##>, e.g. GEN_PG_001_001_01."
+      "pattern": "^GEN_(PG_\\d{3}_\\d{3}|CV_\\d{3}|(CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*)_\\d{2}$",
+      "description": "Record ID: GEN_<page, cover or asset id>_<attempt##>, e.g. GEN_PG_001_001_01, GEN_CV_001_01."
     },
     "page": {
       "type": ["string", "null"],
-      "pattern": "^PG_\\d{3}_\\d{3}$",
-      "description": "Page the attempt was for, or null for an asset-scoped record."
+      "pattern": "^(PG_\\d{3}_\\d{3}|CV_\\d{3})$",
+      "description": "Page the attempt was for, the cover ID for a cover record, or null for an asset-scoped record."
     },
     "asset": {
       "type": ["string", "null"],
@@ -31,12 +31,12 @@
     "kind": { "enum": ["image"], "description": "Kind of media generated." },
     "prompt_package": {
       "type": "string",
-      "pattern": "^PP_(PG_\\d{3}_\\d{3}|(CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*)_[A-Z0-9][A-Z0-9_-]*$",
+      "pattern": "^PP_(PG_\\d{3}_\\d{3}|CV_\\d{3}|(CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*)_[A-Z0-9][A-Z0-9_-]*$",
       "description": "Prompt package the attempt was generated from."
     },
     "output_render": {
       "type": ["string", "null"],
-      "pattern": "^PG_\\d{3}_\\d{3}_V\\d{2}$",
+      "pattern": "^(PG_\\d{3}_\\d{3}|CV_\\d{3})_V\\d{2}$",
       "description": "Render ID produced, or null."
     },
     "request": {

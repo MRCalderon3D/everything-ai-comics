@@ -36,6 +36,8 @@ node scripts/check-continuity.js --root examples/the-night-ferry
 node scripts/build-reference-plan.js --page <page.yaml>
 node scripts/compile-prompts.js --page <page.yaml>
 node scripts/generate-assets.js --page <page.yaml>        # dry-run by default
+node scripts/compile-prompts.js --cover <ISS_ID>          # the issue's cover; generate-assets.js takes --cover too
+node scripts/approve-asset.js --candidate <path-or-stem>  # promote an approved candidate to a master
 node scripts/letter-pages.js --page <page.yaml>
 node scripts/build-edition.js --edition <edition.yaml>
 node scripts/build-board.js --issue <issue dir>

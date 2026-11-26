@@ -80,7 +80,9 @@ writes nothing of its own; it decides what runs next and what waits.
    needed, and return to phase 4 for that page. Enforce `budget_cap`
    against the spend in the generation records.
 7. Phase 6, lettering and continuity. In `overlay` mode run `/lettering`
-   for every reviewed page. Then run `/continuity-review` for the issue.
+   for every reviewed page. If the issue is to have a cover, run `/cover`;
+   its render needs a passing review and the user's approval before the
+   edition can list it. Then run `/continuity-review` for the issue.
    Gate: no blocking finding and no blocking entry in `open_issues`; the
    final-state file exists.
 8. Phase 7, edition. Run `/build-edition`. Gate: the exports have been

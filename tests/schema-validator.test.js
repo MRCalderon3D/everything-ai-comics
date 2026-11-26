@@ -118,7 +118,8 @@ assert.ok(!schemaLib.checkSchemaDocument({ pattern: '([' }).valid, 'bad regex mu
 const { templateSchemaName, SCHEMA_ID_BASE, SCHEMA_NAMES } = require('../scripts/validate');
 
 // template basename = schema name, with two aliases and two schema-less kinds
-assert.strictEqual(SCHEMA_NAMES.length, 18);
+assert.strictEqual(SCHEMA_NAMES.length, 19);
+assert.strictEqual(templateSchemaName('cover/cover.yaml'), 'cover');
 assert.strictEqual(templateSchemaName('page/page.yaml'), 'page');
 assert.strictEqual(templateSchemaName('location/map.yaml'), 'location-map');
 assert.strictEqual(templateSchemaName('continuity/final-state.yaml'), 'continuity-state');

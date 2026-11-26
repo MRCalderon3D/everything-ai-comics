@@ -385,7 +385,9 @@ With overlay lettering, the art is generated without text and the
 lettering is set on top from geometry in `lettering.yaml`. A correction is
 an edit to a YAML file and costs nothing. The output is an SVG. Flattening
 it into the page image for an edition is done by hand in a browser or a
-vector tool.
+vector tool. `letter-pages.js --register-lettered` then files that image
+next to the render and sets it as the page's `lettered_file` in the draft
+editions.
 
 Choose before the first page is rendered. A language with accents the
 model is known to break, or pages that run close to their word budgets, are
@@ -396,7 +398,7 @@ reasons to choose overlay.
 | | |
 |---|---|
 | Before moving on | Every page has a current render with a passing review. The end-of-issue state is written. The edition lists the exact render of each page. Every export has been opened. |
-| Held in | `continuity/<ISS_ID>.final-state.yaml`, `editions/<ED_ID>/edition.yaml`, `editions/<ED_ID>/exports/` |
+| Held in | `continuity/<ISS_ID>.final-state.yaml`, `issues/<ISS_ID>/cover/` when the issue has a cover, `editions/<ED_ID>/edition.yaml`, `editions/<ED_ID>/exports/` |
 | Checked by | `validate-workspace.js` for the edition rules. `build-edition.js` refuses an unreviewed render without `--draft` and never overwrites an export. Publishing is a human decision. |
 | Rules | [publishing/edition-assembly.md](../rules/publishing/edition-assembly.md), [publishing/export-formats.md](../rules/publishing/export-formats.md), and the format layer: [paged/print-specs.md](../rules/paged/print-specs.md) or [webtoon/episode-deliverables.md](../rules/webtoon/episode-deliverables.md) |
 
@@ -415,6 +417,18 @@ An edition names the exact render of every page. It does not take the
 newest file in a folder, which may be a rejected attempt. In the example
 the edition lists `PG_001_001_V01` and `PG_001_002_V02`. `PG_001_002_V01`
 stays on disk, out of the edition, for comparison.
+
+An issue can have a cover. `/cover` plans it in
+`issues/<ISS_ID>/cover/cover.yaml` and takes it through the same loop as a
+page: compile, generate, review the pixels, repair within the limit. It is
+one image with no panels, so the review marks the ledger checks as not
+applicable and judges the rest. When a render has passed and the user
+approves it, the edition lists it under `cover:` and every export opens
+with it. In the example that is `CV_001_V01`.
+
+`build-edition.js` exports five formats from one edition: `pdf`, `cbz`,
+`web`, `images` (a folder and a zip of numbered images), and `epub` (EPUB 3
+with a fixed layout).
 
 Deliver with an explicit account: the current file of every page, the
 rejected versions kept, what was repaired, what was visually rechecked, and
@@ -491,6 +505,7 @@ reported.
 | Review | `/visual-review` | Verdict `pass`, or `fixed` after a repair |
 | Repair | `/repair-page` | Each change seen in the new file, within the cycle limit |
 | Lettering | `/lettering` | Every string exact |
+| Cover (optional) | `/cover` | A cover render reviewed `pass` or `fixed`, then approved by the user |
 | Deliver | `/continuity-review`, `/build-edition` | Final state written, exports opened |
 
 `/full-production` runs these stages in order and stops at each gate.

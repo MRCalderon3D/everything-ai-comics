@@ -83,7 +83,11 @@ that differs, two gates, and a verdict.
 7. Write a finding for every difference: `id`, `panel` (or `null` for the
    whole page), `check`, `expected` (from canon or the plan), `visible`
    (what the pixels show), `severity`, `repair` (the smallest change that
-   would fix it), and `status: open`.
+   would fix it), and `status: open`. Add `region` (`x`, `y`, `w`, `h` in
+   fractions of the page) when the place is easier to mark than to
+   describe. Leave `source` out: it defaults to `reviewer`. Findings with
+   `source: user_request` are a person's change requests; keep them, and
+   never close one on the reviewer's own judgment.
 8. Mark as `blocking`: identity ambiguity, duplicated characters, impossible
    positions, broken causality, and missing critical state transitions. If
    the pixels do not establish who acts, record a blocking finding even
@@ -96,7 +100,8 @@ that differs, two gates, and a verdict.
    finding behind it is open.
 10. Give the verdict. `pass`: no findings, every check `pass` or
     `not_applicable`. `flagged`: a blocking finding is open, a gate fails,
-    or the evidence is too ambiguous to decide. `fixed`: there were
+    a person's change request is open, or the evidence is too ambiguous to
+    decide. `fixed`: there were
     findings, no blocking one is open, and every finding marked `fixed` has
     a recheck.
 11. Review a repair as a new render. Write a new review file for the sibling

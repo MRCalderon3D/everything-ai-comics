@@ -14,6 +14,9 @@
  *      before generation, the reference manifest matches the disk, and the
  *      series plan matches the issue directories.
  *   c. Review rules (docs/data-model.md, "Review rules").
+ *   c2. Covers: cover.yaml against the bibles, cover prompt packages and
+ *      reviews, and the approval rule (an approved cover names a render
+ *      with a passing review).
  *   d. Edition rules ("Edition rules"), except building exports.
  *   e. Generation records: metadata_unavailable agrees with the fields.
  *   f. Lettering: lettering.yaml text equals the page.yaml text.
@@ -31,6 +34,7 @@ const fs = require('fs');
 const path = require('path');
 const ws = require('./lib/workspace');
 const artifacts = require('./lib/artifacts');
+const coverLib = require('./lib/cover');
 const schemaLib = require('./lib/schema');
 const { walk } = require('./lib/fsx');
 const { parseArgs, helpIfRequested, fatal } = require('./lib/cli');
@@ -185,6 +189,7 @@ function createContext(root, opts, errors, warnings) {
     if (m) return issueOfEdition(m[1]) === ctx.issueFilter;
     m = /^generations\/([^/]+)\//.exec(rel);
     if (m && ws.ID.page.test(m[1])) return ws.issueOfPage(m[1]) === ctx.issueFilter;
+    if (m && ws.ID.cover.test(m[1])) return ws.issueOfCover(m[1]) === ctx.issueFilter;
     return true;
   };
 
@@ -199,6 +204,8 @@ function createContext(root, opts, errors, warnings) {
 
   /** Review doc of a render, or null. */
   ctx.review = (renderId) => {
+    const coverId = ws.coverOfRender(renderId);
+    if (coverId) return ctx.loadMap(`issues/${ws.issueOfCover(coverId)}/cover/reviews/${renderId}.review.yaml`);
     const pageId = ws.pageOfRender(renderId);
     if (!pageId) return null;
     return ctx.loadMap(`issues/${ws.issueOfPage(pageId)}/pages/${pageId}/reviews/${renderId}.review.yaml`);
@@ -758,12 +765,33 @@ function checkReviewDoc(ctx, rel, doc, pageId, fileRender, maxCycles) {
         `Finding ${f.id || '?'} was rechecked against ${recheck.render}; expected that render on disk and it is not there.`);
     }
   }
-  if (verdict !== 'flagged' && (openBlocking.length || failedGates.length)) {
+  // A change request from a person (source: user_request) keeps the review
+  // flagged while it is open, whatever its severity. So does a check or a
+  // gate nobody has judged: a review opened by a request records those as
+  // not_performed until a reviewer fills them in.
+  const openRequests = findings.filter((f) => f.source === 'user_request' && f.status === 'open');
+  const notPerformed = Object.keys(checks)
+    .filter((key) => (isObj(checks[key]) ? checks[key].result : checks[key]) === 'not_performed')
+    .map((key) => `checks.${key}`)
+    .concat(Object.keys(gates).filter((key) => gates[key] === 'not_performed').map((key) => `gates.${key}`));
+  if (verdict !== 'flagged' && (openBlocking.length || failedGates.length || openRequests.length || notPerformed.length)) {
     const why = [];
     if (openBlocking.length) why.push(`open blocking finding(s) ${ids(openBlocking)}`);
     if (failedGates.length) why.push(`failed gate(s) ${show(failedGates)}`);
+    if (openRequests.length) why.push(`open change request(s) ${ids(openRequests)}`);
+    if (notPerformed.length) why.push(`${show(notPerformed)} not performed`);
     ctx.err(rel, 'REVIEW_MUST_BE_FLAGGED',
       `verdict is ${show(verdict)} with ${why.join(' and ')}; expected flagged.`);
+  }
+  for (const f of findings) {
+    if (!isObj(f.region)) continue;
+    const { x, y, w, h } = f.region;
+    const numbers = [x, y, w, h].every((n) => typeof n === 'number' && Number.isFinite(n));
+    if (numbers && (x + w > 1.0001 || y + h > 1.0001)) {
+      ctx.err(rel, 'REVIEW_REGION_OUTSIDE_PAGE',
+        `Finding ${f.id || '?'} has region x ${x}, y ${y}, w ${w}, h ${h}; expected x + w and y + h at most 1, ` +
+        'because a region is given in fractions of the page.');
+    }
   }
   for (const f of findings) {
     if (f.severity === 'blocking' && f.status === 'accepted') {
@@ -802,6 +830,176 @@ function checkReviews(ctx) {
           `status is ${doc.status}; expected ${page.dir}/reviews/${current}.review.yaml with verdict pass or fixed, and ` +
           `${review ? `its verdict is ${show(review.verdict)}` : 'there is no such review'}.`);
       }
+    }
+  }
+}
+
+// --- c2. covers --------------------------------------------------------------
+
+/**
+ * issues/<ISS_ID>/cover/: cover.yaml against the bibles, its prompt packages,
+ * its reviews, and the approval rule. A cover review follows the review
+ * rules of a page, with two additions: the ledger checks are not applicable
+ * and a finding names no panel.
+ */
+function checkCovers(ctx) {
+  const maxCycles = maxRepairCycles(ctx);
+  for (const issueId of ctx.issues) {
+    const dir = `issues/${issueId}/cover`;
+    if (!isDir(ctx.abs(dir))) continue;
+    const coverId = ws.coverIdOfIssue(issueId);
+    const rel = `${dir}/cover.yaml`;
+    const doc = ctx.exists(rel) ? ctx.loadMap(rel) : null;
+    if (!ctx.exists(rel)) {
+      ctx.err(rel, 'MISSING_FILE', `${dir}/ has no cover.yaml; expected one in a cover directory.`);
+    }
+
+    if (doc) {
+      expectId(ctx, rel, 'id', doc.id, coverId);
+      expectId(ctx, rel, 'issue', doc.issue, issueId);
+      if (hasText(doc.location) && !ctx.exists(`locations/${doc.location}/location.yaml`)) {
+        ctx.err(rel, 'UNKNOWN_ENTITY',
+          `location is ${doc.location}; expected locations/${doc.location}/location.yaml and it does not exist.`);
+      }
+      const propExists = (id) => ctx.exists(`props/${id}/prop.yaml`);
+      const seenCast = new Set();
+      for (const row of arr(doc.cast).filter(isObj)) {
+        const charId = row.character;
+        if (!hasText(charId)) continue;
+        if (seenCast.has(charId)) {
+          ctx.err(rel, 'COVER_CAST_DUPLICATE', `cast lists ${charId} more than once; expected each character once on a cover.`);
+        }
+        seenCast.add(charId);
+        if (!ctx.exists(`characters/${charId}/character.yaml`)) {
+          ctx.err(rel, 'UNKNOWN_ENTITY',
+            `cast lists ${charId}; expected characters/${charId}/character.yaml and it does not exist.`);
+          continue;
+        }
+        if (hasText(row.wardrobe)) {
+          const outfits = outfitIds(ctx, charId);
+          if (!(outfits && outfits.includes(row.wardrobe))) {
+            ctx.err(rel, 'UNKNOWN_WARDROBE',
+              `${charId} wears ${row.wardrobe}; expected an outfit of characters/${charId}/wardrobe.yaml ` +
+              `(${outfits ? show(outfits) : 'the file is missing'}).`);
+          }
+        }
+        for (const propId of arr(row.holding)) {
+          if (hasText(propId) && !propExists(propId)) {
+            ctx.err(rel, 'UNKNOWN_ENTITY', `${charId} holds ${propId}; expected props/${propId}/prop.yaml and it does not exist.`);
+          }
+        }
+      }
+      const held = new Set(arr(doc.cast).filter(isObj).flatMap((row) => arr(row.holding)));
+      for (const propId of arr(doc.props)) {
+        if (!hasText(propId)) continue;
+        if (!propExists(propId)) {
+          ctx.err(rel, 'UNKNOWN_ENTITY', `props lists ${propId}; expected props/${propId}/prop.yaml and it does not exist.`);
+        } else if (held.has(propId)) {
+          ctx.err(rel, 'COVER_PROP_HELD',
+            `props lists ${propId}, which a character on the cover also holds; expected a held prop under that character's holding only.`);
+        }
+      }
+
+      // Approval: an approved cover names a render with a passing review.
+      const approved = doc.approved_render;
+      if (doc.status === 'approved') {
+        if (!hasText(approved)) {
+          ctx.err(rel, 'COVER_APPROVAL_UNREVIEWED',
+            `status is approved and approved_render is ${show(approved)}; expected the cover render that was approved.`);
+        } else if (ws.coverOfRender(approved) !== coverId) {
+          ctx.err(rel, 'ID_PATH_MISMATCH',
+            `approved_render is ${show(approved)}; expected a render of this cover (${coverId}_V##).`);
+        } else {
+          if (!ctx.renderOnDisk(approved)) {
+            ctx.err(rel, 'MISSING_RENDER',
+              `approved_render is ${approved}; expected ${dir}/renders/${approved}.png (or jpg, webp) and no such file is on disk.`);
+          }
+          const review = ctx.review(approved);
+          if (!ws.reviewPasses(review)) {
+            ctx.err(rel, 'COVER_APPROVAL_UNREVIEWED',
+              `status is approved; expected ${dir}/reviews/${approved}.review.yaml with verdict pass or fixed, and ` +
+              `${review ? `its verdict is ${show(review.verdict)}` : 'there is no such review'}.`);
+          }
+        }
+      } else if (hasText(approved)) {
+        ctx.err(rel, 'COVER_STATUS_MISMATCH',
+          `approved_render is ${approved} while status is ${show(doc.status)}; expected null until the cover is approved.`);
+      }
+    }
+
+    for (const name of listNames(ctx.abs(`${dir}/prompts`)).filter((n) => /\.ya?ml$/i.test(n))) {
+      const pkgRel = `${dir}/prompts/${name}`;
+      const pkg = ctx.loadMap(pkgRel);
+      if (!pkg) continue;
+      expectId(ctx, pkgRel, 'page', pkg.page, coverId);
+      for (const entry of arr(pkg.references).filter(isObj)) {
+        checkAssetId(ctx, pkgRel, 'references[].asset_id', entry.asset_id);
+      }
+    }
+
+    for (const name of listNames(ctx.abs(`${dir}/reviews`)).filter((n) => /\.review\.ya?ml$/i.test(n))) {
+      const reviewRel = `${dir}/reviews/${name}`;
+      const review = ctx.loadMap(reviewRel);
+      if (!review) continue;
+      const fileRender = name.replace(/\.review\.ya?ml$/i, '');
+      checkReviewDoc(ctx, reviewRel, review, coverId, fileRender, maxCycles);
+      if (ws.coverOfRender(fileRender) !== coverId) {
+        ctx.err(reviewRel, 'ID_PATH_MISMATCH',
+          `The file reviews ${fileRender}; expected a render of this cover (${coverId}_V##).`);
+      } else if (!ctx.renderOnDisk(fileRender)) {
+        ctx.err(reviewRel, 'MISSING_RENDER',
+          `Review of ${fileRender}; expected that image under ${dir}/renders/ and none is on disk. A review needs pixels to judge.`);
+      }
+      const checks = isObj(review.checks) ? review.checks : {};
+      for (const key of coverLib.NOT_APPLICABLE_CHECKS) {
+        const result = isObj(checks[key]) ? checks[key].result : checks[key];
+        // not_performed is how a review opened by a change request records a check nobody has judged yet.
+        if (result !== undefined && result !== 'not_applicable' && result !== 'not_performed') {
+          ctx.err(reviewRel, 'COVER_REVIEW_CHECK',
+            `checks.${key} is ${show(result)}; expected not_applicable, because a cover has no panel ledger and no sequence for that check to judge.`);
+        }
+      }
+      for (const f of arr(review.findings).filter(isObj)) {
+        if (f.panel !== null && f.panel !== undefined) {
+          ctx.err(reviewRel, 'COVER_REVIEW_PANEL',
+            `Finding ${f.id || '?'} names panel ${show(f.panel)}; expected null, because a cover has no panels.`);
+        }
+      }
+    }
+  }
+}
+
+/** The optional cover of an edition: the listed render is a reviewed cover render of the issue. */
+function checkEditionCover(ctx, rel, doc, draft) {
+  const cover = doc.cover;
+  if (!isObj(cover)) return;
+  const coverId = ws.coverIdOfIssue(doc.issue);
+  const renderId = cover.render;
+  if (!coverId || ws.coverOfRender(renderId) !== coverId) {
+    ctx.err(rel, 'EDITION_RENDER_MISMATCH',
+      `cover ships render ${show(renderId)}; expected a cover render of ${show(doc.issue)} (${coverId || 'CV_###'}_V##).`);
+    return;
+  }
+  const file = hasText(cover.file) ? cover.file.replace(/\\/g, '/') : null;
+  if (!file || !ctx.exists(file)) {
+    ctx.err(rel, 'EDITION_RENDER_MISSING',
+      `cover ships file ${show(cover.file)}; expected that image on disk and it is not there.`);
+  } else if (!path.posix.basename(file).startsWith(renderId)) {
+    ctx.err(rel, 'EDITION_RENDER_MISMATCH',
+      `cover names render ${renderId} and file ${file}; expected the file of that exact render.`);
+  }
+  if (hasText(cover.lettered_file) && !ctx.exists(cover.lettered_file.replace(/\\/g, '/'))) {
+    ctx.err(rel, 'EDITION_RENDER_MISSING',
+      `cover ships lettered_file ${cover.lettered_file}; expected that file on disk and it is not there.`);
+  }
+  const review = ctx.review(renderId);
+  if (!ws.reviewPasses(review)) {
+    const message = `${renderId} is listed as the cover; expected a review with verdict pass or fixed, and ` +
+      `${review ? `its verdict is ${show(review.verdict)}` : 'it has no review file'}.`;
+    if (draft) {
+      ctx.warn(rel, 'EDITION_RENDER_UNREVIEWED', `${message} Allowed while the edition is a draft.`);
+    } else {
+      ctx.err(rel, 'EDITION_RENDER_UNREVIEWED', `${message} Edition status is ${show(doc.status)}.`);
     }
   }
 }
@@ -876,6 +1074,8 @@ function checkEditions(ctx) {
       }
     }
 
+    checkEditionCover(ctx, rel, doc, draft);
+
     if (issuePages) {
       // Gaps: a page missing before the last listed one is always an error;
       // a draft may stop short of the end of the issue.
@@ -928,7 +1128,8 @@ function checkGenerations(ctx) {
         'because a number the tool did not report and nobody estimated is invented.');
     }
     if ((doc.status === 'succeeded' || doc.status === 'approved') && hasText(doc.output_render) &&
-        ws.ID.render.test(doc.output_render) && !ctx.renderOnDisk(doc.output_render)) {
+        (ws.ID.render.test(doc.output_render) || ws.ID.coverRender.test(doc.output_render)) &&
+        !ctx.renderOnDisk(doc.output_render)) {
       ctx.err(rel, 'MISSING_RENDER',
         `output_render is ${doc.output_render} on a ${doc.status} record; expected that image on disk and it is not there.`);
     }
@@ -996,6 +1197,7 @@ const SECTIONS = [
   ['schemas', checkSchemas],
   ['cross-references', checkCrossReferences],
   ['review rules', checkReviews],
+  ['covers', checkCovers],
   ['edition rules', checkEditions],
   ['generation records', checkGenerations],
   ['lettering', checkLettering],

@@ -1,0 +1,33 @@
+# Schema: schemas/generation-record.schema.json
+# A cover record names the cover ID where a page record names its page.
+
+id: GEN_CV_001_01
+page: CV_001
+asset: null
+provider: harness-native
+model: unreported
+kind: image
+prompt_package: PP_CV_001_HARNESS-NATIVE
+output_render: CV_001_V01
+
+request:
+  summary: Handoff to the harness image tool.
+  endpoint: null
+
+response:
+  summary: One image returned.
+  provider_job_id: null
+  error: null
+
+media_files: [issues/ISS_001/cover/renders/CV_001_V01.png]
+
+cost:
+  currency: USD
+  amount: null
+  estimated: false
+  reported: false
+
+seed: null
+metadata_unavailable: [model, cost, seed]
+status: succeeded
+created_at: "2026-11-26T11:00:00Z"

@@ -60,7 +60,9 @@ checks:                                # all fourteen, each with result (pass | 
 findings:                              # may be empty
   - id: F01                            # F##, unique within this file
     panel: PN_001_001_02               # panel ID, or null for a page-level finding
-    check: identity                    # one of the check keys
+#    source: reviewer                   # reviewer (default) | user_request. A user request is written by scripts/lib/review-requests.js
+#    region: { x: 0.5, y: 0.1, w: 0.4, h: 0.3 }   # optional: the area concerned, in fractions of the page from its top-left corner
+    check: identity                    # one of the check keys. Only a user request may leave it out
     expected: "TODO: what canon or the plan calls for."
     visible: "TODO: what the pixels show instead."
     severity: blocking                 # blocking | minor. Identity ambiguity is always blocking
@@ -74,7 +76,7 @@ gates:                                 # recorded separately
   style_fidelity: pass                 # pass | fail
   narrative_continuity: fail           # pass | fail
 
-verdict: flagged                       # pass: no findings. fixed: repaired and rechecked. flagged: open blocking finding or failed gate
+verdict: flagged                       # pass: no findings. fixed: repaired and rechecked. flagged: open blocking finding, failed gate, or open user request
 repair_cycle: 0                        # 0 for a first render, +1 per repair
 reviewed_at: "2026-01-01"
 

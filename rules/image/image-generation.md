@@ -9,7 +9,7 @@ recorded whether it ran or not.
 ## Scope
 
 Image layer (the visual layer also applies). Governs every call to an image
-provider (fal, replicate, comfyui, gemini, harness-native, manual), for pages
+provider (fal, replicate, comfyui, gemini, harness-native, codex-cli, manual), for pages
 and for reference art, together with the prompt packages and generation
 records around it. Used by `/visual-development`, `/generate-pages`, and
 `/repair-page`. Reference attachment is detailed in `reference-roles.md`, and
@@ -44,6 +44,11 @@ the page-by-page procedure in `page-generation.md`.
   rest of this layer still applies to them: package first, references
   attached as images, record completed after the image comes back. Zero
   marginal cost waives nothing.
+- `codex-cli` needs no environment variable. A live run starts the Codex CLI
+  on this machine (`codex exec`) with the references attached in order and
+  saves the image it draws. A missing `codex` binary, a timeout, or a
+  cancelled run is a `failed` record. The run draws on the user's Codex
+  plan, so the `--live --yes` confirmation applies as for any provider.
 - NEVER print, log, or store an API key, and NEVER copy one into a prompt
   package, a generation record, or a commit. Records carry a payload hash.
 
@@ -68,11 +73,14 @@ The values declared in `manifests/image-providers.json`:
 | comfyui | 8 | false | none |
 | gemini | 3 | true | unreliable |
 | harness-native | 4 | true | unreliable |
+| codex-cli | 4 | true | unreliable |
 | manual | 4 | true | unreliable |
 
-All six produce `2:3`, `3:4`, `9:16`, `1:1`, `3:2`, `4:3`, and `16:9`.
-gemini, harness-native, and manual add `4:5`, and gemini also `5:4` and
-`21:9`.
+All seven produce `2:3`, `3:4`, `9:16`, `1:1`, `3:2`, `4:3`, and `16:9`.
+gemini, harness-native, codex-cli, and manual add `4:5`, and gemini also
+`5:4` and `21:9`. codex-cli draws through the Codex CLI, whose image tool
+renders `1:1`, `2:3`, and `3:2`: any other ratio comes back in the nearest
+of those frames and is cropped before lettering or export.
 
 - `compile()` MUST fail on an unsupported aspect ratio, on more input images
   than the limit (the edit target of a repair counts as one), on a repair

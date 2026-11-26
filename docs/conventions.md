@@ -41,12 +41,12 @@ character-designer, environment-designer, layout-artist, penciller, colorist,
 letterer, continuity-editor, prompt-director, image-generation-specialist,
 visual-reviewer, prepress-specialist, production-qa.
 
-**Commands (26):** project-init, source-analyze, story-bible, series-plan,
+**Commands (27):** project-init, source-analyze, story-bible, series-plan,
 character-bible, location-bible, prop-bible, style-bible, visual-development,
 ingest-references, issue-breakdown, page-plan, panel-script, thumbnails,
 panel-ledger, smart-page, reference-plan, generate-pages, visual-review,
-repair-page, lettering, continuity-review, build-edition, full-production,
-humanize, self-review.
+repair-page, lettering, cover, continuity-review, build-edition,
+full-production, humanize, self-review.
 
 **Skills (29):** source-analysis, adaptation, narrative-structure,
 comic-scripting, text-humanization, character-consistency,
@@ -76,22 +76,23 @@ duplicated into a format layer. `manifests/rules.json` mirrors this roster and
 
 **Contexts (5):** development, preproduction, production, publishing, review.
 
-**Schemas (18):** project, story-bible, series-plan, character, wardrobe,
+**Schemas (19):** project, story-bible, series-plan, character, wardrobe,
 location, location-map, prop, issue, scene, page, lettering, reference-plan,
-prompt-package, continuity-state, generation-record, visual-review, edition.
+prompt-package, continuity-state, generation-record, visual-review, cover,
+edition.
 Files are `schemas/<name>.schema.json`; `$id` is
 `https://everything-ai-comics.dev/schemas/<name>.schema.json`.
 
 **Manifests (7):** profiles.json, agents.json, commands.json, skills.json,
 rules.json, image-providers.json, harnesses.json.
 
-**Providers (6):** image: fal, replicate, comfyui, gemini, harness-native, manual.
+**Providers (7):** image: fal, replicate, comfyui, gemini, harness-native, codex-cli, manual.
 
-**Scripts (13):** install.js, doctor.js, validate.js, sync-harnesses.js,
+**Scripts (14):** install.js, doctor.js, validate.js, sync-harnesses.js,
 create-project.js, validate-workspace.js, compile-prompts.js,
-build-reference-plan.js, generate-assets.js, check-continuity.js,
-letter-pages.js, build-edition.js, build-board.js. Shared helpers live in
-`scripts/lib/`.
+build-reference-plan.js, generate-assets.js, approve-asset.js,
+check-continuity.js, letter-pages.js, build-edition.js, build-board.js. Shared
+helpers live in `scripts/lib/`.
 
 **Hooks (4):** validate-after-write.js, protect-approved-assets.js,
 detect-continuity-drift.js, require-cost-confirmation.js, wired by `hooks/hooks.json`.
@@ -272,8 +273,9 @@ rule layers apply, what to defer.
 | visual-review | Review rendered pages against plan and references; record findings, gates, and a verdict. | visual-reviewer, continuity-editor, art-director | pixel-review, continuity-checking |
 | repair-page | Repair a flagged page as a sibling version, then recheck the whole page and its neighbors. | visual-reviewer, prompt-director, image-generation-specialist | page-repair, prompt-compilation, pixel-review |
 | lettering | Plan, place, and check balloons, captions, and sound effects for in-image or overlay lettering. | letterer, visual-reviewer | balloon-lettering |
+| cover | Plan the cover of an issue, generate and review it, and record the approved render. | art-director, editor-in-chief, prompt-director, image-generation-specialist, visual-reviewer | panel-composition, reference-selection, prompt-compilation, image-generation, pixel-review |
 | continuity-review | Audit continuity across pages and issue boundaries and write the end-of-issue state. | continuity-editor, production-qa | continuity-checking, state-tracking |
-| build-edition | Assemble reviewed pages into an edition and export PDF, CBZ, and web reader. | prepress-specialist, editor-in-chief, production-qa | edition-assembly |
+| build-edition | Assemble reviewed pages into an edition and export PDF, CBZ, web reader, images, and EPUB. | prepress-specialist, editor-in-chief, production-qa | edition-assembly |
 | full-production | Orchestrate the whole pipeline from source text to published edition, with approval gates and cost confirmation. | editor-in-chief, production-qa | production-orchestration |
 | humanize | Rewrite generated or existing prose so it reads human, or audit it with --check. | script-editor, comic-writer | text-humanization |
 | self-review | Run the self-evaluation pass on existing artifacts and report or fix what it finds. | production-qa, editor-in-chief | self-evaluation |
@@ -293,10 +295,15 @@ rows above. `validate.js` cross-checks every listed name against the manifests.
 - Lettering elements: `L##`, unique within a page.
 - Renders (page image candidates): `<PAGE_ID>_V##` (e.g. `PG_001_004_V02`).
   A repair always creates the next version; earlier files stay on disk.
+- Covers: `CV_<issue number>` (e.g. `CV_001` for `ISS_001`), one per issue.
+  Cover renders: `<COVER_ID>_V##` (e.g. `CV_001_V02`), versioned like page
+  renders. A cover has no panels. Where a prompt package, a generation
+  record, or a review names its `page`, a cover file names the cover ID.
 - Assets: `CHAR_*`, `LOC_*`, `PROP_*`, `LOOK_*`, versioned `_V##`
   (e.g. `CHAR_MARA_TURN_MASTER_V02`). Approved masters carry `_MASTER`.
 - Wardrobe states: `WARD_<CHARACTER>_<NAME>` (e.g. `WARD_MARA_OILSKIN`).
-- Prompt packages: `PP_<page-or-entity-id>_<PROVIDER>`, with a `-P##` suffix for
+- Prompt packages: `PP_<page-or-entity-id>_<PROVIDER>`, or
+  `PP_<COVER_ID>_<PROVIDER>` for a cover (`PP_CV_001_FAL`), with a `-P##` suffix for
   a single panel and a `-<TAG>` suffix for a reference sheet (`TURN`, `EXPR`,
   `WARD`, `PLATE`, `SHEET` for a prop, `LOOK`, `DETAIL`). A wardrobe sheet
   appends its outfit, a detail its subject, and a plate a non-default time
@@ -305,8 +312,14 @@ rows above. `validate.js` cross-checks every listed name against the manifests.
   the tag (`CHAR_MARA_WARD_OILSKIN_V01`, `PROP_FLARE_GUN_SHEET_V01`,
   `LOC_FERRY_DECK_PLATE_DUSK_V01`). Promotion to a master is an
   approval step: the file is copied to the `_MASTER` name and registered in
-  `references/manifest.yaml`; the candidate stays on disk.
-- Generation records: `GEN_<page-id>_<attempt##>` or `GEN_<entity-id>_<attempt##>`.
+  `references/manifest.yaml`; the candidate stays on disk. The master keeps
+  the candidate's version number (`CHAR_MARA_TURN_V02` becomes
+  `CHAR_MARA_TURN_MASTER_V02`). `scripts/approve-asset.js --candidate
+  <path-or-stem>` does the copy and the registration once a person has
+  approved the image, and `--supersede` replaces the approved master of the
+  same sheet.
+- Generation records: `GEN_<page-id>_<attempt##>`, `GEN_<entity-id>_<attempt##>`,
+  or `GEN_<cover-id>_<attempt##>` (`GEN_CV_001_02`).
 - Canon facts: `FACT_###`, unique within the story bible.
 - Review findings: `F##`, unique within a review file.
 - Editions: `ED_<issue>_##` (e.g. `ED_001_03`).
@@ -334,6 +347,7 @@ production/
 │   └── <ISS_ID>/
 │       ├── issue.yaml         # issue.schema.json
 │       ├── scenes/            # <SC_ID>.yaml (scene.schema.json)
+│       ├── cover/             # optional: cover.yaml (cover.schema.json), prompts/, renders/ <CV_ID>_V##.png, reviews/, laid out like a page
 │       └── pages/
 │           └── <PG_ID>/
 │               ├── page.yaml              # page.schema.json: layout, panels, ledger, lettering text
@@ -343,11 +357,53 @@ production/
 │               ├── prompts/               # <provider>.yaml (prompt-package.schema.json)
 │               ├── renders/               # <PG_ID>_V##.png|jpg versioned candidates, never overwritten
 │               └── reviews/               # <RENDER_ID>.review.yaml (visual-review.schema.json)
-├── generations/               # <PG_ID or ENTITY_ID>/GEN_*.yaml (generation-record.schema.json) + GEN_*.request.json
+├── generations/               # <PG_ID, CV_ID or ENTITY_ID>/GEN_*.yaml (generation-record.schema.json) + GEN_*.request.json
 ├── continuity/                # <ISS_ID>.final-state.yaml (continuity-state.schema.json)
 └── editions/
     └── <ED_ID>/               # edition.yaml (edition.schema.json), exports/
 ```
+
+## Cover, edition, and lettered-file tooling
+
+The cover goes through the same scripts as a page. Each has a command-line
+form and an exported function, and both do the same thing.
+
+| Task | Command line | Function |
+|---|---|---|
+| Compile the cover package | `compile-prompts.js --cover <ISS_ID> [--root <workspace>] [--provider <id>] [--model <id>] [--repair <review.yaml>]` | `compileCover({ root, issue, provider, model, repair, write })` in `scripts/compile-prompts.js` |
+| Generate the cover | `generate-assets.js --cover <ISS_ID> [--root <workspace>] [--provider <id>] [--live --yes]` | `generateAssets({ cover: '<ISS_ID>', root, provider, live, yes })` in `scripts/generate-assets.js` |
+| Approve a cover render | none | `approveCover({ root, issue, render })` in `scripts/lib/cover.js` |
+| Build an edition | `build-edition.js --edition <edition.yaml> [--formats pdf,cbz,web,images,epub] [--draft] [--force]` | `buildEdition(editionFile, { formats, draft, force })` in `scripts/build-edition.js` |
+| Compose an edition | none | `draftEdition({ root, issue })` in `scripts/build-edition.js` |
+| File a lettered page | `letter-pages.js --register-lettered <image> --render <RENDER_ID> (--page <page.yaml> \| --root <workspace>)` | `registerLetteredFile({ root, page, render, file })` in `scripts/letter-pages.js` |
+
+- `compileCover` returns what `compilePage` returns, `{ pkg, spec, warnings,
+  fileName }`, plus `fileRel`, the workspace-relative path the package
+  belongs at. It writes nothing unless `write: true`. `repair` is a review
+  file path or a review document.
+- `generateAssets` treats a cover package like a page package: the record
+  goes under `generations/<COVER_ID>/` and the image to the next free
+  `cover/renders/<COVER_ID>_V##`. Nothing is overwritten.
+- `approveCover` sets `status: approved` and `approved_render` in
+  `cover.yaml`, and refuses a render whose review is not `pass` or `fixed`.
+  It returns `{ cover, render, file, previous, preserved }`.
+- `draftEdition` writes nothing. It returns an edition document with the
+  next free edition ID, status `draft`, every page that has a current
+  render, and the cover when `cover.yaml` is approved. The object also
+  carries `blockers`, a non-enumerable array of `{ page, render, code,
+  message }` that lists what keeps the edition from being final (`no_render`,
+  `render_missing`, `no_review`, `not_passing`). Because it is
+  non-enumerable, serializing the object gives a valid `edition.yaml`.
+- `registerLetteredFile` stores a PNG or JPEG as
+  `<RENDER_ID>.lettered.png` (or `.jpg`) next to the render and sets
+  `lettered_file` on that render's entry in every draft edition. It returns
+  `{ path, render, editions, skipped }`. `file` is a path or a Buffer.
+  Reviewed and published editions are never changed.
+- Path helpers for the cover live in `scripts/lib/workspace.js`:
+  `coverIdOfIssue`, `issueOfCover`, `coverOfRender`, `coverDir`, `coverFile`,
+  `loadCover`, `coverRenderFile`, `listCoverRenders`, `coverReviewFile`,
+  `listCoverReviews`. `renderFile`, `reviewFile`, and `loadReview` take a
+  cover render ID as well as a page render ID.
 
 ## Provider interface (JS, CommonJS)
 
@@ -358,7 +414,7 @@ module.exports = {
   id: 'fal',                    // matches manifests/image-providers.json
   kind: 'image',
   label: 'fal.ai',
-  env: ['FAL_KEY'],             // required env vars; empty for local/harness-native/manual
+  env: ['FAL_KEY'],             // required env vars; empty for local/harness-native/codex-cli/manual
   capabilities: {               // hard limits compile() checks packages against
     referenceImages: 4,         // max reference inputs, 0 if unsupported
     aspectRatios: ['2:3', '3:4', '1:1', '9:16'],
@@ -368,7 +424,7 @@ module.exports = {
   // prompt-package (schemas/prompt-package.schema.json) -> provider request spec
   compile(promptPackage, options = {}) { /* pure, no I/O */ },
   // request spec -> generation record (schemas/generation-record.schema.json)
-  async generate(requestSpec, { dryRun = true, outDir } = {}) { /* fetch-based */ },
+  async generate(requestSpec, { dryRun = true, outDir, root, signal, onProgress } = {}) { /* fetch-based */ },
 };
 ```
 
@@ -377,6 +433,31 @@ record with status `dry_run`, calls no network) and MUST refuse to run live when
 env var is missing. Never log API keys. `manual` and `harness-native` produce a
 handoff package for a person or for the harness's own image tool; they never
 call the network.
+
+`codex-cli` runs the Codex command-line tool the user is signed in to. In
+live mode it starts `codex exec` with the package's reference images attached
+in order and the instruction on stdin, has Codex save one PNG at a temporary
+path inside `outDir`, and returns the image on the record. It needs no env
+var. A missing `codex` binary, a non-zero exit with no file, a timeout, a
+cancelled run, and a saved file that is not an image each give a `failed`
+record with a plain message; text on stderr alone never does. The image model
+is `unreported` unless Codex names it, and the cost is `null`.
+
+`signal` and `onProgress` are optional. `generate-assets.js` hands them
+through from `generateAssets({ signal, onProgress })`. Aborting the signal
+stops a provider that runs a local tool, process tree included, and its
+record fails with the error `cancelled`; packages not started yet are
+skipped. `onProgress(line)` receives short status lines while the tool runs.
+API providers ignore both.
+
+Code that starts a command-line tool goes through `providers/lib/cli-spawn.js`:
+`resolveBinary(name, envOverride)` finds the executable on Windows and POSIX
+(an npm `.cmd` shim is resolved to the script it launches),
+`spawnCli({ bin, args, cwd, stdin, env, signal, timeoutMs, onStdout, onStderr })`
+runs it and resolves with `{ code, signal, timedOut, cancelled, stdout, stderr }`,
+and `killTree(child)` stops a process and everything it started. Text a
+person wrote goes to the tool on stdin or in a file, never on the command
+line.
 
 ## Manifest shapes
 
@@ -395,6 +476,17 @@ call the network.
 
 `FAL_KEY`, `REPLICATE_API_TOKEN`, `COMFYUI_HOST`, `GOOGLE_API_KEY` (Gemini).
 Document in README; never commit values.
+
+The `codex-cli` provider reads three optional settings. None is a secret and
+none is required, so its `env` list stays empty:
+
+- `CODEX_BIN`: path of the `codex` executable when it is not on `PATH`. Tests
+  point it at a stub.
+- `CODEX_IMAGE_TIMEOUT_MS`: time limit for one image in milliseconds, default
+  `900000` (15 minutes). A run that passes it is stopped and recorded as
+  failed.
+- `CODEX_IMAGE_MODEL`: model for the Codex session, passed as `-m`. Without
+  it Codex uses its own default, unless the prompt package pins a model.
 
 ## Cross-cutting policies (mirrored in rules/)
 
@@ -428,15 +520,25 @@ Document in README; never commit values.
   The whole page and its neighbors are rechecked after a local edit. After two
   failed repair cycles the plan or the references are fixed before any further
   generation.
+- **Change requests:** a change a person asks for on a rendered page is a
+  review finding with `source: user_request`, written by `addUserRequest()` in
+  `scripts/lib/review-requests.js`. It may mark a `region` of the page, it
+  keeps the review `flagged` while it is open, and a repair carries it with
+  the reviewer's findings. A render that had no review gets one whose checks
+  and gates read `not_performed` until a reviewer judges them.
 - **Asset provenance:** every generated file gets a generation record
   (provider, model, prompt package hash, references used, cost, timestamp).
   Metadata the tool does not report is recorded as unavailable, never invented.
 - **Approval gates:** assets move `draft → review → approved`. Approved assets
   are immutable; supersede with a new version. Verdicts are `pass`, `fixed`, or
   `flagged`; human approval is a separate decision recorded on the review.
+  `scripts/approve-asset.js` records the approval of a reference candidate:
+  the master copy, the registry entry, the entity file, and for a look the
+  frozen style.
 - **Cost control:** batch generation requires an explicit cost estimate and
   confirmation; dry-run is always the default.
-- **Edition discipline:** an edition lists the exact render of every page.
+- **Edition discipline:** an edition lists the exact render of every page,
+  and of the cover when it has one.
   Only renders whose review verdict is `pass` or `fixed` enter a non-draft
   edition. Exports never overwrite an existing file; a new edition gets a new ID.
 - **Prose style:** all human-facing generated text follows the

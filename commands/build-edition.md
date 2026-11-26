@@ -1,5 +1,5 @@
 ---
-description: Assemble reviewed pages into an edition and export PDF, CBZ, and web reader.
+description: Assemble reviewed pages into an edition and export PDF, CBZ, web reader, images, and EPUB.
 ---
 
 # /build-edition
@@ -8,7 +8,9 @@ description: Assemble reviewed pages into an edition and export PDF, CBZ, and we
 
 Turn an issue's reviewed pages into something a reader can open. An
 edition is a list: the exact render that ships for every page, in reading
-order. From that list the command exports a PDF, a CBZ, and a web reader.
+order, with the approved cover in front when the issue has one. From that
+list the command exports a PDF, a CBZ, a web reader, a folder of numbered
+images, and an EPUB.
 Editions are never rebuilt over each other. The pilot went through seven
 of them, and a later build overwrote earlier exports. Here a corrected
 edition gets a new ID and says what it replaces and what changed.
@@ -23,8 +25,9 @@ edition gets a new ID and says what it replaces and what changed.
 ## Inputs
 
 - `issue` (ID, required): the `ISS_###` to assemble.
-- `formats` (list, optional, default the `pdf`, `cbz`, and `web` targets in
-  `deliverables` of `project.yaml`, else `pdf,cbz`): export formats.
+- `formats` (list, optional, default the `pdf`, `cbz`, `web`, `images`, and
+  `epub` targets in `deliverables` of `project.yaml`, else `pdf,cbz`):
+  export formats.
 - `label` (string, optional, default `first edition` or the next ordinal):
   the edition's human label.
 - `supersedes` (ID, optional): the `ED_<issue>_##` this edition corrects.
@@ -51,48 +54,55 @@ edition gets a new ID and says what it replaces and what changed.
 2. Take the next edition ID for the issue (`ED_<issue>_##`). An ID is never
    reused, even for a build that failed.
 3. Write `production/editions/<ED_ID>/edition.yaml`: `id`, `issue`,
-   `title`, `label`, `status: draft`, `supersedes`, `changes`, `pages`, and
-   an empty `exports` list.
+   `title`, `label`, `status: draft`, `supersedes`, `changes`, `cover`,
+   `pages`, and an empty `exports` list.
 4. List the pages in page-number order, once each, with no gaps. For each,
    copy `render` from the page's `current_render` after confirming its
    review, and set `file` to that image's path relative to the workspace
    root. Do not take the newest file in `renders/`; it may be a rejected
    attempt.
-5. Overlay lettering: run `/lettering` for any page without a lettered
+5. Cover: when `production/issues/<ISS_ID>/cover/cover.yaml` has
+   `status: approved`, set `cover.render` to its `approved_render` and
+   `cover.file` to that image's path. A cover that is still a draft stays
+   out; leave `cover` as `null` and say so. The cover is optional.
+6. Overlay lettering: run `/lettering` for any page without a lettered
    output, flatten the SVG over the render in a browser or a vector tool,
-   and set `lettered_file` to the flattened PNG or JPEG. Its file name
-   starts with the render ID (`<RENDER_ID>.lettered.png`); the build
-   rejects an SVG and a file named for another render. In `in_image` mode
-   leave it `null`.
-6. For a correction, set `supersedes` to the earlier edition and list in
+   and file the flattened PNG or JPEG with `node scripts/letter-pages.js
+   --register-lettered <image> --render <RENDER_ID> --root production`. It
+   is stored as `<RENDER_ID>.lettered.png` next to the render and set as
+   `lettered_file` in this draft edition. The build rejects an SVG and a
+   file named for another render. In `in_image` mode leave it `null`.
+7. For a correction, set `supersedes` to the earlier edition and list in
    `changes` which page now uses which render and why ("PG_001_002 uses V02
    instead of V01: Oskar's face corrected in panel 3"). The earlier
    edition's directory is left as it is.
-7. production-qa validates before anything is built: `node
+8. production-qa validates before anything is built: `node
    scripts/validate-workspace.js --root production --issue <ISS_ID>`.
-8. Build: `node scripts/build-edition.js --edition
-   production/editions/<ED_ID>/edition.yaml --formats pdf,cbz,web`. The
-   script refuses a render without a `pass` or `fixed` review unless
-   `--draft` is given, and it skips an export file that already exists.
-   Without `--formats` it builds the `pdf`, `cbz`, and `web` targets listed
-   in `deliverables`, or `pdf` and `cbz` when none is listed. Keep `--force`
-   for rerunning a build nobody has received yet. It replaces exports only
-   while the edition's status is `draft` or the build is `--draft`; on a
-   `reviewed` or `published` edition the script stops with
-   `force-not-draft`. Once an export has gone to anyone, the answer is a
-   new edition.
-9. Open every export. Count the pages, read them in order, and confirm
-   each page is the listed render. Check the page size in the PDF, the
-   sort order of the files in the CBZ, and that the web reader advances in
-   the project's `reading_direction` or scrolls as one column for a
-   webtoon. Confirm `exports` now lists each file with `format`, `file`,
-   and `built_at`.
-10. editor-in-chief moves the status on evidence. `draft` becomes
+9. Build: `node scripts/build-edition.js --edition
+   production/editions/<ED_ID>/edition.yaml --formats
+   pdf,cbz,web,images,epub`. The script refuses a render without a `pass`
+   or `fixed` review unless `--draft` is given, and it skips an export
+   file that already exists. Without `--formats` it builds the `pdf`,
+   `cbz`, `web`, `images`, and `epub` targets listed in `deliverables`,
+   or `pdf` and `cbz` when none is listed. Keep `--force` for rerunning a
+   build nobody has received yet. It replaces exports only while the
+   edition's status is `draft` or the build is `--draft`; on a `reviewed`
+   or `published` edition the script stops with `force-not-draft`. Once an
+   export has gone to anyone, the answer is a new edition.
+10. Open every export. Count the pages, read them in order, and confirm
+    each page is the listed render, with the cover first when the edition
+    has one. Check the page size in the PDF, the sort order of the files in
+    the CBZ and in the images folder, that the web reader advances in the
+    project's `reading_direction` or scrolls as one column for a webtoon,
+    and that the EPUB opens in a reader app and turns pages the same way.
+    Confirm `exports` now lists each file with `format`, `file`, and
+    `built_at`.
+11. editor-in-chief moves the status on evidence. `draft` becomes
     `reviewed` when the exports have been opened and checked. `reviewed`
     becomes `published` when the user says the edition has gone out; then
     set the issue's `status` to `published` in `issue.yaml` and in the
     series plan. A draft build never becomes `published`.
-11. Run the self-evaluation gates on the edition file and write the
+12. Run the self-evaluation gates on the edition file and write the
     delivery note: the current render of every page by filename, the
     rejected versions kept for comparison, what was repaired since the
     last edition, what was visually rechecked, and what still needs a
@@ -103,12 +113,13 @@ edition gets a new ID and says what it replaces and what changed.
 
 - `production/editions/<ED_ID>/edition.yaml`, validates against
   `schemas/edition.schema.json`.
-- `production/editions/<ED_ID>/exports/`: the PDF, the CBZ, and the web
-  reader directory, named
+- `production/editions/<ED_ID>/exports/`: the PDF, the CBZ, the web
+  reader directory, the images, and the EPUB, named
   `<title-slug>-<issue number>-ed<edition number>[-DRAFT]` with the
-  extension `.pdf` or `.cbz`, or the suffix `-web` for the reader directory
-  (`the-night-ferry-001-ed01.cbz`, `the-night-ferry-001-ed01-web/`).
-  `-DRAFT` marks a draft build.
+  extension `.pdf`, `.cbz`, or `.epub`, the suffix `-web` for the reader
+  directory, and the suffixes `-images` and `-images.zip` for the image
+  folder and its zip (`the-night-ferry-001-ed01.cbz`,
+  `the-night-ferry-001-ed01-web/`). `-DRAFT` marks a draft build.
 - `production/issues/<ISS_ID>/issue.yaml` and
   `production/story/series-plan.yaml`, `status` updated on publication.
 - The delivery note, in the conversation.
@@ -124,6 +135,12 @@ edition gets a new ID and says what it replaces and what changed.
   each needs. For `print`, state trim, bleed, and safe margin from the
   `page` block (`rules/paged/print-specs.md`). The scripts do not crop or
   composite images.
+- With a cover, the first file of the CBZ, the web reader, the images,
+  and the EPUB is `000-cover.<ext>`, and the pages follow from `001`.
+- `draftEdition({ root, issue })` in `scripts/build-edition.js` composes
+  steps 2 to 6 from the workspace without writing anything, and lists what
+  still blocks a final edition. A tool that drives this command can start
+  from its result.
 - Format differences: a paged edition exports one image per page. A
   webtoon edition exports the segments as one vertical column and follows
   `rules/webtoon/episode-deliverables.md`.
@@ -132,6 +149,7 @@ edition gets a new ID and says what it replaces and what changed.
   comments inside that block do not. When the block cannot be replaced
   safely it rewrites the whole file through the YAML library, loses the
   comments, and says so.
-- Related: `/continuity-review` (gate), `/lettering` (overlay output),
+- Related: `/continuity-review` (gate), `/cover` (the approved cover),
+  `/lettering` (overlay output),
   `/visual-review` (the verdicts this command reads), `/full-production`
   (runs this last).

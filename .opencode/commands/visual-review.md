@@ -23,6 +23,8 @@ is not an acceptable result; the file with its evidence is.
   another look.
 - The user wants a second, independent review of a page before approving
   it.
+- A person's change request opened the review of a render nobody had
+  reviewed. Its checks and gates read `not_performed` and have to be judged.
 
 ## Inputs
 
@@ -64,7 +66,10 @@ is not an acceptable result; the file with its evidence is.
    can be judged. Crop or zoom; a full-page view hides swapped faces and
    wrong hands.
 5. Fill all fourteen `checks`, each with a `result` (`pass` | `fail` |
-   `not_applicable`) and `evidence` that describes pixels.
+   `not_applicable`) and `evidence` that describes pixels. When the file
+   was opened by a change request, replace every `not_performed` check and
+   gate with a judged result, set `reviewer` and `independent` for this
+   review, and keep the findings with `source: user_request` as they are.
    continuity-editor answers the checks that read the ledger, and
    art-director answers `style_fidelity`:
    - `identity`: face, hair, build, and clothing against the assigned
@@ -91,6 +96,10 @@ is not an acceptable result; the file with its evidence is.
 7. Write a finding for every failed check: `id` (`F##`), `panel`, `check`,
    `expected` (from canon or plan), `visible` (what the pixels show),
    `severity`, `repair` (the smallest useful change), and `status: open`.
+   A finding may add `region` (`x`, `y`, `w`, `h` in fractions of the page)
+   to mark the area. `source` stays absent or `reviewer`; `user_request` is
+   for changes a person asked for, written by `addUserRequest()` in
+   `scripts/lib/review-requests.js`.
    Identity ambiguity, a duplicated character, an impossible position,
    broken causality, and a missing state transition that later panels
    depend on are `blocking`. If the pixels do not establish who acts,
@@ -100,7 +109,8 @@ is not an acceptable result; the file with its evidence is.
    continuity-editor.
 9. Set the verdict. `pass`: zero findings and every check `pass` or
    `not_applicable`. `flagged`: any blocking finding is open, a gate
-   fails, or the visible evidence is ambiguous. `fixed`: only for a
+   fails, a change request from a person is still open, or the visible
+   evidence is ambiguous. `fixed`: only for a
    repaired render, after each carried finding has a `recheck` naming the
    render that was reopened and what is visible there. Set `repair_cycle`
    (0 for a first render) and `supersedes`.

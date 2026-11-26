@@ -12,4 +12,8 @@ assets: []
 #    sha256: null
 #    approved_by: null
 #    approved_at: null
+#    promoted_from: CHAR_EXAMPLE_TURN_V01   # the candidate a master was copied from
+#    generation_record: null            # GEN id of the run that produced the candidate, or null
 #    notes: ""
+# A master is registered by `node scripts/approve-asset.js --candidate <path-or-stem>`,
+# after a person approved the candidate. It writes the entry above.

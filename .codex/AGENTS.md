@@ -10,6 +10,7 @@ custom prompts; never edit them here.
 - build-edition
 - character-bible
 - continuity-review
+- cover
 - full-production
 - generate-pages
 - humanize

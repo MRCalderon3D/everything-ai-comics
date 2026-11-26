@@ -20,6 +20,9 @@ references, where the cause usually is.
   image.
 - A repaired version came back with some of the requested changes undone.
 - `/continuity-review` added a finding to a page that had passed.
+- A person asked for a change on a rendered page. The request is a finding
+  with `source: user_request` in that render's review, and the review is
+  `flagged`.
 
 ## Inputs
 
@@ -73,7 +76,13 @@ references, where the cause usually is.
    panel 3"). The compiler locks everything that was right: the panels no
    finding names, the lettering, the panel borders, the drawing style.
 5. One request carries every open blocking finding of the review, or every
-   open finding when none is blocking. When a combined request leaves some
+   open finding when none is blocking. Every open change request from a
+   person (`source: user_request`) is carried too, whatever its severity.
+   A finding's `region` (`x`, `y`, `w`, `h` in fractions of the page) is
+   written into the request as the area of the page to change. A request
+   that names no check appears in the prompt as `user request`; one filed
+   under `lettering` lets the repair change the lettering it names. When a
+   combined request leaves some
    changes undone, the next cycle carries only the findings still open,
    which keeps an identity repair apart from a prop or state repair. Each
    request attaches the reference sheet of what it corrects.
@@ -107,6 +116,9 @@ references, where the cause usually is.
 11. Write `reviews/<NEW_RENDER_ID>.review.yaml`: `supersedes` names the old
     render, `repair_cycle` is the old value plus one, and each repaired
     finding has `status: fixed` with a `recheck` (`render`, `evidence`).
+    A carried finding keeps its `source` and `region`. A change request
+    that is not visible in the new render stays `open`, and the review
+    stays `flagged` until it is fixed or the person drops it.
     The verdict is `fixed` when no blocking finding is open, `flagged`
     otherwise. On `fixed`, move `current_render` in `page.yaml` to the new
     version and set `status: reviewed`.
@@ -141,8 +153,14 @@ references, where the cause usually is.
   default and each repair run needs its own confirmation.
 - `validate-workspace.js` rejects a review whose `repair_cycle` exceeds
   `repair_policy.max_cycles`, a `fixed` finding without recheck evidence,
-  and a `fixed` verdict with an open blocking finding. Changing
-  `max_cycles` is a project decision for the user.
+  and a `fixed` verdict with an open blocking finding or an open change
+  request. Changing `max_cycles` is a project decision for the user.
+- Change requests are recorded by `addUserRequest()` in
+  `scripts/lib/review-requests.js`. Nobody writes them by hand. A request on a
+  render with no review opens one whose checks and gates are
+  `not_performed`. That review can be repaired from, and the new render
+  then gets a full review. Repairs made for a person's requests count
+  toward `repair_cycle` like any other.
 - After the plan or the references have been corrected, the page starts
   again through `/generate-pages` as a first render of the revised plan,
   with a new version number.

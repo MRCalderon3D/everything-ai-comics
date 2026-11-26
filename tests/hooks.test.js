@@ -98,6 +98,19 @@ t.test('protect: an existing render is never overwritten; the next version is na
   blocked(runHook('protect-approved-assets', { file: w.abs(`${RENDERS_P2}/PG_001_002_V02.lettered.svg`) }));
 });
 
+t.test('protect: an existing cover render is never overwritten either', () => {
+  const w = makeWorkspace();
+  const dir = 'issues/ISS_001/cover/renders';
+  allowed(runHook('protect-approved-assets', { file: w.abs(`${dir}/CV_001_V01.png`) }), 'the first cover render');
+  w.touch(`${dir}/CV_001_V01.png`);
+  w.touch(`${dir}/CV_001_V02.png`);
+  const res = runHook('protect-approved-assets', { file: w.abs(`${dir}/CV_001_V01.png`) });
+  blocked(res);
+  assert.ok(res.stderr.includes('CV_001_V03'), `should name the next free version: ${res.stderr}`);
+  allowed(runHook('protect-approved-assets', { file: w.abs(`${dir}/CV_001_V03.png`) }), 'a new version is fine');
+  allowed(runHook('protect-approved-assets', { file: w.abs('issues/ISS_001/cover/cover.yaml') }), 'cover.yaml stays writable');
+});
+
 t.test('protect: an existing export is never overwritten; the next edition is named', () => {
   const w = makeWorkspace();
   const exportRel = 'editions/ED_001_01/exports/the-night-ferry-ed01.cbz';

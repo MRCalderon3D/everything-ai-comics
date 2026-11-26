@@ -73,7 +73,10 @@ value. A provider whose variable is missing is limited to dry-run.
 
 No variable is needed to start. Generation stays in dry-run until you ask
 for a live run, and the `harness-native` and `manual` providers never need
-one.
+one. The `codex-cli` provider needs the Codex command-line tool instead of
+a variable, and doctor says whether the `codex` binary is found and which
+version it is. A missing binary is reported and is not counted as a
+failure.
 
 ## 2. Start the workspace
 
@@ -105,8 +108,10 @@ shape the rest of the project:
   redo and has to be flattened by hand for an edition. No provider declares
   reliable text rendering, so decide this before the first page is rendered.
 - `default_providers.image`: one of `fal`, `replicate`, `comfyui`,
-  `gemini`, `harness-native`, or `manual`. The default is `harness-native`,
-  which hands each request to your assistant's own image tool.
+  `gemini`, `harness-native`, `codex-cli`, or `manual`. The default is
+  `harness-native`, which hands each request to your assistant's own image
+  tool. `codex-cli` has the scripts start the Codex CLI and save the image
+  themselves.
 - `repair_policy.max_cycles`: how many repairs a page gets before its plan
   or its references are fixed instead. The default is 2.
 
@@ -300,18 +305,39 @@ The file that comes back is a candidate with the next free version, such as
 an approval step:
 
 1. Open the candidate and compare it with the bible, feature by feature.
-2. Save the pick under its master name, such as
-   `CHAR_OSKAR_EXPR_MASTER_V01` (a look page becomes
-   `<LOOK_ID>_MASTER_V##`), and register it in `references/manifest.yaml`
-   with `status: review`.
-3. When you approve it, the entry becomes `status: approved` with
-   `approved_by` and `approved_at`. Its ID goes into the entity file's
-   `references`, and an approved look master goes into `style.look_refs` in
-   `project.yaml`.
+2. When you approve it, record the approval:
 
-An approved master is immutable. A change is a new `_V##` with its own
-manifest entry, and the old one becomes `superseded`. Only approved assets
-can be attached to a page request.
+   ```bash
+   node scripts/approve-asset.js --candidate CHAR_OSKAR_EXPR_V01 --root production
+   ```
+
+   `--candidate` takes the file's path or its name without the extension.
+3. The script copies the pick to its master name with the same version
+   number, here `CHAR_OSKAR_EXPR_MASTER_V01` (a look page becomes
+   `<LOOK_ID>_MASTER_V##`). It registers the master in
+   `references/manifest.yaml` with `status: approved`, `approved_by`,
+   `approved_at`, a checksum, and the generation record the candidate came
+   from. The ID goes into the entity file's `references`. A look master
+   also goes into `style.look_refs` in `project.yaml`, and that freezes the
+   style block.
+
+```
+approved: CHAR_OSKAR_EXPR_MASTER_V01 (expressions, role identity) for CHAR_OSKAR
+  master:    characters/CHAR_OSKAR/refs/CHAR_OSKAR_EXPR_MASTER_V01.png
+  candidate: characters/CHAR_OSKAR/refs/CHAR_OSKAR_EXPR_V01.png (kept)
+  record:    GEN_CHAR_OSKAR_01
+  wrote: characters/CHAR_OSKAR/refs/CHAR_OSKAR_EXPR_MASTER_V01.png
+  wrote: references/manifest.yaml
+  wrote: characters/CHAR_OSKAR/character.yaml
+The approval is recorded. Nothing here checked the drawing.
+```
+
+An approved master is immutable. A change is a new candidate, approved with
+`--supersede`: it gets its own manifest entry and the old one becomes
+`superseded`, with its file still on disk. Without `--supersede` the script
+refuses a sheet that already has a master. It lists the pages and reference
+plans that still cite the old master, so you can replan them. Only approved
+assets can be attached to a page request.
 
 ## 6. Plan the issue
 
@@ -576,6 +602,24 @@ changed after it was compiled, and a request whose input image is missing
 from disk. When the provider returns an image, the script saves it at the
 target path and fills in the record.
 
+With `codex-cli` there is no variable to set. Compile the page for it and
+run it live:
+
+```bash
+node scripts/compile-prompts.js --page <page.yaml> --provider codex-cli
+node scripts/generate-assets.js --page <page.yaml> --provider codex-cli --live --yes
+```
+
+The script starts `codex exec` with the reference images attached in order,
+waits for Codex to draw, and saves the result as the next render. One page
+can take several minutes. The limit is 15 minutes unless
+`CODEX_IMAGE_TIMEOUT_MS` says otherwise, and `CODEX_BIN` points at the
+executable when it is not on `PATH`. The record says `model: unreported`
+unless Codex names its image model, and the cost stays `null`. If the binary
+is missing, the run times out, or Codex saves nothing, the record is
+`failed` and says why. Codex's image tool draws 1:1, 2:3 and 3:2; a page in
+another ratio comes back in the nearest of those and has to be cropped.
+
 When a file comes back, open it. A successful call means an image exists.
 Check that it is the right page with the planned number of panels, then set
 the page's `status` to `rendered`. The image is a candidate until it has
@@ -673,6 +717,14 @@ asked it to move. The new review sets `supersedes`, raises `repair_cycle`
 by one, and marks each repaired finding `fixed` with a `recheck` that names
 the new render and what is visible there.
 
+A repair also carries changes a person asked for. Such a request is a
+finding with `source: user_request` in the render's review, optionally with
+a `region` that marks the area in fractions of the page. It is recorded by
+`addUserRequest()` in `scripts/lib/review-requests.js`, which a front end
+calls; the review becomes `flagged` and `compile-prompts.js --repair` picks
+the request up with the reviewer's findings. The shape is in
+[data-model.md](data-model.md).
+
 Repairs are counted. When `repair_cycle` reaches
 `repair_policy.max_cycles`, `compile-prompts.js --repair` refuses and
 `validate-workspace.js` rejects a review above the limit. At that point the
@@ -719,8 +771,16 @@ error: issues/ISS_001/pages/PG_001_002/lettering.yaml not found; overlay letteri
 Two limits apply to overlay mode. Line breaks and fit warnings come from a
 character-width model and not from the real font, so check the SVG by eye.
 And the scripts do not rasterize: to put a lettered page in an edition,
-open the SVG in a browser or a vector tool, export it at the canvas size as
-PNG or JPEG, and set that file as `lettered_file` in the edition.
+open the SVG in a browser or a vector tool and export it at the canvas size
+as PNG or JPEG. Then file the export:
+
+```bash
+node scripts/letter-pages.js --register-lettered <image> --render <RENDER_ID> --page <page.yaml>
+```
+
+It is stored as `renders/<RENDER_ID>.lettered.png` and set as
+`lettered_file` on that render's entry in every draft edition. A reviewed
+or published edition is left as it is.
 
 A lettering fix in overlay mode costs nothing: edit `lettering.yaml` and
 run the script again. To change a word, change `page.yaml` first.
@@ -741,12 +801,33 @@ the review of the page that shows it, and a blocking one sends the page
 back to `/repair-page`.
 
 ```
+/cover
+```
+
+This step is optional. It plans the issue's cover in
+`production/issues/<ISS_ID>/cover/cover.yaml`: one image with no panels,
+the characters and props on it, and the exact title and issue text. The
+cover then goes through the page loop with its own flags:
+
+```bash
+node scripts/compile-prompts.js --cover ISS_001 --root production-ferry
+node scripts/generate-assets.js --cover ISS_001 --root production-ferry
+```
+
+The package attaches the look master and the master of each character on
+the cover. Renders are `cover/renders/CV_001_V##.png`, and the review of
+each sits in `cover/reviews/`. A cover has no ledger, so its review records
+`position`, `movement`, and `role_causality` as `not_applicable`. When a
+render has passed and you approve it, `cover.yaml` gets `status: approved`
+and `approved_render`.
+
+```
 /build-edition
 ```
 
 This writes `production/editions/<ED_ID>/edition.yaml`, which lists the
-exact render of every page, taken from each page's `current_render`. Then
-it builds:
+exact render of every page, taken from each page's `current_render`, and
+the approved cover under `cover:` when the issue has one. Then it builds:
 
 ```bash
 node scripts/build-edition.js --edition production-ferry/editions/ED_001_01/edition.yaml
@@ -758,10 +839,14 @@ wrote editions/ED_001_01/exports/the-night-ferry-001-ed01.cbz
 build-edition: ED_001_01, pdf, cbz built. Renders shipped and their review verdicts: PG_001_001_V01 (pass), PG_001_002_V02 (fixed)
 ```
 
-Without `--formats` the script builds the `pdf`, `cbz`, and `web` targets
-listed under `deliverables` in `project.yaml`, or `pdf,cbz` when there are
-none. The web reader is a directory with an `index.html`. After a build the
-`exports` list in `edition.yaml` records each file.
+Without `--formats` the script builds the `pdf`, `cbz`, `web`, `images`,
+and `epub` targets listed under `deliverables` in `project.yaml`, or
+`pdf,cbz` when there are none. The web reader is a directory with an
+`index.html`. `images` is a folder of numbered page images with a zip of
+the same files beside it. `epub` is an EPUB 3 with a fixed layout, one
+image per page. With a cover in the edition, the cover is the first page of
+every format and its file is `000-cover`. After a build the `exports` list
+in `edition.yaml` records each file.
 
 Run it a second time and nothing is replaced:
 

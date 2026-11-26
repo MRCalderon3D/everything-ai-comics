@@ -62,7 +62,17 @@ about the state of a page, an issue, or an edition.
 - `not_applicable` is a result with evidence too: say what the page lacks
   that makes the check empty, such as "no props on this page".
 - A finding states what canon or the plan expected, what is visible instead,
-  its severity, and the smallest useful repair.
+  its severity, and the smallest useful repair. It MAY mark the area it is
+  about with `region` (`x`, `y`, `w`, `h` in fractions of the page).
+- A finding carries its `source`. `reviewer`, the default, means the review
+  found it in the pixels. `user_request` means a person asked for the
+  change; such a finding quotes the request in `repair`, may leave `check`
+  out, and keeps the review `flagged` while it is open
+  (`scripts/lib/review-requests.js` writes it).
+- `not_performed` is the result of a check nobody has judged. Only a review
+  opened by a change request on a render without a review records it, for
+  its checks and its two gates. A reviewer NEVER uses it to skip a check,
+  and a review that holds one cannot be `pass` or `fixed`.
 - A finding marked `fixed` carries a `recheck` that names the corrected
   render and what is now visible there. A repair request that returned
   without error is not evidence of a repair (`repair-limits.md`).
@@ -102,7 +112,9 @@ about the state of a page, an issue, or an edition.
   verdict.
 - `scripts/validate-workspace.js` enforces the review rules: a `pass` has no
   findings, a `fixed` finding has a recheck with evidence, an open blocking
-  finding or a failed gate forces `flagged`.
+  finding or a failed gate forces `flagged`. So does an open change request
+  from a person, and so does a check or gate left `not_performed`. A
+  `region` that reaches past the page is an error.
 - Those checks confirm that evidence was written. Whether it describes the
   pixels is visual review: a reviewer who did not generate the image
   (`independent: true`) or a person opens the same file and reads the

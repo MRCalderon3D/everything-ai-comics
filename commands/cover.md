@@ -1,0 +1,151 @@
+---
+description: Plan the cover of an issue, generate and review it, and record the approved render.
+---
+
+# /cover
+
+## Purpose
+
+Give an issue its front cover. A cover is one image with no panels. It is
+planned in `cover.yaml`, compiled and generated like a page, and reviewed
+on its pixels like a page. It uses the same frozen style block and the same
+approved masters, so the character on the cover is the character inside.
+The command ends when one cover render has a passing review and the user
+has approved it. From then on `/build-edition` puts it first in the
+edition.
+
+## Use When
+
+- An issue's pages are planned and its masters are approved, and the issue
+  needs a cover.
+- A cover render was flagged in review and needs a repair.
+- The cover text changed (title, issue line, credits) and the cover has to
+  be drawn again.
+- A candidate has passed review and the user wants to approve it, or to
+  approve a different version.
+
+## Inputs
+
+- `issue` (ID, required): the `ISS_###` whose cover to make.
+- `concept` (string, optional): what the cover shows. Without it the
+  command proposes one from the issue and asks.
+- `provider` (string, optional, default `generation.provider` in
+  `cover.yaml`, then `default_providers.image` in `project.yaml`): an ID
+  from `manifests/image-providers.json`.
+- `approve` (render ID, optional): approve this `CV_###_V##` and stop.
+- `--dry-run` (flag, default on): write the request spec and a `dry_run`
+  record; call nothing.
+- `--live` (flag, optional, default off): call the provider, after the cost
+  confirmation.
+
+## Invokes Agents
+
+- art-director
+- editor-in-chief
+- prompt-director
+- image-generation-specialist
+- visual-reviewer
+
+## Required Skills
+
+- panel-composition
+- reference-selection
+- prompt-compilation
+- image-generation
+- pixel-review
+
+## Process
+
+1. Check the preconditions and stop on the first that fails. The style
+   block exists and the look master is approved. Every character the cover
+   will show has an approved identity master. No `open_questions` entry
+   with `blocking: true` lacks a `resolution`.
+2. Decide the concept. editor-in-chief states what the cover should tell a
+   reader about this issue without giving away its ending. art-director
+   turns that into one drawable image: who is on it, where, in which pose,
+   and where the title sits. One moment only. A cover that tries to show
+   three scenes reads as none.
+3. Write `production/issues/<ISS_ID>/cover/cover.yaml` from
+   `templates/cover/cover.yaml`. Set `id` to `CV_<issue number>`. Fill
+   `concept`, `composition`, `location`, and one `cast` row per character
+   with `action`, `acting`, `wardrobe`, visible `state` tags, and held
+   props. Each character appears once. A prop goes under the character who
+   holds it, or under `props` when nobody does.
+4. Write the cover text under `lettering`: the exact `title`, and the
+   `issue_line`, `tagline`, and `credits` if the cover carries them. Words
+   and accents are in the project's language. `mode` defaults to the
+   project's lettering mode. With `overlay` the art is drawn without text
+   and the title is set afterwards.
+5. Start the cover as `status: draft` with `approved_render: null`.
+6. prompt-director compiles the package: `node scripts/compile-prompts.js
+   --cover <ISS_ID> --root production --provider <id>`. Read it before
+   sending. The style block is verbatim. The look master is attached with
+   role `style` and each character's master with role `identity`. The
+   location plate and prop sheets follow while the provider's image budget
+   allows; the script names any it left out. `lettering_text` lists every
+   cover string in `in_image` mode.
+7. Cost gate. Show the estimate for one image and wait for an explicit
+   confirmation before a live run.
+8. Generate: `node scripts/generate-assets.js --cover <ISS_ID> --root
+   production --provider <id>` for the dry run, and add `--live --yes`
+   after the confirmation. The render is saved at the next free version,
+   `cover/renders/CV_###_V##.png`, with a record under
+   `production/generations/CV_###/`. With `harness-native` or `manual` the
+   request file is the handoff package, and the image is saved at the
+   target path it names. Never write over an existing version.
+9. visual-reviewer, who did not generate the image, opens the render and
+   writes `cover/reviews/<RENDER_ID>.review.yaml` in the visual-review
+   format. `page` holds the cover ID. `position`, `movement`, and
+   `role_causality` are `not_applicable` on a cover, with the reason as
+   evidence. The other checks are judged when `cover.yaml` names what they
+   look at, and findings leave `panel` as `null`. Check every cover string
+   character by character.
+10. On `flagged`, repair within the repair limit: `node
+    scripts/compile-prompts.js --cover <ISS_ID> --root production --repair
+    <review.yaml>`, generate the sibling version, and review the whole
+    cover again. After the limit, fix `cover.yaml` or the references and
+    start from a fresh generate package.
+11. Approval. Show the user the render that passed and ask. On a yes,
+    editor-in-chief sets `status: approved` and `approved_render` to that
+    render in `cover.yaml`, and records the decision under
+    `human_approval` in the review. A render without a `pass` or `fixed`
+    review cannot be approved.
+12. Run `node scripts/validate-workspace.js --root production --issue
+    <ISS_ID>`, then the self-evaluation gates on the files this run wrote.
+    Report mechanical validation and the visual review as separate lines.
+
+## Outputs
+
+- `production/issues/<ISS_ID>/cover/cover.yaml`, validates against
+  `schemas/cover.schema.json`.
+- `production/issues/<ISS_ID>/cover/prompts/<provider>.yaml`, validates
+  against `schemas/prompt-package.schema.json` (ID `PP_CV_###_<PROVIDER>`).
+- `production/issues/<ISS_ID>/cover/renders/CV_###_V##.png`, versioned
+  candidates, never overwritten.
+- `production/issues/<ISS_ID>/cover/reviews/<RENDER_ID>.review.yaml`,
+  validates against `schemas/visual-review.schema.json`.
+- `production/generations/CV_###/GEN_CV_###_<attempt##>.yaml` and the
+  `GEN_*.request.json` beside it (`schemas/generation-record.schema.json`).
+
+## Notes
+
+- Cost warning: this command can spend money. Dry run is the default and
+  the hook `require-cost-confirmation.js` blocks `generate-assets --live`
+  without `--yes`.
+- The cover is optional. An edition without `cover:` exports the pages
+  alone.
+- Approving a cover does not put it in an edition that already exists.
+  `/build-edition` lists the approved render under `cover:` in the next
+  edition, and the cover becomes the first page of every export.
+- If a later review flags the approved render, the cover goes back to
+  `draft` until another render passes and is approved.
+- Overlay mode: after the title is set on the art in a browser or a vector
+  tool, file the flattened image with `node scripts/letter-pages.js
+  --register-lettered <image> --render <RENDER_ID> --root production`. The
+  edition then ships that file as the cover's `lettered_file`.
+- Format differences: a paged cover uses the page aspect ratio and joins
+  the edition's aspect check. A webtoon cover uses the segment ratio from
+  `project.yaml` and is left out of the width comparison.
+- Related: `/visual-development` (the masters), `/generate-pages` and
+  `/visual-review` (the same loop for pages), `/repair-page` (the repair
+  limit), `/build-edition` (ships the approved cover).

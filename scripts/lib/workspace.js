@@ -19,6 +19,8 @@ const ID = {
   page: /^PG_\d{3}_\d{3}$/,
   panel: /^PN_\d{3}_\d{3}_\d{2}$/,
   render: /^PG_\d{3}_\d{3}_V\d{2}$/,
+  cover: /^CV_\d{3}$/,
+  coverRender: /^CV_\d{3}_V\d{2}$/,
   lettering: /^L\d{2}$/,
   finding: /^F\d{2}$/,
   edition: /^ED_\d{3}_\d{2}$/,
@@ -154,8 +156,12 @@ function listPages(root, issueId) {
   });
 }
 
-/** Absolute path of a render image, trying each supported extension; null if absent. */
+/**
+ * Absolute path of a render image, trying each supported extension; null if
+ * absent. Takes a page render (PG_001_004_V02) or a cover render (CV_001_V01).
+ */
 function renderFile(root, renderId) {
+  if (ID.coverRender.test(String(renderId))) return coverRenderFile(root, renderId);
   const pageId = pageOfRender(renderId);
   if (!pageId) return null;
   const dir = path.join(pageDir(root, pageId), 'renders');
@@ -179,7 +185,9 @@ function listRenders(root, pageId) {
   return [...ids].sort();
 }
 
+/** Path of the review of a page render or a cover render (the file may not exist). */
 function reviewFile(root, renderId) {
+  if (ID.coverRender.test(String(renderId))) return coverReviewFile(root, renderId);
   const pageId = pageOfRender(renderId);
   if (!pageId) return null;
   return path.join(pageDir(root, pageId), 'reviews', `${renderId}.review.yaml`);
@@ -207,6 +215,100 @@ function listReviews(root, pageId) {
 /** True when the review's verdict lets the render into a non-draft edition. */
 function reviewPasses(review) {
   return !!review && (review.verdict === 'pass' || review.verdict === 'fixed');
+}
+
+// --- cover -------------------------------------------------------------------
+// One cover per issue: issues/<ISS_ID>/cover/ holds cover.yaml, prompts/,
+// renders/ and reviews/, laid out like a page directory. The cover ID carries
+// the issue number (CV_001 is the cover of ISS_001).
+
+/** "ISS_001" -> "CV_001". */
+function coverIdOfIssue(issueId) {
+  const m = /^ISS_(\d{3})$/.exec(String(issueId));
+  return m ? `CV_${m[1]}` : null;
+}
+
+/** "CV_001" -> "ISS_001". */
+function issueOfCover(coverId) {
+  const m = /^CV_(\d{3})$/.exec(String(coverId));
+  return m ? `ISS_${m[1]}` : null;
+}
+
+/** "CV_001_V02" -> "CV_001". */
+function coverOfRender(renderId) {
+  const m = /^(CV_\d{3})_V\d{2}$/.exec(String(renderId));
+  return m ? m[1] : null;
+}
+
+/** An issue ID from an issue ID or a cover ID; null for anything else. */
+function issueOfCoverArg(issueOrCover) {
+  const text = String(issueOrCover);
+  return ID.issue.test(text) ? text : issueOfCover(text);
+}
+
+/** Cover directory of an issue. Takes the issue ID or the cover ID. */
+function coverDir(root, issueOrCover) {
+  const issueId = issueOfCoverArg(issueOrCover);
+  return issueId ? path.join(issueDir(root, issueId), 'cover') : null;
+}
+
+/** Path of cover.yaml (the file may not exist). Takes the issue ID or the cover ID. */
+function coverFile(root, issueOrCover) {
+  const dir = coverDir(root, issueOrCover);
+  return dir ? path.join(dir, 'cover.yaml') : null;
+}
+
+/** cover.yaml of an issue, or null when the issue has no cover. */
+function loadCover(root, issueOrCover) {
+  const file = coverFile(root, issueOrCover);
+  return file ? loadYaml(file) : null;
+}
+
+/** Absolute path of a cover render image, trying each supported extension; null if absent. */
+function coverRenderFile(root, renderId) {
+  const coverId = coverOfRender(renderId);
+  if (!coverId) return null;
+  const dir = path.join(coverDir(root, coverId), 'renders');
+  for (const ext of IMAGE_EXTENSIONS) {
+    const file = path.join(dir, renderId + ext);
+    if (isFile(file)) return file;
+  }
+  return null;
+}
+
+/** Cover render IDs present on disk for an issue, sorted by version. */
+function listCoverRenders(root, issueOrCover) {
+  const base = coverDir(root, issueOrCover);
+  const dir = base ? path.join(base, 'renders') : null;
+  if (!dir || !isDir(dir)) return [];
+  const ids = new Set();
+  for (const name of fs.readdirSync(dir)) {
+    const ext = path.extname(name).toLowerCase();
+    const stem = name.slice(0, name.length - ext.length);
+    if (IMAGE_EXTENSIONS.includes(ext) && ID.coverRender.test(stem)) ids.add(stem);
+  }
+  return [...ids].sort();
+}
+
+/** Path of the review of a cover render (the file may not exist). */
+function coverReviewFile(root, renderId) {
+  const coverId = coverOfRender(renderId);
+  if (!coverId) return null;
+  return path.join(coverDir(root, coverId), 'reviews', `${renderId}.review.yaml`);
+}
+
+/** All reviews of an issue's cover: [{ render, file, doc }], sorted by render ID. */
+function listCoverReviews(root, issueOrCover) {
+  const base = coverDir(root, issueOrCover);
+  const dir = base ? path.join(base, 'reviews') : null;
+  if (!dir || !isDir(dir)) return [];
+  return fs.readdirSync(dir)
+    .filter((n) => /\.review\.ya?ml$/i.test(n))
+    .sort()
+    .map((n) => {
+      const file = path.join(dir, n);
+      return { render: n.replace(/\.review\.ya?ml$/i, ''), file, doc: loadYaml(file) };
+    });
 }
 
 function loadCharacter(root, charId) {
@@ -294,6 +396,16 @@ module.exports = {
   loadReview,
   listReviews,
   reviewPasses,
+  coverIdOfIssue,
+  issueOfCover,
+  coverOfRender,
+  coverDir,
+  coverFile,
+  loadCover,
+  coverRenderFile,
+  listCoverRenders,
+  coverReviewFile,
+  listCoverReviews,
   loadCharacter,
   loadWardrobe,
   loadLocation,

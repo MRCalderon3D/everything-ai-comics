@@ -25,6 +25,7 @@
         "visual-review",
         "repair-page",
         "lettering",
+        "cover",
         "continuity-review",
         "build-edition",
         "full-production",
@@ -176,6 +177,7 @@
         "generate-pages",
         "visual-review",
         "repair-page",
+        "cover",
         "humanize",
         "self-review"
       ],
@@ -197,6 +199,7 @@
         "character-sheet-generation",
         "location-design",
         "visual-style-development",
+        "panel-composition",
         "reference-selection",
         "self-evaluation",
         "prompt-compilation",

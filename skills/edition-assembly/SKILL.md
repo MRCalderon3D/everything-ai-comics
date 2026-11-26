@@ -62,7 +62,9 @@ earlier edition stays what it was.
 6. Validate before building:
    `node scripts/validate-workspace.js --root <workspace> --issue <ISS_ID>`.
 7. Build:
-   `node scripts/build-edition.js --edition <edition.yaml> --formats pdf,cbz,web`.
+   `node scripts/build-edition.js --edition <edition.yaml> --formats pdf,cbz,web,images,epub`.
+   Name only the formats the project delivers. When the edition has a
+   `cover`, the cover is the first page of each one.
    The script refuses an edition that lists a render without a `pass` or
    `fixed` review. For a reading copy of work in progress add `--draft`,
    which marks every export as a draft. The script does not overwrite an
@@ -94,10 +96,11 @@ earlier edition stays what it was.
 ## Outputs
 
 - `production/editions/<ED_ID>/edition.yaml` (`edition.schema.json`).
-- Exports under `production/editions/<ED_ID>/exports/`: PDF, CBZ, and a web
-  reader, named `<title-slug>-<issue number>-ed<edition number>[-DRAFT]`
-  with `.pdf`, `.cbz`, or the directory suffix `-web`
-  (`the-night-ferry-001-ed01.cbz`).
+- Exports under `production/editions/<ED_ID>/exports/`: PDF, CBZ, a web
+  reader, numbered images, and EPUB, named
+  `<title-slug>-<issue number>-ed<edition number>[-DRAFT]` with `.pdf`,
+  `.cbz`, `.epub`, the directory suffix `-web`, or `-images` and
+  `-images.zip` (`the-night-ferry-001-ed01.cbz`).
 - Overlay mode: lettered page files referenced by `lettered_file`.
 - A delivery note: the current render of every page by filename, what was
   repaired since the last edition, what was visually rechecked, and what

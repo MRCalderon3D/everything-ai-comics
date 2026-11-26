@@ -37,7 +37,7 @@ the real decision.
 
 | Hook | Event | Effect |
 |---|---|---|
-| `protect-approved-assets.js` | before a file write | Blocks three overwrites: a reference asset whose status is `approved` in `references/manifest.yaml`, any existing file under a page's `renders/`, and any existing file under `editions/<ED_ID>/exports/`. The message names the next version to create (`PG_001_002_V03`, `ED_001_02`, `CHAR_MARA_TURN_MASTER_V02`). |
+| `protect-approved-assets.js` | before a file write | Blocks three overwrites: a reference asset whose status is `approved` in `references/manifest.yaml`, any existing file under a page's or a cover's `renders/`, and any existing file under `editions/<ED_ID>/exports/`. The message names the next version to create (`PG_001_002_V03`, `ED_001_02`, `CHAR_MARA_TURN_MASTER_V02`). |
 | `validate-after-write.js` | after a file write | Blocks when a schema-known artifact (project, character, issue, scene, page, review, edition, and the rest) fails its schema in `schemas/`, or is not parseable YAML. |
 | `detect-continuity-drift.js` | after a `page.yaml` write | Warns. Runs the panel ledger audit for the page's issue and prints the findings that touch the page: a level change with no `moved`, a prop that changed hands with no `transfers` entry, a dropped state tag, a broken page chain. |
 | `require-cost-confirmation.js` | before a shell command | Blocks `generate-assets ... --live` without `--yes`. Dry-run first, confirm the cost estimate, then run again with both flags. |

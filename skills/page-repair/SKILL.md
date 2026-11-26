@@ -24,7 +24,10 @@ problem belongs to the plan or the references.
 ## Inputs
 
 - The review file `reviews/<RENDER_ID>.review.yaml`: findings with `panel`,
-  `check`, `expected`, `visible`, `severity`, and `repair`.
+  `check`, `expected`, `visible`, `severity`, and `repair`, and where given
+  `source` and `region`. A finding with `source: user_request` is a change
+  a person asked for: its `repair` holds their words and it may have no
+  `check`.
 - The flagged render and its prompt package.
 - `page.yaml`, the reference plan, and the bibles for the entities named in
   the findings.
@@ -55,7 +58,9 @@ problem belongs to the plan or the references.
    drawing style).
 5. Expect one request per cycle. The compiler sends every open blocking
    finding of the review together, or every open finding when none is
-   blocking. A combined request tends to carry out the most visible change
+   blocking. Open change requests from a person go in with them whatever
+   their severity, and a `region` becomes a sentence saying where on the
+   page the change goes. A combined request tends to carry out the most visible change
    and skip the rest. What it skips stays `open` in the new review, and the
    next cycle carries only that, so an identity repair and a prop or state
    repair end up in separate requests. Each request produces its own

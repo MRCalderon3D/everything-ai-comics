@@ -41,14 +41,18 @@ Publishing layer. Applies to `deliverables` in `project.yaml`, to the
 | `pdf` | Reading copy, one comic page per PDF page | `scripts/build-edition.js` |
 | `cbz` | Comic archive for reader apps | `scripts/build-edition.js` |
 | `web` | Self-contained web reader | `scripts/build-edition.js` |
+| `images` | One numbered image per page, as a folder and a zip | `scripts/build-edition.js` |
+| `epub` | EPUB 3 with a fixed layout, one image per page | `scripts/build-edition.js` |
 | `social-carousel` | Crops of pages or panels for social feeds | External image tool, from the edition's renders |
 | `print` | Press-ready files to a printer's specification | External prepress tool, from the edition's renders |
 
 - An edition's `exports` list records each file the build produced, with
-  its `format` (`pdf`, `cbz`, or `web`) and its `built_at` time. For the web
-  reader the recorded file is its `index.html`.
-- Without `--formats`, the build produces the `pdf`, `cbz`, and `web`
-  targets the project declares, and `pdf` and `cbz` when it declares none.
+  its `format` (`pdf`, `cbz`, `web`, `images`, or `epub`) and its `built_at`
+  time. For the web reader the recorded file is its `index.html`, and for
+  the images it is the zip.
+- Without `--formats`, the build produces the `pdf`, `cbz`, `web`, `images`,
+  and `epub` targets the project declares, and `pdf` and `cbz` when it
+  declares none.
 - Deliverables are declared before pages are planned, because they set the
   page ratio, the lettering size, and the safe margins.
 - A target that the project does not declare is not built on speculation.
@@ -91,6 +95,34 @@ Publishing layer. Applies to `deliverables` in `project.yaml`, to the
   continuous vertical strip.
 - The reader presents the edition's renders as they are. It does not
   rescale them into different proportions or add content of its own.
+
+## Images and EPUB
+
+- The `images` export is the pages as loose files: a folder
+  `<base name>-images/` and a zip `<base name>-images.zip` holding the same
+  files. Names follow the CBZ rule, so alphabetical order is reading order.
+  Each image is the listed render as it is, or the entry's `lettered_file`.
+- The `epub` export is an EPUB 3 with a fixed layout: one image per page,
+  each on its own page document with a viewport of the image's pixel size.
+  The package declares `rendition:layout` as `pre-paginated` and the page
+  progression from `reading_direction`, and it carries a navigation
+  document.
+- The `mimetype` entry is the first file of the EPUB archive and is stored
+  uncompressed. Images are stored as they are.
+- A draft EPUB says so in its title and shows a banner on every page.
+
+## Cover
+
+- An edition may name a cover render under `cover:`. When it does, the
+  cover is the first page of every export. It is `000-cover.<ext>` in the
+  CBZ, the web reader, the images, and the EPUB, so it sorts before page
+  `001`.
+- `ComicInfo.xml` marks that page as `FrontCover`, and the EPUB marks its
+  image as `cover-image`.
+- The cover passes the same review gate as a page. In a paged project it
+  also joins the aspect-ratio comparison. A webtoon cover is not a scroll
+  segment and is left out of the width comparison.
+- An edition without `cover:` exports the pages alone, numbered from `001`.
 
 ## Social carousel and print
 
@@ -156,8 +188,8 @@ settings in the edition's `notes`.
 ## Validation
 
 - `schemas/project.schema.json` restricts `deliverables[].target` to the
-  five targets, and `schemas/edition.schema.json` restricts an export's
-  `format` to `pdf`, `cbz`, or `web`.
+  targets in the table above, and `schemas/edition.schema.json` restricts an
+  export's `format` to `pdf`, `cbz`, `web`, `images`, or `epub`.
 - `scripts/build-edition.js` builds only from an `edition.yaml`, applies the
   review gate of `edition-assembly.md`, and skips an existing export unless
   `--force` is passed. It refuses `--force` on an edition whose status is
@@ -169,7 +201,7 @@ settings in the edition's `notes`.
 - `hooks/protect-approved-assets.js` blocks a direct write over an existing
   file under `editions/*/exports/`.
 - `scripts/validate-workspace.js` checks that every file an edition lists
-  for its pages exists on disk.
+  for its pages and its cover exists on disk.
 - A `--force` rebuild of a draft leaves no mark beyond a newer `built_at`
   on the export. Production-qa reads the `built_at` times at release review
   and confirms the exports were built after the last change to the page

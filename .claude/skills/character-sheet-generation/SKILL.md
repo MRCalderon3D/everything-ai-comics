@@ -99,19 +99,24 @@ describe them again from text.
    `CHAR_MARA_WARD_OILSKIN_V01.png` and
    `CHAR_MARA_DETAIL_TORN_LEFT_CUFF_V01.png` for an outfit and a detail)
    under `production/characters/<CHAR_ID>/refs/`, always the next free
-   version and never under a `_MASTER` name. Save the selected candidate as
-   `<CHAR_ID>_<TAG>_MASTER_V##` (for example `CHAR_MARA_TURN_MASTER_V01`)
-   and register it in `production/references/manifest.yaml` with `entity`,
-   `kind`, `path`, `status: review`, and `default_role` (`identity`, or
-   `wardrobe` for an outfit sheet). Each attempt has its generation record
-   and request file under `production/generations/<CHAR_ID>/`.
+   version and never under a `_MASTER` name. Each attempt has its
+   generation record and request file under
+   `production/generations/<CHAR_ID>/`. Submit the selected candidate for
+   review under its candidate name.
 10. Record approval per reference. The user approves each sheet
-    individually; write `status: approved`, `approved_by`, and
-    `approved_at`, then add the asset ID to `character.references` and to
-    the outfit's `references`. Reuse approvals that exist and ask only about
-    sheets that are new.
-11. Correct a sheet by making the next version. The old asset becomes
-    `superseded` and its file stays on disk.
+    individually. For each approved one run
+    `node scripts/approve-asset.js --candidate <CHAR_ID>_<TAG>_V## --root production`.
+    It copies the candidate to `<CHAR_ID>_<TAG>_MASTER_V##` with the same
+    version (for example `CHAR_MARA_TURN_MASTER_V01`), registers it in
+    `production/references/manifest.yaml` with `status: approved`,
+    `approved_by`, `approved_at`, its generation record, and `default_role`
+    (`identity`, or `wardrobe` for an outfit sheet), and adds the asset ID
+    to `character.references` and, for an outfit sheet, to the outfit's
+    `references`. Reuse approvals that exist and ask only about sheets that
+    are new.
+11. Correct a sheet by making the next version. Approve the new candidate
+    with `approve-asset.js --supersede`: the old asset becomes `superseded`
+    and its file stays on disk.
 
 ## Outputs
 

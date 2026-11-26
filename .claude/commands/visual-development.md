@@ -109,19 +109,28 @@ with one default role, and from then on outranks any prompt.
    per sheet or order a re-roll with corrected wording. After the project's
    `repair_policy.max_cycles` rounds without a usable candidate, fix the
    bible text instead of rolling again.
-7. Promote the pick. Save it as `<ENTITY_ID>_<TAG>_MASTER_V##` (a look
-   page as `<LOOK_ID>_MASTER_V##`) and register it in
-   `production/references/manifest.yaml`: `id`, `entity`, `kind`, `path`,
-   `status: review`, `sha256`, and a single `default_role` (`identity` for
-   a turnaround, `style` for a look page, `spatial_continuity` for a plate,
-   `prop_consistency` for a prop, `wardrobe` for a wardrobe sheet).
-8. Hand each image to the user with a review card: what the asset is, the
+7. Hand the pick to the user with a review card: what the asset is, the
    features to verify taken from the bible, anything this image cannot show,
-   and what approving it allows next. On approval set `status: approved` with
-   `approved_by` and `approved_at`, add the asset ID to the entity file's
-   `references`, and add an approved look master to `style.look_refs` in
-   `project.yaml`. Then move to the next planned sheet without waiting to be
-   asked.
+   and what approving it allows next. The file under review is the
+   candidate, still under its candidate name. Wait for an explicit approval
+   of that image.
+8. Promote the approved pick with
+   `node scripts/approve-asset.js --candidate <path-or-stem> --root production [--note "<text>"]`.
+   The script copies the candidate to `<ENTITY_ID>_<TAG>_MASTER_V##` (a look
+   page to `<LOOK_ID>_MASTER_V##`) with the candidate's version number and
+   registers it in `production/references/manifest.yaml` as `approved`:
+   `id`, `entity`, `kind`, `path`, `sha256`, `approved_by`, `approved_at`,
+   the candidate and generation record it came from, and a single
+   `default_role` (`identity` for a turnaround or an expression sheet,
+   `style` for a look page, `spatial_continuity` for a plate,
+   `prop_consistency` for a prop, `wardrobe` for a wardrobe sheet). It adds
+   the asset ID to the entity file's `references`, and for a look master it
+   sets `style.look_refs` and `style.style_block` in `project.yaml`, which
+   freezes the style block. When the sheet already has an approved master,
+   add `--supersede`: the old entry becomes `superseded` and its file stays.
+   Run the script only after the user approved the image; it records the
+   decision and does not make it. Then move to the next planned sheet
+   without waiting to be asked.
 9. Run `node scripts/validate-workspace.js --root production`, then the
    self-evaluation gates on the manifest entries and generation records.
    Report sheets approved, sheets waiting for a verdict, and spend against
@@ -147,8 +156,10 @@ with one default role, and from then on outranks any prompt.
   the default and a live batch always shows its estimate first. Cut
   `variants` before cutting sheets.
 - An approved master is immutable. The hook `protect-approved-assets.js`
-  refuses edits to it. A change is a new `_V##`, a new manifest entry, and
-  `status: superseded` on the old one.
+  refuses edits to it. A change is a new candidate, approved with
+  `approve-asset.js --supersede`, which writes the new manifest entry and
+  sets `status: superseded` on the old one. The script lists the pages and
+  reference plans that still cite the old master; replan and recompile them.
 - A photograph or an outside drawing brought in through `/ingest-references`
   informs a sheet through the description its analysis wrote into the
   bible. It does not replace the sheet: identity masters are drawn in the
@@ -156,7 +167,8 @@ with one default role, and from then on outranks any prompt.
 - With `harness-native` or `manual` the script writes a handoff package
   (the `GEN_*.request.json`) and calls no network. The harness image tool
   or a person produces the image and saves it at the target path the
-  request names, and steps 5 to 8 apply to that file.
+  request names, and steps 5 to 8 apply to that file. With `codex-cli` the
+  live run starts the Codex CLI and saves the candidate itself.
 - fal's default model ignores reference images. Pin a multi-image model
   with `--model` when compiling, or the look master is not used.
 - Related: `/character-bible`, `/location-bible`, `/prop-bible`,

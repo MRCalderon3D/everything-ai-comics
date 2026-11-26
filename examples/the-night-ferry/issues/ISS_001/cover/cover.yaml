@@ -1,0 +1,34 @@
+# Schema: schemas/cover.schema.json
+# The cover of ISS_001. One image, no panels. It is drawn after the pages, from the same masters.
+
+id: CV_001
+issue: ISS_001
+
+concept: Mara stands in the wheelhouse doorway with the flare gun lowered, looking down at the deck, where the tarpaulin over the crates has one corner lifted.
+composition: Low angle from the deck. Mara is small and high at right, the crates large at lower left. The top third is black sky, left free for the title.
+location: LOC_FERRY_DECK
+time_of_day: night
+
+cast:
+  - character: CHAR_MARA
+    wardrobe: WARD_MARA_OILSKIN
+    action: Stands in the wheelhouse doorway, flare gun lowered in her right hand.
+    acting: Still, weight on one leg, eyes on the crates.
+    state: []
+    holding: [PROP_FLARE_GUN]
+
+props: [PROP_TARPAULIN]                # in view, in nobody's hands
+
+lettering:
+  mode: in_image                       # the same mode as the pages
+  title: The Night Ferry
+  issue_line: "No. 1: Crossing"
+  tagline: null
+  credits: null
+
+generation:
+  provider: harness-native
+
+status: approved                       # CV_001_V01 passed its review, then was approved
+approved_render: CV_001_V01
+notes: Oskar is not on the cover. The lifted corner of the tarpaulin is the only sign of him.

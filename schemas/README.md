@@ -18,7 +18,7 @@ hook check each YAML file against its schema.
 - Every top-level document accepts an optional free-text `notes`.
 - Only fields marked required in the data model are required here.
 
-## Roster (18, mirrors docs/conventions.md)
+## Roster (19, mirrors docs/conventions.md)
 
 | Schema | Validates | Lives at |
 |---|---|---|
@@ -37,9 +37,17 @@ hook check each YAML file against its schema.
 | `reference-plan` | Reference images for one page, one role each, with priority and omission risk | `production/issues/<ISS_ID>/pages/<PG_ID>/reference-plan.yaml` |
 | `prompt-package` | Compiled prompt, parameters, references, repair block, source hashes | `production/issues/<ISS_ID>/pages/<PG_ID>/prompts/<provider>.yaml`, and any `prompts/*.yaml` beside reference art (`<entity dir>/refs/prompts/`, `references/style/prompts/`) |
 | `generation-record` | Provenance of one attempt: provider, model, output, cost, status | `production/generations/<scope>/GEN_*.yaml` |
-| `visual-review` | Fourteen checks with evidence, findings, two gates, verdict | `production/issues/<ISS_ID>/pages/<PG_ID>/reviews/<RENDER_ID>.review.yaml` |
+| `visual-review` | Fourteen checks with evidence, findings (a reviewer's, or a person's change request), two gates, verdict | `production/issues/<ISS_ID>/pages/<PG_ID>/reviews/<RENDER_ID>.review.yaml` |
+| `cover` | The cover of an issue: concept, cast, props, cover lettering, approval state | `production/issues/<ISS_ID>/cover/cover.yaml` |
 | `continuity-state` | Where every character and prop is at the end of an issue | `production/continuity/<ISS_ID>.final-state.yaml` |
-| `edition` | The exact render of every page, and the exports built from them | `production/editions/<ED_ID>/edition.yaml` |
+| `edition` | The exact render of every page and of the optional cover, and the exports built from them | `production/editions/<ED_ID>/edition.yaml` |
+
+A cover reuses three of these schemas. Its prompt package
+(`cover/prompts/<provider>.yaml`), its generation records
+(`generations/<COVER_ID>/GEN_*.yaml`), and its reviews
+(`cover/reviews/<RENDER_ID>.review.yaml`) follow `prompt-package`,
+`generation-record`, and `visual-review`, with the cover ID in the `page`
+field.
 
 `references/manifest.yaml` has no schema. Scripts read its fields directly;
 the data model lists them.
@@ -54,6 +62,8 @@ the data model lists them.
 | Page | `^PG_\d{3}_\d{3}$` | `PG_001_004` |
 | Panel | `^PN_\d{3}_\d{3}_\d{2}$` | `PN_001_004_03` |
 | Render | `^PG_\d{3}_\d{3}_V\d{2}$` | `PG_001_004_V02` |
+| Cover | `^CV_\d{3}$` | `CV_001` |
+| Cover render | `^CV_\d{3}_V\d{2}$` | `CV_001_V02` |
 | Lettering element | `^L\d{2}$` | `L03` |
 | Finding | `^F\d{2}$` | `F01` |
 | Edition | `^ED_\d{3}_\d{2}$` | `ED_001_03` |
@@ -63,8 +73,8 @@ the data model lists them.
 | Fact | `^FACT_\d{3}$` | `FACT_007` |
 | Provider | `^[a-z][a-z0-9-]*$` | `harness-native` |
 | State tag, level, landmark | `^[a-z][a-z0-9_]*$` | `cut_left_hand`, `deck`, `crates` |
-| Prompt package | `^PP_(PG_\d{3}_\d{3}\|<entity>)_[A-Z0-9][A-Z0-9_-]*$` | `PP_PG_001_001_HARNESS-NATIVE`, `PP_PG_001_002_FAL-P03`, `PP_CHAR_MARA_FAL-TURN` |
-| Generation record | `^GEN_(PG_\d{3}_\d{3}\|<entity>)_\d{2}$` | `GEN_PG_001_002_02` |
+| Prompt package | `^PP_(PG_\d{3}_\d{3}\|CV_\d{3}\|<entity>)_[A-Z0-9][A-Z0-9_-]*$` | `PP_PG_001_001_HARNESS-NATIVE`, `PP_PG_001_002_FAL-P03`, `PP_CV_001_FAL`, `PP_CHAR_MARA_FAL-TURN` |
+| Generation record | `^GEN_(PG_\d{3}_\d{3}\|CV_\d{3}\|<entity>)_\d{2}$` | `GEN_PG_001_002_02`, `GEN_CV_001_01` |
 
 ## Design decisions
 
@@ -79,6 +89,12 @@ the data model lists them.
   scene.
 - A review names all fourteen checks. `checks` requires every key, and each
   check requires a `result` and a non-empty `evidence`.
+- A cover is reviewed with the same schema. The checks that judge the panel
+  ledger (`position`, `movement`, `role_causality`) are recorded as
+  `not_applicable` with the reason as evidence, so a cover review still
+  lists fourteen checks. `validate-workspace.js` enforces that.
+- A cover carries its own approval. `cover.yaml` requires `status` and
+  `approved_render`, and the second is `null` while the first is `draft`.
 - A fixed finding needs a recheck. The finding schema accepts `status: fixed`
   only when `recheck` is present with a render and evidence. The other review
   rules compare several fields and are enforced by `validate-workspace.js`.
@@ -108,8 +124,8 @@ second file is left to the scripts:
 - `check-continuity.js` applies the ledger rules: one row per character, prop
   custody and transfers, level changes, persistent state tags, the hands
   budget, speakers in cast, and the page chain.
-- `validate-workspace.js` resolves cross-references and applies the review and
-  edition rules.
+- `validate-workspace.js` resolves cross-references and applies the review,
+  cover, and edition rules.
 
 Neither the schemas nor the scripts look at an image. Identity, anatomy, and
 continuity in the rendered page are judged in the visual review.
@@ -130,6 +146,10 @@ project
                    |
                    v
         continuity-state, edition
+
+issue -> cover -> prompt-package -> generation-record -> cover render
+                                                             |
+                    edition (cover:)  <--  visual-review  <--+
 ```
 
 ## Templates

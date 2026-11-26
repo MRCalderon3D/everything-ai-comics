@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://everything-ai-comics.dev/schemas/visual-review.schema.json",
   "title": "Visual Review",
-  "description": "Evidence-based review of one render (production/issues/<ISS_ID>/pages/<PG_ID>/reviews/<RENDER_ID>.review.yaml): fourteen named checks with pixel evidence, findings with expected / visible / repair / recheck, two gates, and a verdict. validate-workspace.js enforces the review rules.",
+  "description": "Evidence-based review of one render (production/issues/<ISS_ID>/pages/<PG_ID>/reviews/<RENDER_ID>.review.yaml, or production/issues/<ISS_ID>/cover/reviews/<RENDER_ID>.review.yaml for a cover): fourteen named checks with pixel evidence, findings with expected / visible / repair / recheck, two gates, and a verdict. A finding may also be a person's change request (source: user_request), and a review opened by such a request records its checks and gates as not_performed until a reviewer fills them in. validate-workspace.js enforces the review rules.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -10,15 +10,19 @@
     "verdict", "repair_cycle", "reviewed_at"
   ],
   "properties": {
-    "page": { "type": "string", "pattern": "^PG_\\d{3}_\\d{3}$", "description": "Page under review." },
+    "page": {
+      "type": "string",
+      "pattern": "^(PG_\\d{3}_\\d{3}|CV_\\d{3})$",
+      "description": "Page under review. A cover review names the cover ID here (CV_001)."
+    },
     "render": {
       "type": "string",
-      "pattern": "^PG_\\d{3}_\\d{3}_V\\d{2}$",
-      "description": "The render under review."
+      "pattern": "^(PG_\\d{3}_\\d{3}|CV_\\d{3})_V\\d{2}$",
+      "description": "The render under review: a page render or a cover render."
     },
     "supersedes": {
       "type": ["string", "null"],
-      "pattern": "^PG_\\d{3}_\\d{3}_V\\d{2}$",
+      "pattern": "^(PG_\\d{3}_\\d{3}|CV_\\d{3})_V\\d{2}$",
       "description": "The render this one replaces, or null."
     },
     "reviewer": { "type": "string", "minLength": 1, "description": "Agent name, or \"human\"." },
@@ -78,18 +82,18 @@
       "description": "The two gates, recorded separately.",
       "properties": {
         "style_fidelity": {
-          "enum": ["pass", "fail"],
-          "description": "Does the render match the look master and the style bible?"
+          "enum": ["pass", "fail", "not_performed"],
+          "description": "Does the render match the look master and the style bible? not_performed: nobody has judged it yet (a review opened by a change request)."
         },
         "narrative_continuity": {
-          "enum": ["pass", "fail"],
-          "description": "Do identity, position, custody, state, and causality hold?"
+          "enum": ["pass", "fail", "not_performed"],
+          "description": "Do identity, position, custody, state, and causality hold? not_performed: nobody has judged it yet."
         }
       }
     },
     "verdict": {
       "enum": ["pass", "fixed", "flagged"],
-      "description": "pass: no findings. fixed: findings repaired and rechecked. flagged: a blocking finding is open or a gate fails."
+      "description": "pass: no findings. fixed: findings repaired and rechecked. flagged: a blocking finding is open, a gate fails, a person's change request is open, or a check or gate has not been performed."
     },
     "repair_cycle": {
       "type": "integer",
@@ -119,19 +123,22 @@
       "required": ["result", "evidence"],
       "description": "One named check.",
       "properties": {
-        "result": { "enum": ["pass", "fail", "not_applicable"], "description": "Outcome of the check." },
+        "result": {
+          "enum": ["pass", "fail", "not_applicable", "not_performed"],
+          "description": "Outcome of the check. not_performed: nobody has judged it yet, which only a review opened by a change request records; such a review stays flagged."
+        },
         "evidence": {
           "type": "string",
           "minLength": 1,
-          "description": "What is visible in the render that supports the result."
+          "description": "What is visible in the render that supports the result. For not_performed, why the check was not made."
         }
       }
     },
     "finding": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "check", "expected", "visible", "severity", "repair", "status"],
-      "description": "One defect with its evidence and repair.",
+      "required": ["id", "expected", "visible", "severity", "repair", "status"],
+      "description": "One defect with its evidence and repair, or one change a person asked for. A reviewer's finding names its check; a user request may leave it out.",
       "properties": {
         "id": {
           "type": "string",
@@ -149,7 +156,23 @@
             "object_custody", "physical_state", "wardrobe", "spatial_logic", "drawing_clarity",
             "lettering", "page_structure", "style_fidelity"
           ],
-          "description": "The check the finding belongs to."
+          "description": "The check the finding belongs to. Required unless source is user_request."
+        },
+        "source": {
+          "enum": ["reviewer", "user_request"],
+          "description": "Who raised the finding. reviewer (the default when the field is absent): the review found it in the pixels. user_request: a person asked for the change."
+        },
+        "region": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y", "w", "h"],
+          "description": "The area the finding is about, in fractions of the page (0 to 1) measured from its top-left corner. x + w and y + h do not exceed 1.",
+          "properties": {
+            "x": { "type": "number", "minimum": 0, "maximum": 1, "description": "Left edge." },
+            "y": { "type": "number", "minimum": 0, "maximum": 1, "description": "Top edge." },
+            "w": { "type": "number", "exclusiveMinimum": 0, "maximum": 1, "description": "Width." },
+            "h": { "type": "number", "exclusiveMinimum": 0, "maximum": 1, "description": "Height." }
+          }
         },
         "expected": { "type": "string", "minLength": 1, "description": "What canon or the plan calls for." },
         "visible": {
@@ -174,7 +197,7 @@
           "properties": {
             "render": {
               "type": "string",
-              "pattern": "^PG_\\d{3}_\\d{3}_V\\d{2}$",
+              "pattern": "^(PG_\\d{3}_\\d{3}|CV_\\d{3})_V\\d{2}$",
               "description": "The corrected render that was reopened."
             },
             "evidence": {
@@ -192,6 +215,17 @@
           }
         },
         { "required": ["recheck"] }
+      ],
+      "allOf": [
+        {
+          "anyOf": [
+            { "required": ["check"] },
+            {
+              "required": ["source"],
+              "properties": { "source": { "const": "user_request" } }
+            }
+          ]
+        }
       ]
     }
   }

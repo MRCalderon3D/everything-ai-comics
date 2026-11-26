@@ -114,6 +114,27 @@
       }
     },
     {
+      "id": "codex-cli",
+      "file": "providers/image/codex-cli.js",
+      "label": "Codex CLI (codex exec with its image tool)",
+      "env": [],
+      "capabilities": {
+        "referenceImages": 4,
+        "aspectRatios": [
+          "2:3",
+          "3:4",
+          "9:16",
+          "1:1",
+          "4:5",
+          "3:2",
+          "4:3",
+          "16:9"
+        ],
+        "imageEditing": true,
+        "textRendering": "unreliable"
+      }
+    },
+    {
       "id": "manual",
       "file": "providers/image/manual.js",
       "label": "Manual image generation (any web UI or desktop tool)",

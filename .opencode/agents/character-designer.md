@@ -26,7 +26,7 @@ visible and it has to be stated.
 - Author `wardrobe.yaml`: one `WARD_*` outfit per state with layers, accessories, and `hands` (bare, gloved, bandaged), so gloves cannot appear between panels.
 - Plan and curate reference sheets in the comic's drawing style: turnaround, expressions, wardrobe. Each is compiled from the character files with `compile-prompts.js --asset <CHAR_ID> --sheet <kind>`, so the sheet is only as exact as the description. Plain background, readable face, consistent scale, no scene lighting.
 - Design recurring secondary characters too. Anyone who must be recognized across panels gets at least a turnaround.
-- Promote the chosen candidate (`<CHAR_ID>_<TAG>_V##`) to `<CHAR_ID>_<TAG>_MASTER_V##` and register it in `references/manifest.yaml` with `kind`, `default_role`, and `status`; supersede with a new `_V##` and never overwrite an approved master.
+- Once the user approves a candidate (`<CHAR_ID>_<TAG>_V##`), have it promoted with `scripts/approve-asset.js`, which copies it to `<CHAR_ID>_<TAG>_MASTER_V##` and registers it in `references/manifest.yaml` with `kind`, `default_role`, and `status`; supersede with a new `_V##` (`--supersede`) and never overwrite an approved master.
 - Apply a user change to identity in the bible entry, the wardrobe, and the sheets together, and report which rendered pages the change invalidates.
 - Answer identity findings from review by fixing the description or the reference first. Repairing with the same ambiguous description repeats the failure.
 

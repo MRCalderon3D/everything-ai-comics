@@ -10,6 +10,12 @@ status: draft                          # draft | reviewed | published
 supersedes: null                       # previous edition ID, or null
 changes: []                            # what changed since the superseded edition
 
+cover: null                            # optional. The cover render that ships as the first page of every export:
+#cover:
+#  render: CV_001_V01                   # an approved cover render, reviewed pass or fixed
+#  file: issues/ISS_001/cover/renders/CV_001_V01.png
+#  lettered_file: null                  # overlay mode: the lettered cover as PNG or JPEG. Else null
+
 pages:                                 # reading order, once each, no gaps
   - page: PG_001_001
     render: PG_001_001_V01             # the exact render that ships
@@ -17,8 +23,8 @@ pages:                                 # reading order, once each, no gaps
     lettered_file: null                # overlay mode: the lettered page as PNG or JPEG, named <RENDER_ID>.lettered.png. Else null
 
 exports: []                            # filled by build-edition.js
-#  - format: cbz                        # pdf | cbz | web
-#    file: editions/ED_001_01/exports/<title-slug>-001-ed01.cbz   # <title-slug>-<issue number>-ed<edition number>[-DRAFT].<ext>; web is <...>-web/index.html
+#  - format: cbz                        # pdf | cbz | web | images | epub
+#    file: editions/ED_001_01/exports/<title-slug>-001-ed01.cbz   # <title-slug>-<issue number>-ed<edition number>[-DRAFT].<ext>; web is <...>-web/index.html, images is <...>-images.zip
 #    built_at: null
 
 created_at: "2026-01-01"

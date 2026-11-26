@@ -18,6 +18,8 @@ Shared patterns:
 | Page | `^PG_\d{3}_\d{3}$` |
 | Panel | `^PN_\d{3}_\d{3}_\d{2}$` |
 | Render | `^PG_\d{3}_\d{3}_V\d{2}$` |
+| Cover | `^CV_\d{3}$` |
+| Cover render | `^CV_\d{3}_V\d{2}$` |
 | Lettering element | `^L\d{2}$` |
 | Finding | `^F\d{2}$` |
 | Edition | `^ED_\d{3}_\d{2}$` |
@@ -67,7 +69,7 @@ style:
 default_providers:                     # required
   image: harness-native                # required. one of the image provider roster
 deliverables:
-  - target: pdf                        # required. pdf | cbz | web | social-carousel | print
+  - target: pdf                        # required. pdf | cbz | web | images | epub | social-carousel | print
     notes: Reading copy.
 content:
   rating: mature                       # all-ages | teen | mature
@@ -246,6 +248,9 @@ assets:
     sha256: null
     approved_by: null
     approved_at: null
+    promoted_from: CHAR_MARA_TURN_V01  # the candidate this master is a copy of. written by approve-asset.js
+    generation_record: null            # GEN id of the run that produced the candidate, or null when none is on file
+    superseded_by: null                # the master that replaced this one. set when status becomes superseded
     notes: ""
 ```
 
@@ -257,6 +262,32 @@ Registry rules (`validate-workspace.js` enforces them mechanically):
 - An ID that carries `_MASTER` has status `approved` or `superseded`.
 - Every asset ID in a character, wardrobe, location, or prop file is
   registered here for that entity.
+
+Approving a candidate (`scripts/approve-asset.js`, exported as
+`approveAsset({ root, candidate, note, supersede })`):
+
+- The candidate (`<ENTITY_ID>_<TAG>_V##`, a look page `<LOOK_ID>_V##`) is
+  copied to the same name with `_MASTER` before the version, in the same
+  directory. The version number is kept: `CHAR_MARA_TURN_V02` becomes
+  `CHAR_MARA_TURN_MASTER_V02`. The candidate file stays, and no existing
+  file is replaced.
+- The master is registered with `status: approved`, its `kind` (read from the
+  tag), one `default_role`, the `sha256` of the file, `approved_by` and
+  `approved_at`, `promoted_from`, and `generation_record`. The record is the
+  one whose `media_files` list the candidate, or whose request file names it
+  as the target of a handoff.
+- The entity file's `references` gain the master. A wardrobe sheet is also
+  added to the `references` of the outfit it draws.
+- A look master freezes the style: it is added to `style.look_refs` in
+  `project.yaml`, and `style.style_block` names the block file. A look is
+  refused while the block file is missing or empty.
+- A sheet that already has an approved master is refused. With `supersede`
+  the old entry takes `status: superseded` and `superseded_by`, its file
+  stays on disk under its own versioned name, and the entity file, the
+  outfits, and `look_refs` move to the new master. Pages, reference plans,
+  and covers that still cite the old ID are returned as stale. The script
+  leaves those files alone: they are replanned and recompiled.
+- The script records a decision a person made. It never looks at the image.
 
 ## issues/<ISS_ID>/issue.yaml (`issue`)
 
@@ -448,8 +479,8 @@ One role per entry, and an asset appears once. A `style` entry is never also
 ## issues/<ISS_ID>/pages/<PG_ID>/prompts/<provider>.yaml (`prompt-package`)
 
 ```yaml
-id: PP_PG_001_001_HARNESS-NATIVE       # required. PP_<page or entity id>_<PROVIDER>[-P## | -<TAG>]
-page: PG_001_001                       # required. page ID, or null for an asset-scoped package
+id: PP_PG_001_001_HARNESS-NATIVE       # required. PP_<page, cover or entity id>_<PROVIDER>[-P## | -<TAG>]
+page: PG_001_001                       # required. page ID, the cover ID for a cover package, or null for an asset-scoped package
 asset: null                            # entity ID for asset-scoped packages
 provider: harness-native               # required
 model: harness-native                  # required. pinned by provider.compile()
@@ -479,8 +510,15 @@ source_hashes:                         # required
   style_block: 9a8b7c6d5e4f3a20
 ```
 
-Two variants use the same schema:
+Three variants use the same schema:
 
+- Cover packages (compiled with `--cover <ISS_ID>`) are written to
+  `issues/<ISS_ID>/cover/prompts/<provider>.yaml` with the id
+  `PP_<COVER_ID>_<PROVIDER>`. `page` holds the cover ID, `asset` is null,
+  and `source_hashes` carries `page` (the hash of `cover.yaml`) and
+  `style_block`. A cover has no reference plan: its references come from
+  `cover.yaml` and the registry. `lettering_text` lists the cover strings.
+  Generation writes the next free `cover/renders/<COVER_ID>_V##`.
 - Per-panel packages (`generation.mode: per_panel`, compiled with `--panel`)
   are written to `prompts/<provider>.<PN_ID>.yaml` with the id
   `PP_<PAGE_ID>_<PROVIDER>-P##`.
@@ -499,19 +537,19 @@ Two variants use the same schema:
   entity's `refs/` directory (look pages in
   `references/style/`). A candidate never carries `_MASTER`: promoting it to
   a master is an approval step that registers the file in
-  `references/manifest.yaml`.
+  `references/manifest.yaml`, done by `scripts/approve-asset.js`.
 
 ## generations/<scope>/GEN_*.yaml (`generation-record`)
 
 ```yaml
-id: GEN_PG_001_001_01                  # required. GEN_<page or entity id>_<attempt##>
-page: PG_001_001                       # required. page ID or null
+id: GEN_PG_001_001_01                  # required. GEN_<page, cover or entity id>_<attempt##>
+page: PG_001_001                       # required. page ID, the cover ID for a cover record, or null
 asset: null                            # entity ID for asset-scoped records
 provider: harness-native               # required
 model: unreported                      # required. the reported model, or "unreported"
 kind: image                            # required. image
 prompt_package: PP_PG_001_001_HARNESS-NATIVE   # required
-output_render: PG_001_001_V01          # render ID produced, or null
+output_render: PG_001_001_V01          # render ID produced (page or cover render), or null
 request:
   summary: Handoff to the harness image tool.   # required
   endpoint: null
@@ -565,11 +603,14 @@ checks:                                # required. every key below, each with re
   lettering:       { result: pass, evidence: "All four strings exact; tails point to the right speaker." }
   page_structure:  { result: pass, evidence: "Four panels in the planned 2 / 2 grid." }
   style_fidelity:  { result: pass, evidence: "Line weight and black placement match the look master." }
-  # result: pass | fail | not_applicable. evidence is required and describes pixels, not the prompt.
+  # result: pass | fail | not_applicable | not_performed. evidence is required and describes pixels, not the prompt.
+  # not_performed is for a review opened by a change request: nobody has judged the check yet.
 findings:                              # required (may be empty)
   - id: F01                            # required
     panel: PN_001_002_03               # panel ID, or null for a page-level finding
-    check: identity                    # required. one of the check keys
+    source: reviewer                   # reviewer | user_request. default reviewer when absent
+    region: { x: 0.52, y: 0.5, w: 0.4, h: 0.3 }   # optional. the area concerned, in fractions of the page from its top-left corner
+    check: identity                    # one of the check keys. required unless source is user_request
     expected: Oskar has a round face and a hooded jacket.   # required. from canon or plan
     visible: In V01 the boy had Mara's long face and cropped hair.   # required. pixel-based observation
     severity: blocking                 # required. blocking | minor
@@ -579,8 +620,8 @@ findings:                              # required (may be empty)
       render: PG_001_002_V02           # the corrected render that was reopened
       evidence: Round face and hood present in panel 3 of V02.
 gates:                                 # required
-  style_fidelity: pass                 # required. pass | fail
-  narrative_continuity: pass           # required. pass | fail
+  style_fidelity: pass                 # required. pass | fail | not_performed
+  narrative_continuity: pass           # required. pass | fail | not_performed
 verdict: fixed                         # required. pass | fixed | flagged
 repair_cycle: 1                        # required. 0 for a first render; +1 per repair
 reviewed_at: "2026-11-26"              # required
@@ -595,12 +636,150 @@ Review rules (`validate-workspace.js` enforces them mechanically):
 - `verdict: pass` requires zero findings and every check `pass` or `not_applicable`.
 - `verdict: fixed` requires at least one finding, no `open` blocking finding,
   and a `recheck` with evidence on every `fixed` finding.
-- `verdict: flagged` is required when any blocking finding is `open` or any
-  gate is `fail`.
+- `verdict: flagged` is required when any blocking finding is `open`, any
+  gate is `fail`, a change request (`source: user_request`) is `open`, or
+  any check or gate is `not_performed`.
 - A `blocking` finding cannot be `accepted`.
+- A `region` stays inside the page: `x + w` and `y + h` are at most 1.
 - `repair_cycle` never exceeds `project.repair_policy.max_cycles`.
 - `page.yaml` with `status: reviewed` or `approved` has a review file for its
   `current_render` whose verdict is `pass` or `fixed`.
+
+### Change requests from a person
+
+A person who reads a rendered page and wants something changed does not have
+to write a review. `addUserRequest({ root, page, render, text, panel, region })`
+in `scripts/lib/review-requests.js` records the request as a finding of that
+render's review, and the repair pipeline treats it like any other finding.
+
+```yaml
+  - id: F02
+    panel: PN_001_002_04               # or null for the whole page
+    source: user_request
+    region: { x: 0.5, y: 0.52, w: 0.45, h: 0.4 }   # optional
+    expected: The requested change shows in the panel, and nothing else differs.
+    visible: The panel as drawn in PG_001_002_V02, before the requested change.
+    severity: minor                    # minor unless the caller says blocking
+    repair: Make the searchlight beam wider, so it reaches the crates.   # the person's words
+    status: open
+```
+
+- `source` says who raised a finding. A finding with no `source` is the
+  reviewer's. A request may leave `check` out, because a person asks for a
+  change without filing it under one of the fourteen checks. Every reviewer
+  finding still names its check.
+- `region` is optional on any finding. `x`, `y`, `w`, `h` are fractions of
+  the page between 0 and 1, measured from the top-left corner, with `w` and
+  `h` greater than 0. A repair prompt turns it into a sentence about where
+  on the page the change goes.
+- The call sets `verdict: flagged`. An open request keeps the review flagged
+  whatever its severity. A request the person drops is marked `accepted`,
+  which is why the default severity is `minor`.
+- When the flagged render is the page's `current_render` and the page is
+  `reviewed` or `approved`, the page falls back to `status: rendered`,
+  because it no longer has a passing review. A `human_approval` of
+  `approved` on that review returns to `pending`.
+- A render with no review gets one, opened by the request. `reviewer` is
+  `human`, every check and both gates are `not_performed` with evidence that
+  says so, and the verdict is `flagged`. No check was judged, so none is
+  claimed. `/visual-review` later replaces each `not_performed` with a
+  judged result and keeps the request. `repair_cycle` and `supersedes` are
+  read from the generation request that produced the render: a render that
+  came out of a repair counts one cycle more than the render it edited.
+- `compile-prompts.js --repair` selects the open blocking findings, or every
+  open finding when none is blocking, and adds every open change request.
+  In the prompt a request with no check reads `Failed check: user request`.
+- The call takes a cover render (`CV_001_V01`) the same way. The review file
+  is the one beside the cover's renders, its `page` is the cover ID, and an
+  approved cover whose approved render is flagged returns to `draft`.
+
+`addUserRequest` returns `{ reviewFile, finding, created, verdict,
+statusChange }`. It also accepts `check` (one of the fourteen keys, when the
+request clearly belongs to one; `lettering` lets the repair change the
+lettering it names), `severity`, and `visible` (what the person sees now).
+
+## issues/<ISS_ID>/cover/cover.yaml (`cover`)
+
+The front cover of an issue. It is optional, and there is one per issue. A
+cover is one image with no panels, so it has no ledger and no reference
+plan. Its directory is laid out like a page directory: `cover.yaml`,
+`prompts/`, `renders/`, `reviews/`.
+
+```yaml
+id: CV_001                             # required. CV_<issue number>
+issue: ISS_001                         # required
+concept: Mara stands in the wheelhouse doorway with the flare gun lowered.   # required. the one image the cover shows
+composition: Low angle from the deck. The top third is black sky, left free for the title.
+location: LOC_FERRY_DECK               # LOC id, or null for a cover with no setting
+time_of_day: night                     # dawn | day | dusk | night
+cast:                                  # characters drawn on the cover, once each. may be empty
+  - character: CHAR_MARA               # required
+    wardrobe: WARD_MARA_OILSKIN        # default: the character's default_wardrobe
+    action: Stands in the wheelhouse doorway, flare gun lowered in her right hand.   # required. the visible pose
+    acting: Still, eyes on the crates.
+    state: []                          # physical state tags visible on the cover
+    holding: [PROP_FLARE_GUN]          # PROP ids in hand
+props: [PROP_TARPAULIN]                # PROP ids in view that nobody holds
+lettering:                             # required
+  mode: in_image                       # in_image | overlay. default: project.lettering.mode
+  title: The Night Ferry               # required. exact words
+  issue_line: "No. 1: Crossing"        # exact words, or null
+  tagline: null                        # exact words, or null
+  credits: null                        # exact words, or null
+generation:
+  provider: harness-native             # default: project.default_providers.image
+status: approved                       # required. draft | approved
+approved_render: CV_001_V01            # required. the cover render that ships, or null while status is draft
+```
+
+`compile-prompts.js --cover <ISS_ID>` builds the prompt from the frozen
+style block, this file, and the bibles, in the page aspect ratio of
+`project.yaml`. Each attached image has one role: the look master is
+`style` and the identity master of every character in `cast` is `identity`,
+and these are always attached. The location plate (`spatial_continuity`)
+and the sheets of plot-relevant props (`prop_consistency`) are attached
+while the provider's image budget allows, last one dropped first. In
+`in_image` mode the prompt lists the cover strings in the order title,
+issue line, tagline, credits, and `lettering_text` keeps them for the
+review. In `overlay` mode the art is drawn with no text.
+
+Renders are `cover/renders/<COVER_ID>_V##.png`, versioned and never
+overwritten like page renders. Generation records are
+`generations/<COVER_ID>/GEN_<COVER_ID>_##.yaml`.
+
+Cover rules (`validate-workspace.js` enforces them mechanically):
+
+- `id` is the cover ID of the directory's issue, and `issue` is that issue.
+- `location`, every `character`, every `wardrobe`, and every prop exist. A
+  character appears once in `cast`. A prop is under one character's
+  `holding` or under `props`, not both.
+- `status: approved` requires `approved_render` to be a render of this
+  cover that is on disk and has a review with verdict `pass` or `fixed`.
+  This is the same bar a page meets to enter an edition.
+- `status: draft` has `approved_render: null`.
+
+### Reviewing a cover
+
+A cover render is reviewed in
+`cover/reviews/<RENDER_ID>.review.yaml`, which uses the `visual-review`
+schema and the review rules above. Three things differ from a page review:
+
+- `page` holds the cover ID (`page: CV_001`) and `render` the cover render.
+  `compared_against.neighbors` stays empty.
+- Every finding has `panel: null`.
+- All fourteen checks are still listed, and they fall into three groups.
+
+| Checks | On a cover |
+|---|---|
+| `cast_count`, `drawing_clarity`, `lettering`, `page_structure`, `style_fidelity` | Always judged. `page_structure` means one full image in the page ratio with no panel borders. `lettering` compares the cover strings character by character, or confirms the art carries no text in overlay mode. |
+| `identity`, `wardrobe`, `physical_state`, `object_identity`, `object_custody`, `spatial_logic` | Judged when `cover.yaml` names what the check looks at: characters, state tags, props, held props, a location. Otherwise `not_applicable`. |
+| `position`, `movement`, `role_causality` | Always `not_applicable`. They compare a panel with the ledger and with the panels around it, and a cover has neither. |
+
+A check that does not apply is recorded as `result: not_applicable` with
+the reason as its `evidence` ("A cover has no ledger row to compare a
+position with."). `validate-workspace.js` reports `position`, `movement`,
+or `role_causality` recorded as `pass` or `fail` on a cover review, and a
+finding that names a panel.
 
 ## continuity/<ISS_ID>.final-state.yaml (`continuity-state`)
 
@@ -639,13 +818,17 @@ label: first edition                   # required
 status: draft                          # required. draft | reviewed | published
 supersedes: null                       # previous edition ID, or null
 changes: []                            # what changed since the superseded edition
+cover:                                 # optional. the cover render that ships as the first page, or null
+  render: CV_001_V01                   # required. a cover render of this issue
+  file: issues/ISS_001/cover/renders/CV_001_V01.png   # required. relative to workspace root
+  lettered_file: null                  # overlay mode: the lettered cover, else null
 pages:                                 # required, in reading order
   - page: PG_001_001                   # required
     render: PG_001_001_V01             # required. the exact render that ships
     file: issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V01.png   # required. relative to workspace root
     lettered_file: null                # overlay mode: the lettered output, else null
 exports:                               # required (may be empty before the first build)
-  - format: cbz                        # required. pdf | cbz | web
+  - format: cbz                        # required. pdf | cbz | web | images | epub
     file: editions/ED_001_01/exports/the-night-ferry-001-ed01.cbz   # required
     built_at: null
 created_at: "2026-11-26"
@@ -653,17 +836,39 @@ created_at: "2026-11-26"
 
 Edition rules (`build-edition.js` and `validate-workspace.js`):
 
-- Every listed render has a review with verdict `pass` or `fixed`. Otherwise
+- Every listed render has a review with verdict `pass` or `fixed`, the cover
+  included. Otherwise
   the build refuses, unless `--draft`, which marks every export as a draft
   (`-DRAFT` in the file name, a stamp on every PDF page).
 - Pages are listed once each, in page-number order, starting at page 1, with
   no gaps.
+- `cover`, when set, names a cover render of the edition's issue and its
+  file. The cover is then the first page of every export: the first PDF
+  page, and `000-cover.<ext>` ahead of `001.<ext>` in the CBZ, the web
+  reader, the images, and the EPUB. `ComicInfo.xml` marks it `FrontCover`.
+  Without `cover` the exports hold the pages alone.
 - Export names are `<title-slug>-<issue number>-ed<edition number>[-DRAFT].<ext>`;
   the web reader is a directory with the same base name and a `-web` suffix.
+- Formats: `pdf` (one image per page), `cbz` (the images plus
+  `ComicInfo.xml`), `web` (a static reader; the recorded file is its
+  `index.html`), `images` (a folder `<base name>-images/` and a zip
+  `<base name>-images.zip` with one numbered image per page; the recorded
+  file is the zip), and `epub` (EPUB 3, fixed layout, one image per page,
+  reading direction from `project.yaml`).
 - An export file that already exists is never overwritten. `--force` replaces
   it only while the edition has status `draft`; a reviewed or published
   edition is corrected with a new edition ID that sets `supersedes` and
   `changes`.
 - `lettered_file`, when set, is a PNG or JPEG. The SVG overlay written by
   `letter-pages.js` is exported to an image with a browser or a vector tool
-  first.
+  first. The export is stored next to the render as
+  `<RENDER_ID>.lettered.png` (or `.jpg`). `letter-pages.js
+  --register-lettered` (`registerLetteredFile`) files it there and sets
+  `lettered_file` on that render's entry in every draft edition. A page or
+  a cover with a `lettered_file` ships that file in every format.
+- `draftEdition({ root, issue })` in `build-edition.js` composes an edition
+  from the current state without writing it: the next free ID, status
+  `draft`, each page with its `current_render`, the cover when `cover.yaml`
+  is approved, and any stored lettered file. It reports what keeps the
+  edition from being final (a page with no render, a render with no passing
+  review) in a `blockers` list that is not part of the document.

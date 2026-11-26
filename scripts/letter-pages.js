@@ -14,12 +14,18 @@
  * Layout is approximate: there is no font file to measure, so line breaks
  * come from a character-width table. Elements whose wrapped text does not fit
  * their box are reported as warnings with the measured overflow.
+ *
+ * registerLetteredFile() files the PNG or JPEG exported from that SVG: next
+ * to the render as <RENDER_ID>.lettered.png, and as lettered_file in the
+ * draft editions that ship the render.
  */
 
 const fs = require('fs');
 const path = require('path');
+const util = require('util');
 const { parseArgs, helpIfRequested } = require('./lib/cli');
 const { writeFileEnsuring } = require('./lib/fsx');
+const yaml = require('./lib/yaml');
 const ws = require('./lib/workspace');
 const { imageInfo } = require('./lib/image-info');
 const svg = require('./lib/svg');
@@ -29,6 +35,7 @@ letter-pages.js: write the lettering overlay SVG for one page (overlay mode).
 
 Usage:
   node scripts/letter-pages.js --page <page.yaml> [--render <RENDER_ID>] [--embed]
+  node scripts/letter-pages.js --register-lettered <image> --render <RENDER_ID> (--page <page.yaml> | --root <workspace>)
 
 Options:
   --page <file>      The page.yaml of the page. lettering.yaml is read from
@@ -51,6 +58,11 @@ The layout is approximate. Line breaks and fit warnings come from a
 character-width model, not from the real font, so check the result by eye.
 SVG is a vector file: to get a PNG for an edition, open it in a browser or a
 vector tool and export it at the canvas size.
+
+--register-lettered files that exported image. It is stored next to the render
+as <RENDER_ID>.lettered.png (or .jpg) and set as "lettered_file" on the entry
+of that render in every draft edition. Reviewed and published editions are
+left as they are. The render may be a cover render (CV_###_V##).
 `;
 
 const DEFAULT_SHAPE = {
@@ -428,10 +440,184 @@ function letterPage(pageFile, options = {}) {
   return result;
 }
 
+/**
+ * New text of an edition.yaml after `lettered_file` changed on the entry
+ * that ships `renderId` (a page entry, or the cover). Only that line is
+ * edited or added, and the result is accepted only when it parses to exactly
+ * the intended document; otherwise the document goes through the YAML
+ * library and its comments are lost.
+ * @returns {{text: string, preserved: boolean}}
+ */
+function letteredEditionText(originalText, edition, renderId, relPath) {
+  try {
+    const lines = String(originalText).split(/\r?\n/);
+    const at = lines.findIndex((line) => new RegExp(`^\\s*(?:-\\s+)?render:\\s*["']?${renderId}["']?\\s*(#.*)?$`).test(line));
+    if (at !== -1) {
+      // Keys of the entry sit at the column of "render" (after "- " on the first line of a list item).
+      const column = lines[at].indexOf('render:');
+      const isKeyLine = (line) => line.length - line.trimStart().length === column && !line.trimStart().startsWith('-');
+      let start = at;
+      while (start > 0 && isKeyLine(lines[start - 1])) start--;
+      if (start > 0 && lines[start - 1].indexOf('- ') === column - 2 && lines[start - 1].trim().startsWith('- ')) start--;
+      let end = at + 1;
+      while (end < lines.length && isKeyLine(lines[end])) end++;
+      const value = yaml.stringify({ k: relPath }).slice(3).trimEnd();
+      let found = -1;
+      for (let i = start; i < end; i++) {
+        if (/^\s*(?:-\s+)?lettered_file:/.test(lines[i])) found = i;
+      }
+      if (found !== -1) {
+        const comment = /\s(#.*)$/.exec(lines[found]);
+        lines[found] = lines[found].replace(/^(\s*(?:-\s+)?lettered_file:).*$/, `$1 ${value}${comment ? `  ${comment[1]}` : ''}`);
+      } else {
+        lines.splice(end, 0, `${' '.repeat(column)}lettered_file: ${value}`);
+      }
+      const text = `${lines.join('\n').trimEnd()}\n`;
+      if (util.isDeepStrictEqual(yaml.parse(text), edition)) return { text, preserved: true };
+    }
+  } catch (err) {
+    // Fall through to the full rewrite.
+  }
+  return { text: yaml.stringify(edition), preserved: false };
+}
+
+/**
+ * Store a rasterized lettered page and record it.
+ *
+ * In overlay mode the lettered page is the render with the overlay
+ * flattened onto it. A browser or a vector tool produces that image from the
+ * SVG; this function files it where the data model expects it:
+ * `<RENDER_ID>.lettered.png` (or `.jpg`) next to the render, and as
+ * `lettered_file` on the entry that ships that render in every draft
+ * edition. An edition that is reviewed or published is left as it is: its
+ * files are what readers hold, and a correction is a new edition.
+ * draftEdition() in build-edition.js picks the stored file up for editions
+ * composed later. The same call works for a cover render.
+ *
+ * The render itself is never touched. A lettered file is derived, so storing
+ * it again replaces the earlier one, unless a reviewed or published edition
+ * ships that file.
+ *
+ * @param {{root: string, page?: string, render?: string, file: string|Buffer}} options
+ *   `page` is the page ID (or the cover ID). `render` defaults to the page's
+ *   current_render. `file` is the path of the image, or its bytes: PNG or JPEG.
+ * @returns {{path: string, render: string, editions: string[], skipped: string[]}}
+ *   `path` is workspace-relative. `editions` lists the draft editions whose
+ *   entry was updated; `skipped` the reviewed or published ones that list
+ *   the render and were left alone.
+ * @throws an Error with `code` when the render or the image is missing or unusable
+ */
+function registerLetteredFile(options = {}) {
+  const fail = (code, message) => Object.assign(new Error(message), { code });
+  const root = options.root ? path.resolve(String(options.root)) : null;
+  if (!root || !fs.existsSync(path.join(root, 'project.yaml'))) {
+    throw fail('no-workspace', `registerLetteredFile needs the workspace root (the directory that holds project.yaml), got "${options.root}"`);
+  }
+  let renderId = options.render ? String(options.render) : null;
+  const owner = options.page ? String(options.page) : null;
+  if (!renderId && owner && ws.ID.page.test(owner)) {
+    const page = ws.loadPage(root, owner);
+    renderId = page && page.current_render ? String(page.current_render) : null;
+    if (!renderId) throw fail('render-unknown', `${owner} has no current_render: pass the render the lettered image was made from`);
+  }
+  const ownerOfRender = renderId ? (ws.pageOfRender(renderId) || ws.coverOfRender(renderId)) : null;
+  if (!ownerOfRender) {
+    throw fail('render-id', `"${renderId}" is not a render ID (expected PG_###_###_V## or CV_###_V##)`);
+  }
+  if (owner && owner !== ownerOfRender) {
+    throw fail('render-page', `render ${renderId} does not belong to ${owner}`);
+  }
+  const renderPath = ws.renderFile(root, renderId);
+  if (!renderPath) throw fail('render-missing', `render image for ${renderId} not found in the workspace`);
+
+  let data;
+  if (Buffer.isBuffer(options.file)) {
+    data = options.file;
+  } else if (typeof options.file === 'string' && options.file) {
+    const source = path.resolve(options.file);
+    if (!fs.existsSync(source) || !fs.statSync(source).isFile()) throw fail('file-missing', `lettered image not found: ${source}`);
+    data = fs.readFileSync(source);
+  } else {
+    throw fail('file-missing', 'registerLetteredFile needs "file": the path of the lettered image, or its bytes');
+  }
+  let info;
+  try {
+    info = imageInfo(data);
+  } catch (err) {
+    throw fail('file-format', `the lettered image is not a PNG or JPEG (${err.message}); export the SVG overlay to an image first`);
+  }
+  if (info.format !== 'png' && info.format !== 'jpeg') {
+    throw fail('file-format', `the lettered image is ${info.format.toUpperCase()}; an edition takes a lettered PNG or JPEG`);
+  }
+
+  const dir = path.dirname(renderPath);
+  const target = path.join(dir, `${renderId}.lettered.${info.ext}`);
+  const rel = ws.rel(root, target);
+  const siblings = ['png', 'jpg', 'jpeg'].map((ext) => path.join(dir, `${renderId}.lettered.${ext}`));
+
+  // Editions that ship this render: drafts are updated, the others protect their file.
+  const listing = [];
+  for (const editionId of ws.listEditions(root)) {
+    const file = path.join(root, 'editions', editionId, 'edition.yaml');
+    let edition = null;
+    try {
+      edition = ws.loadYaml(file);
+    } catch (err) {
+      edition = null;
+    }
+    if (!edition || typeof edition !== 'object') continue;
+    const entries = (Array.isArray(edition.pages) ? edition.pages : []).concat(edition.cover ? [edition.cover] : []);
+    const entry = entries.find((e) => e && e.render === renderId);
+    if (entry) listing.push({ editionId, file, edition, entry });
+  }
+  const locked = listing.filter((l) => l.edition.status !== 'draft');
+  for (const l of locked) {
+    const shipped = l.entry.lettered_file ? path.resolve(ws.abs(root, String(l.entry.lettered_file))) : null;
+    if (shipped && siblings.some((s) => path.resolve(s) === shipped) && fs.existsSync(shipped)) {
+      throw fail('lettered-file-shipped',
+        `${ws.rel(root, shipped)} ships in ${l.editionId}, which is ${l.edition.status}; a lettered file that readers hold is not replaced. ` +
+        'Letter a new render version, or correct the edition with a new edition ID.');
+    }
+  }
+
+  writeFileEnsuring(target, data);
+  // One lettered file per render: an earlier one in the other format would be ambiguous.
+  for (const other of siblings) {
+    if (path.resolve(other) !== path.resolve(target) && fs.existsSync(other)) fs.rmSync(other);
+  }
+
+  const editions = [];
+  for (const l of listing.filter((x) => x.edition.status === 'draft')) {
+    if (l.entry.lettered_file === rel) {
+      editions.push(l.editionId);
+      continue;
+    }
+    l.entry.lettered_file = rel;
+    const updated = letteredEditionText(fs.readFileSync(l.file, 'utf8'), l.edition, renderId, rel);
+    writeFileEnsuring(l.file, updated.text);
+    editions.push(l.editionId);
+  }
+  return { path: rel, render: renderId, editions, skipped: locked.map((l) => l.editionId) };
+}
+
 function main() {
   const argv = process.argv.slice(2);
   helpIfRequested(argv, HELP);
   const { flags } = parseArgs(argv);
+  if (flags['register-lettered'] !== undefined) {
+    const source = flags['register-lettered'];
+    const start = flags.page && flags.page !== true ? path.resolve(String(flags.page)) : process.cwd();
+    const root = flags.root && flags.root !== true ? path.resolve(String(flags.root)) : ws.findWorkspaceRoot(start);
+    if (source === true || !root || !flags.render || flags.render === true) {
+      console.error('error: --register-lettered <image> needs --render <RENDER_ID> and a workspace (--root <dir>, or --page <page.yaml>)');
+      process.exit(1);
+    }
+    const stored = registerLetteredFile({ root, render: String(flags.render), file: String(source) });
+    console.log(`letter-pages: stored ${stored.path}`);
+    for (const id of stored.editions) console.log(`  ${id}: lettered_file set for ${stored.render}`);
+    for (const id of stored.skipped) console.log(`  ${id}: not a draft, left as it is`);
+    return;
+  }
   if (!flags.page || flags.page === true) {
     console.error('error: --page <page.yaml> is required (see --help)');
     process.exit(1);
@@ -453,7 +639,7 @@ function main() {
   console.log('  Layout is approximate. Open the SVG in a browser or a vector tool to check it and to export a PNG.');
 }
 
-module.exports = { letterPage, fitText, pageLettering, DEFAULT_SHAPE };
+module.exports = { letterPage, registerLetteredFile, fitText, pageLettering, DEFAULT_SHAPE };
 
 if (require.main === module) {
   try {

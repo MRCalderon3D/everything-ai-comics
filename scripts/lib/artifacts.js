@@ -19,6 +19,7 @@ const SCAFFOLD_ROOT = path.resolve(__dirname, '..', '..');
 const SCHEMAS_DIR = path.join(SCAFFOLD_ROOT, 'schemas');
 
 const PAGE_DIR = 'issues/[^/]+/pages/[^/]+';
+const COVER_DIR = 'issues/[^/]+/cover';
 
 /** Ordered: the first pattern that matches wins. */
 const ARTIFACT_PATTERNS = [
@@ -36,6 +37,10 @@ const ARTIFACT_PATTERNS = [
   { schema: 'lettering', pattern: new RegExp(`^${PAGE_DIR}/lettering\\.ya?ml$`) },
   { schema: 'reference-plan', pattern: new RegExp(`^${PAGE_DIR}/reference-plan\\.ya?ml$`) },
   { schema: 'visual-review', pattern: new RegExp(`^${PAGE_DIR}/reviews/[^/]+\\.review\\.ya?ml$`) },
+  // The cover of an issue is laid out like a page: cover.yaml, prompts/,
+  // renders/, reviews/. Its reviews use the visual-review schema.
+  { schema: 'cover', pattern: new RegExp(`^${COVER_DIR}/cover\\.ya?ml$`) },
+  { schema: 'visual-review', pattern: new RegExp(`^${COVER_DIR}/reviews/[^/]+\\.review\\.ya?ml$`) },
   // Page-scoped packages live under the page; asset-scoped ones sit in a
   // prompts/ directory next to the asset they generate.
   { schema: 'prompt-package', pattern: /(^|\/)prompts\/[^/]+\.ya?ml$/ },

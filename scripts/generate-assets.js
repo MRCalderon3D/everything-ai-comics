@@ -21,6 +21,11 @@
  * result is saved under the page's renders/ directory. An existing render
  * file is never overwritten. Records never contain API keys.
  *
+ * A cover package (compile-prompts.js --cover) names the cover ID as its
+ * page and behaves like a page package: it is recorded under
+ * generations/CV_###/ and yields the next free cover render,
+ * issues/<ISS_ID>/cover/renders/CV_###_V##.png.
+ *
  * An asset-scoped package (a reference sheet compiled with
  * compile-prompts.js --asset) is recorded under generations/<ENTITY_ID>/
  * and targets the next free candidate in the entity's refs directory:
@@ -39,16 +44,27 @@ const {
   pipelineError, loadPageContext, hashPage, hashPlan, hashText, validateDoc,
 } = require('./lib/page-pipeline');
 const assetPaths = require('./lib/asset-paths');
+const coverLib = require('./lib/cover');
 const ws = require('./lib/workspace');
 const yaml = require('./lib/yaml');
 const { providerTag, isRemote, resolveLocal } = require('../providers/lib/common');
+
+/**
+ * Directory that holds the renders of a page or of a cover. A cover package
+ * names the cover ID (CV_001) as its page.
+ */
+function rendersDir(root, pageId) {
+  const base = ws.ID.cover.test(String(pageId)) ? ws.coverDir(root, pageId) : ws.pageDir(root, pageId);
+  return path.join(base, 'renders');
+}
 
 const HELP = `
 generate-assets.js: generate images from compiled prompt packages.
 
 Usage:
   node scripts/generate-assets.js (--package <prompt-package.yaml> | --page <page.yaml> |
-                                   --issue <issue dir> | --asset <ENTITY_ID> [--root <workspace>])
+                                   --issue <issue dir> | --asset <ENTITY_ID> [--root <workspace>] |
+                                   --cover <ISS_ID> [--root <workspace>])
                                   [--provider <id>] [--live --yes]
 
 Options:
@@ -58,8 +74,10 @@ Options:
                      already reviewed or approved are skipped.
   --asset <ID>       Every sheet package compiled for a CHAR_*, LOC_*, PROP_*
                      or LOOK_* entity (its refs/prompts/ directory).
-  --root <dir>       Workspace root for --asset. Default: the workspace found
-                     from the current directory.
+  --cover <ISS_ID>   The cover package of an issue
+                     (issues/<ISS_ID>/cover/prompts/<provider>.yaml).
+  --root <dir>       Workspace root for --asset and --cover. Default: the
+                     workspace found from the current directory.
   --provider <id>    Use the packages compiled for this provider instead of
                      the page's own provider. With --asset: only that provider.
   --live             Call the provider API (default: DRY RUN).
@@ -76,6 +94,8 @@ Image targets, always the next free version, never an overwrite:
           TAG: TURN, EXPR, WARD_<OUTFIT>, PLATE (PLATE_<STATE> for a
           non-default time of day), SHEET (props), DETAIL_<SUBJECT>
   look    references/style/<LOOK_ID>_V##.png
+  cover   issues/<ISS_ID>/cover/renders/CV_###_V##.png, recorded under
+          generations/CV_###/ as GEN_CV_###_<attempt##>
 A sheet candidate never takes the _MASTER name; approval promotes it.
 `;
 
@@ -127,6 +147,8 @@ function versionOfRender(renderId) {
  * reused even when an old file was moved away.
  */
 function nextRenderId(root, pageId) {
+  // A cover keeps its own version sequence under issues/<ISS_ID>/cover/.
+  if (ws.ID.cover.test(String(pageId))) return coverLib.nextRenderId(root, pageId);
   let max = 0;
   for (const id of ws.listRenders(root, pageId)) max = Math.max(max, versionOfRender(id));
   for (const review of ws.listReviews(root, pageId)) {
@@ -188,9 +210,9 @@ function pagePackageFiles(pageDir, page, providerId) {
 function collectPackages(options) {
   const items = [];
   const skipped = [];
-  const selected = ['package', 'page', 'issue', 'asset'].filter((k) => options[k] && options[k] !== true);
+  const selected = ['package', 'page', 'issue', 'asset', 'cover'].filter((k) => options[k] && options[k] !== true);
   if (selected.length !== 1) {
-    throw pipelineError('bad_arguments', 'exactly one of --package, --page, --issue, --asset is required (see --help)');
+    throw pipelineError('bad_arguments', 'exactly one of --package, --page, --issue, --asset, --cover is required (see --help)');
   }
   const wanted = options.provider && options.provider !== true ? String(options.provider) : null;
 
@@ -241,6 +263,31 @@ function collectPackages(options) {
       else if (wanted && pkg.provider !== wanted) skipped.push(`${toPosix(file)}: compiled for ${pkg.provider}, not ${wanted}`);
       else items.push({ file, pkg, root });
     }
+    return { items, skipped };
+  }
+
+  if (options.cover) {
+    // The cover of an issue: issues/<ISS_ID>/cover/prompts/<provider>.yaml.
+    const issueId = String(options.cover);
+    if (!ws.ID.issue.test(issueId)) {
+      throw pipelineError('bad_arguments', `--cover needs an issue ID (ISS_###), got "${issueId}"`);
+    }
+    const start = options.root && options.root !== true ? path.resolve(String(options.root)) : process.cwd();
+    const root = ws.findWorkspaceRoot(start);
+    if (!root) {
+      throw pipelineError('workspace_missing', `no project.yaml at or above ${start}: pass --root <workspace> or run from inside the workspace`);
+    }
+    const cover = ws.loadCover(root, issueId);
+    if (!cover) {
+      throw pipelineError('cover_missing', `${issueId} has no cover: issues/${issueId}/cover/cover.yaml not found (write it with /cover)`);
+    }
+    const providerId = resolveProviderId(wanted, cover, ws.loadProject(root) || {});
+    const file = path.join(ws.coverDir(root, issueId), 'prompts', `${providerId}.yaml`);
+    if (!fs.existsSync(file)) {
+      throw pipelineError('package_missing',
+        `${ws.coverIdOfIssue(issueId)}: no prompt package for ${providerId} (run compile-prompts.js --cover ${issueId}${wanted ? ` --provider ${wanted}` : ''})`);
+    }
+    items.push({ file, pkg: loadPackage(file), root });
     return { items, skipped };
   }
 
@@ -333,7 +380,7 @@ async function persistMedia(record, ctx) {
     if (ctx.page && ctx.fullPage) {
       for (let tries = 0; tries < 5 && !file; tries++) {
         const renderId = nextRenderId(ctx.root, ctx.page);
-        const candidate = path.join(ws.pageDir(ctx.root, ctx.page), 'renders', `${renderId}${ext}`);
+        const candidate = path.join(rendersDir(ctx.root, ctx.page), `${renderId}${ext}`);
         try {
           writeNew(candidate, buffer);
           file = candidate;
@@ -382,7 +429,10 @@ async function persistMedia(record, ctx) {
 function staleness(root, pkg) {
   const out = [];
   const hashes = pkg.source_hashes || {};
-  if (pkg.page && hashes.page) {
+  if (pkg.page && hashes.page && ws.ID.cover.test(String(pkg.page))) {
+    const cover = ws.loadCover(root, pkg.page);
+    if (cover && coverLib.hashCover(cover) !== hashes.page) out.push(`cover.yaml of ${pkg.page} changed after this package was compiled`);
+  } else if (pkg.page && hashes.page) {
     const page = ws.loadPage(root, pkg.page);
     if (page && hashPage(page) !== hashes.page) out.push(`${pkg.page}/page.yaml changed after this package was compiled`);
   }
@@ -404,6 +454,9 @@ function staleness(root, pkg) {
 /**
  * Run one package: compile the request, write the request spec, call the
  * provider (dry-run unless live), save media, write the record.
+ * @param {{file: string, pkg: object, root: string}} item
+ * @param {{live?: boolean, log?: Function, providerModule?: object, fetchImpl?: Function,
+ *          signal?: AbortSignal, onProgress?: (line: string) => void}} [options]
  * @returns {Promise<{record: object, recordFile: string, requestFile: string, cost: number|null, warnings: string[]}>}
  */
 async function runPackage(item, options = {}) {
@@ -446,7 +499,7 @@ async function runPackage(item, options = {}) {
   const sheet = !target.page ? assetPaths.sheetOfPackage(pkg) : null;
   const sheetTarget = sheet ? { entity: target.asset, stemTag: sheet.stemTag } : null;
   let outputFile = path.join(dir, `${recordId}.png`);
-  if (fullPage) outputFile = path.join(ws.pageDir(root, target.page), 'renders', `${renderId}.png`);
+  if (fullPage) outputFile = path.join(rendersDir(root, target.page), `${renderId}.png`);
   else if (sheetTarget) outputFile = ws.abs(root, assetPaths.nextCandidate(root, sheetTarget.entity, sheetTarget.stemTag).rel);
   const outputPath = ws.rel(root, outputFile);
   const cost = estimateCost(Object.assign({}, pkg, { model: spec.model }), pkg.provider);
@@ -469,10 +522,15 @@ async function runPackage(item, options = {}) {
   const requestFile = path.join(dir, `${recordId}.request.json`);
   writeFileEnsuring(requestFile, `${JSON.stringify(spec, null, 2)}\n`);
 
+  // signal and onProgress are handed through for providers that run a local
+  // tool (codex-cli): aborting the signal stops the tool and yields a failed
+  // record with the error "cancelled". API providers ignore both.
   const record = await provider.generate(spec, {
     dryRun: !live,
     outDir: path.dirname(outputFile),
     root,
+    signal: options.signal,
+    onProgress: options.onProgress,
   });
   if (record.status === 'succeeded') {
     await persistMedia(record, {
@@ -502,9 +560,12 @@ async function runPackage(item, options = {}) {
 
 /**
  * Programmatic entry point (what the CLI runs).
- * @param {{package?: string, page?: string, issue?: string, asset?: string, root?: string,
+ * @param {{package?: string, page?: string, issue?: string, asset?: string, cover?: string, root?: string,
  *          provider?: string, live?: boolean, yes?: boolean, log?: Function,
- *          fetchImpl?: Function}} options
+ *          fetchImpl?: Function, signal?: AbortSignal, onProgress?: (line: string) => void}} options
+ *   signal and onProgress are optional and handed to provider.generate():
+ *   aborting the signal stops a provider that runs a local tool (its record
+ *   fails with the error "cancelled") and skips the packages not started yet.
  * @returns {Promise<{live: boolean, results: object[], failures: string[], skipped: string[], totalCost: number, unestimated: number}>}
  */
 async function generateAssets(options = {}) {
@@ -534,7 +595,14 @@ async function generateAssets(options = {}) {
   const failures = [];
   for (const item of items) {
     try {
-      const result = await runPackage(item, { live, log, fetchImpl: options.fetchImpl });
+      if (options.signal && options.signal.aborted) {
+        failures.push(`${toPosix(item.file)}: cancelled`);
+        log(`  CANCELLED ${toPosix(item.file)}: not started`);
+        continue;
+      }
+      const result = await runPackage(item, {
+        live, log, fetchImpl: options.fetchImpl, signal: options.signal, onProgress: options.onProgress,
+      });
       results.push(Object.assign({ file: item.file }, result));
       if (result.record.status === 'failed') failures.push(`${result.record.id}: ${result.record.response.error}`);
     } catch (err) {
@@ -556,6 +624,7 @@ async function main() {
     page: flags.page,
     issue: flags.issue,
     asset: flags.asset,
+    cover: flags.cover,
     root: flags.root,
     provider: flags.provider,
     live: flags.live === true,

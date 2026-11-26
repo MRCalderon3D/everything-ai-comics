@@ -295,6 +295,25 @@
       ]
     },
     {
+      "name": "cover",
+      "file": "commands/cover.md",
+      "description": "Plan the cover of an issue, generate and review it, and record the approved render.",
+      "agents": [
+        "art-director",
+        "editor-in-chief",
+        "prompt-director",
+        "image-generation-specialist",
+        "visual-reviewer"
+      ],
+      "skills": [
+        "panel-composition",
+        "reference-selection",
+        "prompt-compilation",
+        "image-generation",
+        "pixel-review"
+      ]
+    },
+    {
       "name": "continuity-review",
       "file": "commands/continuity-review.md",
       "description": "Audit continuity across pages and issue boundaries and write the end-of-issue state.",
@@ -310,7 +329,7 @@
     {
       "name": "build-edition",
       "file": "commands/build-edition.md",
-      "description": "Assemble reviewed pages into an edition and export PDF, CBZ, and web reader.",
+      "description": "Assemble reviewed pages into an edition and export PDF, CBZ, web reader, images, and EPUB.",
       "agents": [
         "prepress-specialist",
         "editor-in-chief",

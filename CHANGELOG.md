@@ -1,5 +1,54 @@
 # Changelog
 
+## Unreleased
+
+- Image provider `codex-cli`: draws through the Codex command-line tool the
+  user is signed in to. A live run starts `codex exec` with the reference
+  images attached in order and the prompt on stdin, and saves the result as
+  the next render or candidate. It needs no API key. `npm run doctor` says
+  whether the `codex` binary is found and prints its version. Optional
+  settings: `CODEX_BIN`, `CODEX_IMAGE_TIMEOUT_MS`, `CODEX_IMAGE_MODEL`.
+- `providers/lib/cli-spawn.js`: `resolveBinary`, `spawnCli`, and `killTree`
+  for running a command-line tool on Windows and POSIX, with npm `.cmd`
+  shims resolved and the whole process tree stopped on timeout or cancel.
+- `generateAssets()` and `runPackage()` take `signal` and `onProgress` and
+  hand them to the provider. Aborting the signal stops a running tool and
+  records the attempt as failed with the error `cancelled`.
+- `scripts/approve-asset.js` (`npm run approve:asset`): promotes an approved
+  candidate to its `_MASTER` name, registers it in `references/manifest.yaml`
+  with its generation record, updates the entity file, freezes the style
+  when the asset is a look, and supersedes an earlier master with
+  `--supersede`.
+- Change requests from a person: `addUserRequest()` in
+  `scripts/lib/review-requests.js` records a request as a review finding
+  with `source: user_request` and an optional `region`. A request can open
+  the review of a render that has none; its checks and gates are then
+  `not_performed`. `compile-prompts.js --repair` includes open requests, and
+  `validate-workspace.js` keeps a review flagged while one is open.
+- Covers: one optional cover per issue, `CV_<issue number>`, in
+  `issues/<ISS_ID>/cover/` with `cover.yaml` (new `cover` schema and
+  template), `prompts/`, `renders/CV_###_V##`, and `reviews/`. The new
+  `/cover` command plans, generates, reviews, and approves it.
+  `compile-prompts.js --cover <ISS_ID>` (`compileCover`) and
+  `generate-assets.js --cover <ISS_ID>` treat it like a page. A cover review
+  uses the visual-review schema with `position`, `movement`, and
+  `role_causality` not applicable. `approveCover()` in `scripts/lib/cover.js`
+  refuses a render without a passing review. The example workspace has a
+  cover.
+- Editions: `build-edition.js` adds the formats `images` (a folder and a zip
+  of numbered page images) and `epub` (EPUB 3, fixed layout, written by
+  `scripts/lib/epub.js`). An edition can name a cover render under `cover:`,
+  which becomes the first page of every format (`000-cover`, `FrontCover` in
+  `ComicInfo.xml`). `draftEdition({ root, issue })` composes an edition from
+  the current state without writing it and lists what blocks a final one.
+  `images` and `epub` are also valid `deliverables` targets.
+- Lettered files: `registerLetteredFile()` in `letter-pages.js`
+  (`--register-lettered`) stores the PNG or JPEG exported from the overlay
+  as `<RENDER_ID>.lettered.png` and sets `lettered_file` in the draft
+  editions that ship the render.
+- The `protect-approved-assets` hook also blocks a write over an existing
+  cover render.
+
 ## 0.1.0
 
 First version of the scaffold.

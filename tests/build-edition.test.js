@@ -249,7 +249,7 @@ try {
     assert.match(help.stdout, /comments and hand formatting in\s+edition\.yaml are lost/);
     const noArgs = spawnSync(process.execPath, [SCRIPT], { encoding: 'utf8' });
     assert.strictEqual(noArgs.status, 1);
-    const badFormat = buildEdition(w.edition, { formats: 'pdf,epub' });
+    const badFormat = buildEdition(w.edition, { formats: 'pdf,mobi' });
     assert.deepStrictEqual(codes(badFormat), ['formats']);
   }
 

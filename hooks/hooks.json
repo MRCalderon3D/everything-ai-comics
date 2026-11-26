@@ -5,10 +5,10 @@
     {
       "id": "protect-approved-assets",
       "event": "before-file-write",
-      "match": "**/{references/**,characters/*/refs/**,locations/*/refs/**,props/*/refs/**,issues/*/pages/*/renders/**,editions/*/exports/**}",
+      "match": "**/{references/**,characters/*/refs/**,locations/*/refs/**,props/*/refs/**,issues/*/pages/*/renders/**,issues/*/cover/renders/**,editions/*/exports/**}",
       "script": "hooks/protect-approved-assets.js",
       "blocking": true,
-      "description": "Block overwriting approved reference assets, existing page renders, and existing edition exports; create the next version instead."
+      "description": "Block overwriting approved reference assets, existing page and cover renders, and existing edition exports; create the next version instead."
     },
     {
       "id": "validate-after-write",

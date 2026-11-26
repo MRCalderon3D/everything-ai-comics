@@ -57,13 +57,14 @@ Any directory that holds a `project.yaml` works the same way.
 | [visual-review](visual-review.md) | A review file per render: fourteen checks with pixel evidence, findings, two gates, and a verdict. |
 | [repair-page](repair-page.md) | A sibling version of a flagged page, rechecked change by change, with a new review. |
 | [lettering](lettering.md) | Lettering placement, the overlay (`lettering.yaml` and a lettered SVG) in overlay mode, and the lettering check. |
+| [cover](cover.md) | `cover/cover.yaml`, versioned cover renders with their records and reviews, and the approved cover render. Optional. |
 
 ## Publishing
 
 | Command | What it produces |
 |---|---|
 | [continuity-review](continuity-review.md) | An audit across pages and issue boundaries, and `continuity/<ISS_ID>.final-state.yaml` for the next issue. |
-| [build-edition](build-edition.md) | `edition.yaml` listing the exact render of every page, and the PDF, CBZ, and web reader exports. |
+| [build-edition](build-edition.md) | `edition.yaml` listing the exact render of every page and of the approved cover, and the PDF, CBZ, web reader, image, and EPUB exports. |
 
 ## Orchestration
 
@@ -92,6 +93,7 @@ Any directory that holds a `project.yaml` works the same way.
 /visual-review               # after every page, by a reviewer who did not generate it
 /repair-page                 # only for flagged pages, within the repair limit
 /lettering                   # overlay mode; in-image lettering is checked in the review
+/cover                       # optional; cost-gated like a page, approved by the user
 /continuity-review
 /build-edition
 ```
@@ -101,8 +103,8 @@ first project it is worth running the commands by hand once, to see what
 each file looks like.
 
 The commands that can spend generation budget are `/visual-development`,
-`/generate-pages`, `/repair-page`, and `/thumbnails` with sketch
-rendering. The first three are dry-run by default and show a cost estimate
+`/generate-pages`, `/repair-page`, `/cover`, and `/thumbnails` with sketch
+rendering. The first four are dry-run by default and show a cost estimate
 before a live batch. A sketch thumbnail comes from the harness's image tool
 directly, after its estimate is shown.
 

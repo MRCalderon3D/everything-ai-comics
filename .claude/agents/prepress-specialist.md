@@ -44,7 +44,7 @@ several editions stays traceable only if each one still exists on disk.
 ## Deliverables
 
 - `production/editions/<ED_ID>/edition.yaml` (edition.schema.json)
-- Exports under `production/editions/<ED_ID>/exports/`: PDF, CBZ, and web reader
+- Exports under `production/editions/<ED_ID>/exports/`: PDF, CBZ, web reader, numbered images, and EPUB
 - Notes for social and print deliverables listed in `project.yaml` (cropping and compositing happen in an image tool)
 - Edition handoff: the render shipped for each page, the superseded edition, the changes
 

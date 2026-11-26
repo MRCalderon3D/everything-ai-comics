@@ -72,9 +72,11 @@ first panel.
    from `location.yaml` and `map.yaml`, and generates it with
    `node scripts/generate-assets.js --asset <LOC_ID> --root <workspace>`.
    The candidate lands in `production/locations/<LOC_ID>/refs/` as
-   `<LOC_ID>_PLATE_V##`. The approved pick is saved as
-   `<LOC_ID>_PLATE_MASTER_V##` and registered with `kind: plate` and
-   `default_role: spatial_continuity`. The plate is lit for the first
+   `<LOC_ID>_PLATE_V##`. Once the user approves a pick,
+   `node scripts/approve-asset.js --candidate <LOC_ID>_PLATE_V## --root <workspace>`
+   saves it as `<LOC_ID>_PLATE_MASTER_V##`, registers it with `kind: plate`
+   and `default_role: spatial_continuity`, and lists it in the location's
+   `references`. The plate is lit for the first
    entry of `time_of_day_states`. Another state gets its own plate with
    `--time <state>`, written to `<provider>.plate.<state>.yaml` and
    generated as `<LOC_ID>_PLATE_<STATE>_V##`. List it in `references`. Write the

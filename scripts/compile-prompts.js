@@ -25,8 +25,8 @@
  *
  * --repair <review.yaml> compiles a repair instead: the reviewed render is
  * the edit target, the open blocking findings (or, when none is blocking,
- * every open finding) become the exact changes, and everything else is
- * locked. It refuses once the review's repair_cycle has reached the
+ * every open finding) and every open change request from a person become
+ * the exact changes, and everything else is locked. It refuses once the review's repair_cycle has reached the
  * project's repair_policy.max_cycles.
  *
  * --asset <ENTITY_ID> --sheet <kind> compiles a reference sheet instead of a
@@ -43,6 +43,18 @@
  * state in the file name, the package ID, and the candidate name
  * (scripts/lib/asset-paths.js), so no two sheets share a file.
  *
+ * --cover <ISS_ID> compiles the cover of an issue from
+ * issues/<ISS_ID>/cover/cover.yaml: one image with no panel grid, in the
+ * page aspect ratio. The prompt is the style block, a cover header, the
+ * reference legend, the cover's subject, its own lettering strings (title,
+ * issue line, tagline, credits) in in_image mode or an instruction to leave
+ * the art free of text in overlay mode, and hard constraints. The look
+ * master and the identity master of every character on the cover are
+ * attached; the location plate and prop sheets follow while the provider's
+ * budget allows. The package names the cover ID as its page
+ * (PP_CV_001_<PROVIDER>) and is written to cover/prompts/. --repair works
+ * as for a page.
+ *
  * provider.compile() runs last to enforce the provider's capabilities and
  * pin the model.
  */
@@ -58,6 +70,8 @@ const layout = require('./lib/layout-language');
 const lang = require('./lib/panel-language');
 const sheets = require('./lib/sheet-language');
 const assetPaths = require('./lib/asset-paths');
+const coverLib = require('./lib/cover');
+const { selectRepairFindings } = require('./lib/review-requests');
 const ws = require('./lib/workspace');
 const yaml = require('./lib/yaml');
 const {
@@ -71,7 +85,19 @@ for an image provider.
 
 Usage:
   node scripts/compile-prompts.js --page <page.yaml> [--provider <id>] [--repair <review.yaml>]
+  node scripts/compile-prompts.js --cover <ISS_ID> [--root <workspace>] [--provider <id>] [--repair <review.yaml>]
   node scripts/compile-prompts.js --asset <ENTITY_ID> --sheet <kind> [--root <workspace>] [--provider <id>]
+
+Cover options:
+  --cover <ISS_ID>   The issue whose cover to compile, from
+                     issues/<ISS_ID>/cover/cover.yaml. One image, the page
+                     aspect ratio, the look master and the masters of the
+                     characters on the cover attached with one role each,
+                     and the cover's own title and issue text.
+  --repair <file>    A visual review of one of the cover's renders. Compiles
+                     a repair package, under the same limit as a page.
+  --root <dir>       Workspace root. Default: the workspace found from the
+                     current directory.
 
 Page options:
   --page <file>      page.yaml (or its directory).
@@ -108,6 +134,7 @@ the entity's bible file, and an approved look master (except the first look).
 
 Output, status "compiled":
   page    <page dir>/prompts/<provider>.yaml
+  cover   issues/<ISS_ID>/cover/prompts/<provider>.yaml (ID PP_CV_###_<PROVIDER>)
   sheet   <refs>/prompts/<provider>.<kind>.yaml, where <refs> is
           characters/<ID>/refs, locations/<ID>/refs, or props/<ID>/refs
             wardrobe   <provider>.wardrobe.<WARD_ID>.yaml
@@ -548,13 +575,12 @@ function composePanelPrompt(input) {
 
 /**
  * Select the findings a repair addresses: the open blocking ones, or every
- * open finding when none is blocking.
+ * open finding when none is blocking, plus every open change request from a
+ * person (source: user_request) whatever its severity. The rule lives in
+ * lib/review-requests.js, next to the code that records those requests.
  */
 function selectFindings(review) {
-  const open = (Array.isArray(review.findings) ? review.findings : [])
-    .filter((f) => f && f.status === 'open');
-  const blocking = open.filter((f) => f.severity === 'blocking');
-  return blocking.length ? blocking : open;
+  return selectRepairFindings(review);
 }
 
 /** Repair plan of a review: failing panels, exact changes, locked elements. */
@@ -566,7 +592,12 @@ function buildRepair(page, review, findings, letteringMode) {
   const others = sequence.map((_, i) => i + 1).filter((n) => !failing.includes(n));
   const changes = findings.map((f) => {
     const n = numberOf(f.panel);
-    return `${n ? `Panel ${n}` : 'Whole page'}: ${lang.sentence(f.repair)} Expected result: ${lang.sentence(f.expected)}`;
+    // A finding may mark the area it is about (fractions of the page).
+    const where = regionPhrase(f.region);
+    const place = n
+      ? `Panel ${n}${where ? `, in ${where} of the page` : ''}`
+      : (where ? `In ${where} of the page` : 'Whole page');
+    return `${place}: ${lang.sentence(f.repair)} Expected result: ${lang.sentence(f.expected)}`;
   });
   const touchesLettering = findings.some((f) => f.check === 'lettering');
   const locked = [];
@@ -1123,6 +1154,435 @@ function compileAsset(root, entityId, options = {}) {
   return { pkg, spec, warnings, notes, fileRel: assetPaths.packageFile(entityId, providerId, kind, variant) };
 }
 
+// --- cover -------------------------------------------------------------------
+
+/** The lines that describe one character on the cover. */
+function coverCharacterLines(row, cast, bibles) {
+  const name = bibles.characterName(row.character);
+  const character = bibles.character(row.character);
+  const bits = [`- ${name}.`];
+  const summary = summaryOf(character);
+  if (summary) bits.push(lang.sentence(summary));
+  if (row.action) bits.push(`Action: ${lang.sentence(row.action)}`);
+  if (row.acting) bits.push(`Acting: ${lang.sentence(row.acting)}`);
+  const wardrobeId = row.wardrobe || (character && character.default_wardrobe) || null;
+  const wardrobe = wardrobeId ? wardrobeDescription(row.character, wardrobeId, bibles) : null;
+  if (wardrobe) bits.push(`Wardrobe: ${lang.sentence(wardrobe)}`);
+  const state = lang.statePhrase(row.state);
+  if (state) bits.push(`Physical state, visible in the drawing: ${state}.`);
+  const holding = Array.isArray(row.holding) ? row.holding : [];
+  if (holding.length) bits.push(`Holding: ${joinNames(holding.map((id) => propPhrase(id, bibles)))}.`);
+  const lines = [bits.join(' ')];
+  for (const otherId of adjacentOnPage(row.character, cast, bibles)) {
+    lines.push(`  ${differenceLine(row.character, otherId, bibles)}`);
+  }
+  return lines;
+}
+
+/** What the cover shows: concept, composition, setting, characters, props. */
+function coverSubject(cover, bibles) {
+  const rows = (Array.isArray(cover.cast) ? cover.cast : []).filter((row) => row && row.character);
+  const cast = rows.map((row) => row.character);
+  const lines = [`Concept: ${lang.sentence(cover.concept)}`];
+  if (cover.composition) lines.push(`Composition: ${lang.sentence(cover.composition)}`);
+  if (cover.location) {
+    const summary = summaryOf(bibles.location(cover.location));
+    lines.push(`Setting: ${bibles.locationName(cover.location)}.${summary ? ` ${lang.sentence(summary)}` : ''}` +
+      `${cover.time_of_day ? ` Time of day: ${lang.humanize(cover.time_of_day)}.` : ''}`);
+  } else if (cover.time_of_day) {
+    lines.push(`Time of day: ${lang.humanize(cover.time_of_day)}.`);
+  }
+  if (rows.length) {
+    lines.push(`Characters on the cover: ${rows.length} (${joinNames(rows.map((row) => bibles.characterName(row.character)))}), each exactly once.`);
+    for (const row of rows) lines.push(...coverCharacterLines(row, cast, bibles));
+  } else {
+    lines.push('Characters on the cover: none of the named characters.');
+  }
+  const props = (Array.isArray(cover.props) ? cover.props : []).filter(Boolean);
+  if (props.length) {
+    lines.push('Props in view:');
+    for (const propId of props) lines.push(`- ${capitalize(propPhrase(propId, bibles))}.`);
+  }
+  return lines;
+}
+
+/** The cover's lettering section: its exact strings, or an instruction to leave the art free of text. */
+function coverLetteringSection(cover, project, mode) {
+  const elements = coverLib.letteringElements(cover);
+  if (mode === 'overlay') {
+    return [
+      'LETTERING',
+      'None in the image: the title and the other cover text are added afterwards as an overlay. Draw no text of any kind: no title, no logo, no credits, no readable signs.',
+      'Leave calm, uncluttered space for the title, away from faces and hands.',
+    ].join('\n');
+  }
+  const lettering = project.lettering || {};
+  const lines = [
+    'LETTERING',
+    `Letter the cover with exactly these ${elements.length} element${elements.length === 1 ? '' : 's'}. Copy every string character for character, with its accents and punctuation.` +
+      (lettering.case === 'upper' ? ' Set the lettering in capitals; the words stay exactly as written.' : ''),
+  ];
+  elements.forEach((el, i) => lines.push(`${i + 1}. ${el.label}: "${el.text}"`));
+  lines.push('Keep the lettering clear of faces, hands, and the main action.');
+  const safeMargin = safeMarginLine(project);
+  if (safeMargin) lines.push(safeMargin.replace('every balloon, caption, and sound effect', 'every piece of lettering'));
+  return lines.join('\n');
+}
+
+function coverHeader(project, ratio) {
+  const lines = ['COVER'];
+  lines.push(project.comic_format === 'webtoon'
+    ? `The cover image of one webtoon episode: one single illustration, ${orientationOf(ratio)}, aspect ratio ${ratio}.`
+    : `The front cover of one comic book issue: one single full-bleed illustration, ${orientationOf(ratio)}, aspect ratio ${ratio}.`);
+  lines.push('No panel grid, no panel borders, no gutters: the whole image is the cover.');
+  lines.push(...colorLines(project));
+  return lines.join('\n');
+}
+
+function coverConstraints(cover, bibles, mode, repair) {
+  const names = (Array.isArray(cover.cast) ? cover.cast : [])
+    .filter((row) => row && row.character)
+    .map((row) => bibles.characterName(row.character));
+  const textLine = mode === 'overlay'
+    ? '- No text anywhere in the image.'
+    : (repair ? '- No new text, and no lettering removed or reworded unless CHANGES says so.' : '- No text other than the lettering listed above.');
+  return [
+    'HARD CONSTRAINTS',
+    repair ? '- Still one single image: no panels, no borders, no insets.' : '- One single image. No panels, no borders, no insets.',
+    `- Named characters on the cover: ${names.length ? `${joinNames(names)}, each exactly once` : 'none'}.`,
+    textLine,
+    '- No watermark, signature, barcode, price, or page number.',
+  ].join('\n');
+}
+
+/** Where a finding's optional region sits, as shares of the cover. Null without a usable region. */
+function regionPhrase(region) {
+  if (!region || typeof region !== 'object') return null;
+  const x = Number(region.x);
+  const y = Number(region.y);
+  const w = Number(region.w !== undefined ? region.w : region.width);
+  const h = Number(region.h !== undefined ? region.h : region.height);
+  if (![x, y, w, h].every((n) => Number.isFinite(n)) || w <= 0 || h <= 0) return null;
+  const pct = (n) => `${Math.round(Math.max(0, Math.min(1, n)) * 100)}%`;
+  return `the area from ${pct(x)} to ${pct(x + w)} of the width (left to right) and from ${pct(y)} to ${pct(y + h)} of the height (top to bottom)`;
+}
+
+/** Repair plan of a cover review: exact changes and locked elements. */
+function buildCoverRepair(review, findings, mode) {
+  const changes = findings.map((f) => {
+    const where = regionPhrase(f.region);
+    return `${where ? `In ${where}: ` : ''}${lang.sentence(f.repair)} Expected result: ${lang.sentence(f.expected)}`;
+  });
+  const touchesLettering = findings.some((f) => f.check === 'lettering');
+  const locked = [];
+  if (mode === 'overlay') {
+    locked.push('The cover stays free of text: add no title, logo, or credits.');
+  } else if (touchesLettering) {
+    locked.push('All lettering that CHANGES does not name: text, shape, and position stay as they are.');
+  } else {
+    locked.push('All lettering: the title and every other string keep their exact text, shape, and position.');
+  }
+  locked.push('The composition, and everything CHANGES does not name.');
+  locked.push('The drawing style, and the identity and wardrobe of every character CHANGES does not name.');
+  return { of_render: review.render, findings: findings.map((f) => f.id), changes, locked };
+}
+
+/**
+ * Reference images of a cover, one role each: the look master (style), the
+ * identity master of every character on it, then the location plate and the
+ * sheets of plot-relevant props, which give way first when the provider's
+ * budget is short.
+ */
+function coverReferences(root, cover, project, bibles, options) {
+  const { capacity, totalCapacity, providerId, repair, warnings } = options;
+  const coverId = cover.id;
+  const assets = ws.loadReferenceAssets(root);
+  const picked = [];
+  const add = (asset, role, required) => {
+    if (!asset || picked.some((p) => p.asset.id === asset.id)) return;
+    if (!asset.path) throw pipelineError('reference_unusable', `${asset.id} has no path in references/manifest.yaml`);
+    picked.push({ asset, role, required });
+  };
+
+  const { look, pool, unregistered } = findLookMaster(project, assets);
+  if (!look) {
+    const why = pool.length
+      ? `the look master is not approved (${pool.map((a) => `${a.id} is ${a.status}`).join(', ')})`
+      : `no look master is registered${unregistered.length ? ` (project.style.look_refs lists ${unregistered.join(', ')}, which references/manifest.yaml does not register)` : ''}`;
+    throw pipelineError(pool.length ? 'look_unapproved' : 'look_missing',
+      `${coverId}: ${why}. A cover is drawn in the approved look, so finish the look first.`);
+  }
+  add(look, 'style', true);
+
+  for (const row of (Array.isArray(cover.cast) ? cover.cast : []).filter((r) => r && r.character)) {
+    const { identity } = findIdentityMaster(assets, row.character, bibles.character(row.character));
+    if (identity) add(identity, 'identity', true);
+    else warnings.push(`${row.character} has no approved identity master: the cover draws ${bibles.characterName(row.character)} from the written description only`);
+  }
+  if (cover.location) {
+    const location = bibles.location(cover.location);
+    const listed = location && Array.isArray(location.references) ? location.references : [];
+    const plate = bestApproved(entityAssets(assets, cover.location), listed, { plate: 0 });
+    if (plate) add(plate, plate.default_role === 'composition' ? 'composition' : 'spatial_continuity', false);
+  }
+  const propIds = [];
+  for (const row of (Array.isArray(cover.cast) ? cover.cast : [])) {
+    for (const id of (row && Array.isArray(row.holding) ? row.holding : [])) if (!propIds.includes(id)) propIds.push(id);
+  }
+  for (const id of (Array.isArray(cover.props) ? cover.props : [])) if (id && !propIds.includes(id)) propIds.push(id);
+  for (const propId of propIds) {
+    const prop = bibles.prop(propId);
+    if (!prop || prop.plot_relevant !== true) continue;
+    const sheet = bestApproved(entityAssets(assets, propId), Array.isArray(prop.references) ? prop.references : []);
+    if (sheet) add(sheet, 'prop_consistency', false);
+  }
+
+  while (picked.length > capacity) {
+    let index = -1;
+    for (let i = picked.length - 1; i >= 0; i--) {
+      if (!picked[i].required) { index = i; break; }
+    }
+    if (index === -1) {
+      const roomier = roomierProviders(picked.length + (repair ? 1 : 0), providerId, listProviders('image'));
+      throw pipelineError('budget_exceeded',
+        `${coverId}: the cover needs ${picked.length} reference image(s)${repair ? ' plus the edit target' : ''} ` +
+        `(${picked.map((p) => p.asset.id).join(', ')}) but ${providerId} takes ${totalCapacity}. ` +
+        (roomier.length ? `Use a provider with a larger budget: ${roomier.join(', ')}.` : 'No listed provider takes that many images.'));
+    }
+    const [dropped] = picked.splice(index, 1);
+    warnings.push(`${dropped.asset.id} (${dropped.role}) not attached: ${providerId} takes ${totalCapacity} image(s)${repair ? ', one of them the edit target' : ''}`);
+  }
+  return picked;
+}
+
+/**
+ * Compile the prompt package of an issue's cover.
+ *
+ * The prompt is the frozen style block, a cover header (one image, the page
+ * aspect ratio, color mode), the reference legend, the cover's subject from
+ * cover.yaml and the bibles, its own lettering strings (or an instruction to
+ * leave the art free of text in overlay mode), and hard constraints. With
+ * `repair` it compiles a repair of the reviewed cover render instead.
+ *
+ * @param {{root: string, issue: string, provider?: string, model?: string,
+ *          repair?: string|object, write?: boolean, project?: object,
+ *          styleBlock?: string, providerModule?: object}} options
+ *   `issue` is the ISS_###. `repair` is a review file path or a review
+ *   document. `write: true` also writes the package to `fileRel`.
+ * @returns {{pkg: object, spec: object, warnings: string[], fileName: string, fileRel: string}}
+ *   The shape compilePage returns, plus fileRel: the workspace-relative path
+ *   the package belongs at (issues/<ISS_ID>/cover/prompts/<provider>.yaml).
+ * @throws an Error with `code` on any refusal
+ */
+function compileCover(options = {}) {
+  const root = options.root;
+  const issueId = String(options.issue || '');
+  if (!root || !ws.ID.issue.test(issueId)) {
+    throw pipelineError('bad_arguments', `compileCover needs { root, issue: "ISS_###" }, got issue "${options.issue}"`);
+  }
+  const coverId = ws.coverIdOfIssue(issueId);
+  const cover = ws.loadCover(root, issueId);
+  if (!cover || typeof cover !== 'object') {
+    throw pipelineError('cover_missing',
+      `${issueId} has no cover: issues/${issueId}/cover/cover.yaml not found. Write it with /cover first.`);
+  }
+  if (cover.id !== coverId) {
+    throw pipelineError('cover_invalid', `issues/${issueId}/cover/cover.yaml has id ${cover.id || '(none)'}; the cover of ${issueId} is ${coverId}`);
+  }
+  if (!cover.concept || !String(cover.concept).trim()) {
+    throw pipelineError('cover_invalid', `${coverId}: cover.yaml has no concept, so there is nothing to draw`);
+  }
+
+  const project = options.project || ws.loadProject(root) || {};
+  const providerId = resolveProviderId(options.provider, cover, project);
+  const provider = options.providerModule || loadImageProvider(providerId);
+  const capabilities = provider.capabilities || {};
+  const totalCapacity = typeof capabilities.referenceImages === 'number' ? capabilities.referenceImages : Infinity;
+  const mode = coverLib.letteringMode(cover, project);
+  const warnings = [];
+
+  const styleBlock = options.styleBlock !== undefined ? options.styleBlock : ws.loadStyleBlock(root, project);
+  if (!styleBlock || !String(styleBlock).trim()) {
+    throw pipelineError('style_block_missing',
+      `${coverId}: the frozen style block is missing or empty (${(project.style && project.style.style_block) || 'style/style-block.txt'}). ` +
+      'Every prompt starts with it verbatim; write it with /style-bible first.');
+  }
+
+  // Mode.
+  let review = null;
+  if (options.repair !== undefined && options.repair !== null && options.repair !== false) {
+    if (options.repair === true) throw pipelineError('bad_arguments', '--repair needs the path of a review file');
+    if (typeof options.repair === 'string') {
+      const reviewFile = path.resolve(options.repair);
+      review = ws.loadYaml(reviewFile);
+      if (!review) throw pipelineError('review_missing', `review file not found: ${reviewFile}`);
+    } else {
+      review = options.repair;
+    }
+  }
+  let findings = [];
+  let editTarget = null;
+  let repair = null;
+  if (review) {
+    if (review.page !== coverId) {
+      throw pipelineError('review_mismatch', `review is for ${review.page || '(no page)'}, not ${coverId}`);
+    }
+    const maxCycles = project.repair_policy && Number.isInteger(project.repair_policy.max_cycles)
+      ? project.repair_policy.max_cycles : DEFAULT_MAX_REPAIR_CYCLES;
+    const cycle = Number.isInteger(review.repair_cycle) ? review.repair_cycle : 0;
+    if (cycle >= maxCycles) {
+      throw pipelineError('repair_limit',
+        `${review.render}: repair limit reached (repair_cycle ${cycle}, repair_policy.max_cycles ${maxCycles}). ` +
+        'No further repair is compiled. Fix cover.yaml or the references first, then compile a fresh generate package.');
+    }
+    findings = selectFindings(review);
+    if (!findings.length) {
+      throw pipelineError('nothing_to_repair', `${review.render}: the review has no open finding to repair`);
+    }
+    const file = review.render ? ws.renderFile(root, review.render) : null;
+    if (!file) {
+      throw pipelineError('edit_target_missing', `${review.render || '(no render)'}: the reviewed render is not on disk, so there is nothing to edit`);
+    }
+    editTarget = ws.rel(root, file);
+    repair = buildCoverRepair(review, findings, mode);
+  }
+
+  const capacity = repair ? totalCapacity - 1 : totalCapacity;
+  if (capacity < 0) {
+    throw pipelineError('budget_exceeded', `${providerId} takes no input images, so it cannot carry an edit target`);
+  }
+  const bibles = createBibles(root);
+  const picked = coverReferences(root, cover, project, bibles, {
+    capacity, totalCapacity, providerId, repair: Boolean(repair), warnings,
+  });
+
+  const ratio = (project.page && project.page.aspect_ratio) || '2:3';
+  const parameters = { aspect_ratio: ratio };
+  if (project.page && project.page.width_px && project.page.height_px) {
+    parameters.resolution = `${project.page.width_px}x${project.page.height_px}`;
+  }
+  parameters.seed = null;
+
+  const pkg = {
+    id: `PP_${coverId}_${providerTag(providerId)}`,
+    page: coverId, // a cover package names the cover where a page package names its page
+    asset: null,
+    provider: providerId,
+    model: 'pending',
+    mode: repair ? 'repair' : 'generate',
+    prompt: '',
+    negative_prompt: mode === 'overlay' ? `${NEGATIVE_BASE}, ${NEGATIVE_NO_TEXT}` : NEGATIVE_BASE,
+    parameters,
+    references: picked.map((p) => ({
+      asset_id: p.asset.id,
+      role: p.role,
+      image_path: String(p.asset.path).replace(/\\/g, '/'),
+    })),
+    edit_target: editTarget,
+  };
+  if (repair) pkg.repair = repair;
+
+  const entityByAsset = new Map(picked.map((p) => [p.asset.id, p.asset.entity || null]));
+  const legend = legendSection(attachments(pkg), entityByAsset, bibles)
+    .replace('the rendered page to edit', 'the rendered cover to edit');
+  const subject = coverSubject(cover, bibles);
+  const sections = [String(styleBlock).trim()];
+  if (repair) {
+    const failing = ['FAILING ELEMENTS'];
+    for (const f of findings) {
+      const where = regionPhrase(f.region);
+      failing.push(`${where ? `${capitalize(where)}` : 'Whole cover'}. Failed check: ${lang.humanize(f.check)}.`);
+      failing.push(`  Visible now: ${lang.sentence(f.visible)}`);
+      failing.push(`  Expected: ${lang.sentence(f.expected)}`);
+    }
+    sections.push(
+      ['REPAIR',
+        `Edit Image 1, the rendered cover. This corrects an existing cover; it is not a new drawing. Change only what CHANGES lists and return the whole cover at the same size, aspect ratio ${ratio}.`].join('\n'),
+      legend,
+      failing.join('\n'),
+      ['CHANGES'].concat(repair.changes.map((c, i) => `${i + 1}. ${c}`)).join('\n'),
+      ['PLANNED CONTENT OF THE COVER', ...subject].join('\n'),
+      ['LOCKED, DO NOT CHANGE'].concat(repair.locked.map((l) => `- ${l}`)).join('\n'),
+      coverConstraints(cover, bibles, mode, true));
+  } else {
+    sections.push(
+      coverHeader(project, ratio),
+      legend,
+      ['SUBJECT', ...subject].join('\n'),
+      coverLetteringSection(cover, project, mode),
+      coverConstraints(cover, bibles, mode, false));
+  }
+  pkg.prompt = sections.join('\n\n');
+  pkg.lettering_text = mode === 'in_image' ? coverLib.letteringElements(cover).map((el) => el.text) : [];
+  pkg.status = 'compiled';
+  // A cover has no reference plan: its references come straight from
+  // cover.yaml and the registry, so only the cover and the style block are hashed.
+  pkg.source_hashes = {
+    page: coverLib.hashCover(cover),
+    style_block: hashText(String(styleBlock)),
+  };
+
+  let spec;
+  try {
+    spec = provider.compile(pkg, options.model ? { model: String(options.model) } : {});
+  } catch (err) {
+    throw pipelineError('provider_rejected', `${providerId} cannot run this package: ${err.message}`);
+  }
+  pkg.model = spec.model;
+  for (const w of (spec.meta && spec.meta.warnings) || []) warnings.push(w);
+  if (mode === 'in_image' && pkg.lettering_text.length && capabilities.textRendering === 'unreliable') {
+    warnings.push(`${providerId} renders text unreliably: the review must check all ${pkg.lettering_text.length} lettering string(s) against lettering_text`);
+  }
+
+  const fileName = `${providerId}.yaml`;
+  const fileRel = `issues/${issueId}/cover/prompts/${fileName}`;
+  if (options.write === true) {
+    assertValid('prompt-package', pkg, `prompt package ${pkg.id}`);
+    writeFileEnsuring(ws.abs(root, fileRel), yaml.stringify(pkg));
+  }
+  return { pkg, spec, warnings, fileName, fileRel };
+}
+
+/** --cover branch of the CLI. */
+function mainCover(flags) {
+  let root;
+  let result;
+  try {
+    if (flags.cover === true) throw pipelineError('bad_arguments', '--cover needs an issue ID such as ISS_001');
+    for (const other of ['page', 'asset', 'panel', 'sheet']) {
+      if (flags[other] !== undefined) throw pipelineError('bad_arguments', `--cover and --${other} cannot be combined`);
+    }
+    const start = flags.root && flags.root !== true ? path.resolve(String(flags.root)) : process.cwd();
+    root = ws.findWorkspaceRoot(start);
+    if (!root) {
+      throw pipelineError('workspace_missing',
+        `no project.yaml at or above ${start}: pass --root <workspace> or run from inside the workspace`);
+    }
+    result = compileCover({
+      root,
+      issue: String(flags.cover),
+      provider: flags.provider,
+      model: flags.model && flags.model !== true ? flags.model : undefined,
+      repair: flags.repair,
+    });
+    const check = assertValid('prompt-package', result.pkg, `prompt package ${result.pkg.id}`);
+    if (check.skipped) console.warn('warning: schemas/prompt-package.schema.json not found, schema validation skipped');
+  } catch (err) {
+    console.error(`error: ${err.message}`);
+    process.exit(1);
+  }
+  const { pkg, spec, warnings } = result;
+  const outFile = ws.abs(root, result.fileRel);
+  writeFileEnsuring(outFile, yaml.stringify(pkg));
+  console.log(`prompt package: ${pkg.id} (cover, ${pkg.mode}, ${pkg.provider}, model ${pkg.model}) -> ${toPosix(outFile)}`);
+  console.log(`  prompt: ${pkg.prompt.length} characters, ${pkg.references.length} reference image(s)${pkg.edit_target ? ' + edit target' : ''}, aspect ${pkg.parameters.aspect_ratio}`);
+  if (pkg.repair) console.log(`  repair of ${pkg.repair.of_render}: findings ${pkg.repair.findings.join(', ')}`);
+  console.log(`  lettering strings in the image: ${pkg.lettering_text.length}`);
+  console.log(`  request endpoint: ${spec.endpoint || '(none: handoff to a person or the harness tool)'}`);
+  for (const w of warnings) console.log(`  warning: ${w}`);
+  console.log(`  next: node scripts/generate-assets.js --cover ${flags.cover} --root ${toPosix(root)}`);
+}
+
 /** --asset branch of the CLI. */
 function mainAsset(flags) {
   let root;
@@ -1167,12 +1627,16 @@ function mainAsset(flags) {
 function main() {
   helpIfRequested(process.argv.slice(2), HELP);
   const { flags } = parseArgs();
+  if (flags.cover !== undefined) {
+    mainCover(flags);
+    return;
+  }
   if (flags.asset !== undefined) {
     mainAsset(flags);
     return;
   }
   if (!flags.page || flags.page === true) {
-    console.error('error: --page <page.yaml> or --asset <ENTITY_ID> --sheet <kind> is required (see --help)');
+    console.error('error: --page <page.yaml>, --cover <ISS_ID> or --asset <ENTITY_ID> --sheet <kind> is required (see --help)');
     process.exit(1);
   }
   let ctx;
@@ -1213,6 +1677,7 @@ function main() {
 module.exports = {
   compilePage,
   compileAsset,
+  compileCover,
   composePagePrompt,
   composeRepairPrompt,
   composePanelPrompt,

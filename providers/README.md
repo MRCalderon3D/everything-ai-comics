@@ -7,9 +7,10 @@ what each module exports.
 
 ```
 providers/
-├── image/   fal.js  replicate.js  comfyui.js  gemini.js  harness-native.js  manual.js
-└── lib/     common.js    capability checks, records, env checks, polling
-             handoff.js   shared by manual and harness-native
+├── image/   fal.js  replicate.js  comfyui.js  gemini.js  harness-native.js  codex-cli.js  manual.js
+└── lib/     common.js     capability checks, records, env checks, polling
+             handoff.js    shared by manual and harness-native
+             cli-spawn.js  find and run a command-line tool, stop its process tree
 ```
 
 Every provider has `kind: 'image'`: a comic page is an image.
@@ -23,7 +24,7 @@ module.exports = {
   id: 'fal',                    // matches the manifest entry
   kind: 'image',
   label: 'fal.ai',
-  env: ['FAL_KEY'],             // required env vars; [] for harness-native and manual
+  env: ['FAL_KEY'],             // required env vars; [] for harness-native, codex-cli and manual
   capabilities: {               // hard limits; deep-equal to the manifest
     referenceImages: 4,         // max input images per request, 0 if unsupported
     aspectRatios: ['2:3', '3:4', '9:16', '1:1'],
@@ -31,7 +32,7 @@ module.exports = {
     textRendering: 'unreliable' // 'reliable' | 'unreliable' | 'none'
   },
   compile(promptPackage, options = {}) { ... },   // pure: no I/O, no env reads
-  async generate(requestSpec, { dryRun = true, outDir, root } = {}) { ... },
+  async generate(requestSpec, { dryRun = true, outDir, root, signal, onProgress } = {}) { ... },
 };
 ```
 
@@ -44,6 +45,7 @@ module.exports = {
 | comfyui | 8 | false | none | The default graph is text-to-image. The budget describes your own graph with reference nodes. Use overlay lettering. |
 | gemini | 3 | true | unreliable | Reads inline images and edits a given image. |
 | harness-native | 4 | true | unreliable | Handoff to the harness's image tool. No network. |
+| codex-cli | 4 | true | unreliable | Runs `codex exec` and returns the image it draws. The tool renders 1:1, 2:3 and 3:2; any other ratio comes back in the nearest frame and needs a crop. |
 | manual | 4 | true | unreliable | Handoff to a person. No network. |
 
 What each key means for the pipeline:
@@ -84,7 +86,7 @@ then the package's `references`. `attachments()` in `lib/common.js` computes
 that order for the adapters and for the prompt's reference legend, so "Image 2"
 in the prompt is the second image in the request.
 
-## `generate(requestSpec, { dryRun = true, outDir, root })`
+## `generate(requestSpec, { dryRun = true, outDir, root, signal, onProgress })`
 
 - Dry-run is the default. It calls no network and returns a generation record
   (`schemas/generation-record.schema.json`) with `status: 'dry_run'`.
@@ -99,6 +101,12 @@ in the prompt is the second image in the request.
   returns raw bytes attaches them as base64 on the record's `_media` field;
   `generate-assets.js` writes the files, fills `media_files`, and removes
   `_media` before the record reaches disk.
+- `outDir` is the directory the result will be saved in. A provider that has
+  a tool write a file (`codex-cli`) puts its temporary file there.
+- `signal` is an optional AbortSignal and `onProgress(line)` an optional
+  callback. `generateAssets({ signal, onProgress })` hands both through. A
+  provider that runs a local tool stops it when the signal aborts and returns
+  a failed record with the error `cancelled`. API providers ignore both.
 
 ## Records never invent metadata
 
@@ -136,19 +144,99 @@ prop, `DETAIL_<SUBJECT>`. A candidate never takes
 the `_MASTER` name; approval promotes it.
 
 Use `harness-native` when the coding assistant has its own image tool (Codex
-with gpt-image, or an MCP image tool). Use `manual` when a person generates in
+with gpt-image, or an MCP image tool) and the assistant is the one doing the
+work. Use `codex-cli` when a script should get the image with nobody in the
+loop: it starts Codex, waits, and saves the file. Use `manual` when a person generates in
 a web UI. In both cases the record is completed afterwards with the saved file
 and whatever the tool reported.
+
+## The Codex CLI provider
+
+`codex-cli` draws through the Codex command-line tool the user is signed in
+to. `compile()` builds the package a handoff carries and adds `body.frame`,
+the frame to render the target ratio in. Live `generate()` then does what a
+handoff leaves to the harness:
+
+1. It finds the binary with `resolveBinary('codex', 'CODEX_BIN')`.
+2. It starts
+   `codex exec --skip-git-repo-check --ephemeral -s workspace-write -C <outDir> --json -o <message file> [-m <model>] -i <image> ... -`.
+   The images are the package's inputs in attachment order, as absolute
+   paths. The instruction goes in on stdin, because `-i` takes several
+   values and a prompt on the command line would be read as one more image.
+3. The instruction tells Codex to use its own image tool, to pass every
+   attached image as an input in order, to render the stated frame, to write
+   no code that draws the picture, and to save exactly one PNG at a temporary
+   path inside `outDir`. Codex answers with a small JSON object: the saved
+   path, the pixel size, whether the references were passed, and the image
+   model if the tool names it.
+4. When the process ends, the file is checked with
+   `scripts/lib/image-info.js`, read into `_media`, and deleted together
+   with the message file. `generate-assets.js` names the render or the
+   candidate.
+
+In the record, `model` is `unreported` unless the reply names the image
+model, `cost.amount` is `null`, and `seed` is `null` even when the package
+pins one, because the tool takes no seed. The response summary gives the
+pixel size, the run time in seconds, and what Codex reported about the
+references. A ratio the tool does not render (3:4, 9:16, 4:5, 4:3, 16:9) is
+drawn in the nearest of 1:1, 2:3 and 3:2 with the content kept inside a
+centred area of the target ratio. `compile()` warns about it, and the
+record's notes say the file needs a crop.
+
+A failed run gives a `failed` record with a plain message in
+`response.error`, and the rest of the batch goes on:
+
+| Case | What the record says |
+|---|---|
+| No `codex` binary | `codex binary not found`, with where it looked |
+| Non-zero exit and no file | The exit code, then Codex's last message or the last stderr line |
+| Exit 0 and no file | `finished without saving the image` |
+| Time limit passed | `timed out after N s`; the process tree is stopped |
+| Signal aborted | `cancelled`; the process tree is stopped |
+| Saved file is not an image | `not an image`; the bytes are discarded |
+
+Text on stderr alone is never a failure. Codex prints unrelated noise there,
+such as MCP servers that are not running. A non-zero exit after the image
+was saved keeps the image and notes the code.
+
+`providers/lib/cli-spawn.js` holds the process code, and other callers may
+use it:
+
+```js
+resolveBinary(name, envOverride)
+// -> { found, name, path, command, prefixArgs, via, source, error }
+spawnCli({ bin, args, cwd, stdin, env, signal, timeoutMs, onStdout, onStderr })
+// -> Promise<{ code, signal, timedOut, cancelled, stdout, stderr }>
+killTree(child)
+binaryVersion(bin)   // -> { ok, version, error }, synchronous
+```
+
+`envOverride` is the name of an environment variable that may hold a path.
+On Windows an npm `.cmd` shim is read to find the script it launches, and
+that script runs under Node with no shell. A `.js` file runs under Node on
+every platform. `spawnCli` resolves whatever the exit code is and rejects
+only when the process cannot start. `killTree` uses `taskkill /T /F` on
+Windows and signals the process group elsewhere. Arguments are passed as an
+array, and text a person wrote goes on stdin or in a file.
 
 ## Env vars
 
 `FAL_KEY`, `REPLICATE_API_TOKEN`, `COMFYUI_HOST`, `GOOGLE_API_KEY`.
 `npm run doctor` reports which are set (names only, never values).
 
+`codex-cli` has optional settings and no required variable: `CODEX_BIN`
+(path of the executable, and the way tests inject a stub),
+`CODEX_IMAGE_TIMEOUT_MS` (limit for one image, default 900000), and
+`CODEX_IMAGE_MODEL` (passed as `-m`; without it a model pinned in the
+package is used, else Codex's default). `npm run doctor` says whether the
+binary is found and prints its version. A missing binary is reported and
+does not fail the doctor.
+
 ## Adding a provider
 
 1. Create `providers/image/<id>.js` exporting the interface above. Start from
-   an existing adapter: `gemini.js` for an API, `manual.js` for a handoff.
+   an existing adapter: `gemini.js` for an API, `manual.js` for a handoff,
+   `codex-cli.js` for a command-line tool.
 2. Add the matching entry (id, file, label, env, capabilities) to
    `manifests/image-providers.json`. `capabilities` must deep-equal the
    module's export.

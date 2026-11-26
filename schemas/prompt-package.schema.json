@@ -2,20 +2,20 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://everything-ai-comics.dev/schemas/prompt-package.schema.json",
   "title": "Prompt Package",
-  "description": "Provider-ready request for one page or one asset (production/issues/<ISS_ID>/pages/<PG_ID>/prompts/<provider>.yaml). Compiled from the page file, the bibles, the frozen style block, and the reference plan; never written by hand. Providers' compile() consumes this shape.",
+  "description": "Provider-ready request for one page, one cover, or one asset (production/issues/<ISS_ID>/pages/<PG_ID>/prompts/<provider>.yaml, production/issues/<ISS_ID>/cover/prompts/<provider>.yaml). Compiled from the page file, the bibles, the frozen style block, and the reference plan; never written by hand. Providers' compile() consumes this shape.",
   "type": "object",
   "additionalProperties": false,
   "required": ["id", "page", "provider", "model", "mode", "prompt", "parameters", "status", "source_hashes"],
   "properties": {
     "id": {
       "type": "string",
-      "pattern": "^PP_(PG_\\d{3}_\\d{3}|(CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*)_[A-Z0-9][A-Z0-9_-]*$",
-      "description": "Package ID: PP_<page or asset id>_<PROVIDER>, e.g. PP_PG_001_001_HARNESS-NATIVE."
+      "pattern": "^PP_(PG_\\d{3}_\\d{3}|CV_\\d{3}|(CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*)_[A-Z0-9][A-Z0-9_-]*$",
+      "description": "Package ID: PP_<page, cover or asset id>_<PROVIDER>, e.g. PP_PG_001_001_HARNESS-NATIVE, PP_CV_001_FAL."
     },
     "page": {
       "type": ["string", "null"],
-      "pattern": "^PG_\\d{3}_\\d{3}$",
-      "description": "Page this package generates, or null for an asset-scoped package."
+      "pattern": "^(PG_\\d{3}_\\d{3}|CV_\\d{3})$",
+      "description": "Page this package generates, the cover ID for a cover package, or null for an asset-scoped package."
     },
     "asset": {
       "type": ["string", "null"],
@@ -86,7 +86,7 @@
       "properties": {
         "of_render": {
           "type": "string",
-          "pattern": "^PG_\\d{3}_\\d{3}_V\\d{2}$",
+          "pattern": "^(PG_\\d{3}_\\d{3}|CV_\\d{3})_V\\d{2}$",
           "description": "Render being repaired."
         },
         "findings": {
@@ -120,7 +120,7 @@
         "page": {
           "type": "string",
           "pattern": "^[a-f0-9]{8,64}$",
-          "description": "Hash of page.yaml at compile time."
+          "description": "Hash of page.yaml (cover.yaml for a cover package) at compile time."
         },
         "reference_plan": {
           "type": "string",

@@ -57,7 +57,7 @@ const SCHEMA_NAMES = [
   'project', 'story-bible', 'series-plan', 'character', 'wardrobe',
   'location', 'location-map', 'prop', 'issue', 'scene', 'page', 'lettering',
   'reference-plan', 'prompt-package', 'continuity-state', 'generation-record',
-  'visual-review', 'edition',
+  'visual-review', 'cover', 'edition',
 ];
 const SCHEMA_ID_BASE = 'https://everything-ai-comics.dev/schemas/';
 const SKILL_ORIGIN = 'everything-ai-comics';
@@ -91,6 +91,7 @@ const TEMPLATE_FILES = [
   'scene/scene.yaml',
   'page/page.yaml', 'page/lettering.yaml', 'page/reference-plan.yaml',
   'review/visual-review.yaml',
+  'cover/cover.yaml',
   'continuity/final-state.yaml',
   'edition/edition.yaml',
   'references/manifest.yaml',

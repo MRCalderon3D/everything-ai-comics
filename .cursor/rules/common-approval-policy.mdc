@@ -60,7 +60,9 @@ human one.
   render was reopened and rechecked. Use it only after seeing the listed
   repairs in the new file.
 - `flagged`: a blocking finding is still open, a gate failed, or the visible
-  evidence is ambiguous.
+  evidence is ambiguous. A change request from a person
+  (`source: user_request`) also flags the review until it is fixed or the
+  person drops it, and so does a review whose checks were never performed.
 - Human approval is recorded separately in the review's `human_approval`
   block (`pending`, `approved`, or `rejected`, with `by` and `at`). A page
   takes `status: approved` only after that block says `approved`.

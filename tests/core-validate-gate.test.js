@@ -36,7 +36,7 @@ async function main() {
   const sections = Object.keys(validate.SECTIONS);
   assert.deepStrictEqual(sections, ['manifests', 'files', 'agents', 'commands', 'skills',
     'rules', 'contexts', 'schemas', 'templates', 'providers', 'hooks', 'example', 'harnesses']);
-  assert.strictEqual(validate.SCHEMA_NAMES.length, 18);
+  assert.strictEqual(validate.SCHEMA_NAMES.length, 19);
   assert.strictEqual(validate.SCHEMA_ID_BASE, 'https://everything-ai-comics.dev/schemas/');
   assert.deepStrictEqual(validate.RULE_SECTIONS, ['Purpose', 'Scope', 'Core Principles', 'Validation']);
 

@@ -83,7 +83,9 @@ pixels.
    confirmation from step 2. Each run writes a record and a
    `GEN_*.request.json` under `production/generations/<PG_ID>/`. With
    `harness-native` or `manual` the request file is the handoff package;
-   the harness image tool or a person produces the image from it. A live
+   the harness image tool or a person produces the image from it. With
+   `codex-cli` the live run starts the Codex CLI, waits for it, and saves
+   the image; a missing `codex` binary or a timeout is a failed record. A live
    run refuses a package whose page or style block changed after it was
    compiled.
 7. Confirm the returned image sits at the next free version,

@@ -1,7 +1,8 @@
 # Web studio plan
 
-Draft 2, 2026-11-26. A plan for a web interface on top of the scaffold, for
-people who will not work from an editor. Nothing here is built yet.
+Draft 3, 2026-11-26. A plan for a web interface on top of the scaffold, for
+people who will not work from an editor. The three spikes of phase 0 are done
+and their results are below. The build lives in `studio/`.
 
 ## Goal
 
@@ -144,13 +145,68 @@ What the studio has to account for:
   sheets plus the previous page), editing an existing image for a repair,
   and how often the lettering comes back wrong.
 
-Spikes 2 and 3 have not been run.
+### Spike 2 result (2026-11-26): Claude runs a command headless
 
-Phase 0 decides whether phases 2 to 5 can rely on Codex for drawing. With no
-API in the first version there is no second illustrator, so if the spike
-fails the fallback is a handoff: the studio prepares the prompt and the
-references, the person generates the image in the Codex app and drops the
-file back in. That is the scaffold's `manual` provider with a screen around it.
+Run with Claude Code 2.1.314 from the scaffold root, on a fresh workspace
+made by `create-project.js`, with the prompt on stdin:
+
+```
+claude -p --output-format json --json-schema '<schema>' \
+  --setting-sources project --strict-mcp-config \
+  --permission-mode acceptEdits \
+  --allowedTools "Read,Write,Edit,Glob,Grep,Bash(node scripts/*)" \
+  --add-dir <project dir>
+```
+
+The prompt named `commands/story-bible.md`, gave a four-line premise and said
+nobody could answer questions. In 110 seconds and 18 turns it wrote
+`story/story-bible.yaml` (19 facts with provenance, world rules, arcs, a
+timeline), ran `validate-workspace.js` on its own, and returned a result that
+matched the schema: status, summary, files written, and ten decisions it made
+in place of questions. The workspace validated with 0 errors.
+
+What the studio has to account for:
+
+- `--setting-sources project` keeps the person's own plugins and hooks out of
+  the run and still loads the scaffold's `.claude/` directory, so its hooks
+  apply.
+- The child process must not inherit `CLAUDECODE` and
+  `CLAUDE_CODE_ENTRYPOINT`.
+- Shell calls outside the allowed pattern are denied and listed in
+  `permission_denials`. The run carries on. PowerShell calls were among them,
+  so the allow list has to cover both shells or the prompt has to say which
+  one to use.
+- The call used the default model and reported a list price of 0.67 USD. A
+  full issue is dozens of calls, so the model per verb is a setting.
+
+### Spike 3 result (2026-11-26): cross-tool review
+
+The page Codex drew in spike 1 was reviewed by Claude (`--model sonnet`, only
+the Read tool, permission mode `dontAsk`) against a plan with eight checks,
+three of them altered on purpose: a different caption text, an eyepatch that
+is not there, a ring that is not there. It took 13 seconds. All three altered
+checks came back as failures with a description of what is on the page, and
+the five true ones passed.
+
+One page and three planted errors is a small sample. It says the mechanism
+works. It does not say how often a subtle drift in a face or a costume gets
+through.
+
+### What phase 0 decided
+
+Codex draws and Claude reviews, both headless. The fallback stays in the
+design for machines without Codex: the studio prepares the prompt and the
+references, the person generates the image elsewhere and uploads the file.
+That is the scaffold's `manual` provider with a screen around it.
+
+Three things changed from the first draft of this plan:
+
+- The studio has no dependencies either. Node's `http` module and plain
+  browser modules are enough, and it means there is nothing to install.
+- Drawing is a scaffold provider, `codex-cli`, so the same path works from an
+  editor with `generate-assets.js --provider codex-cli --live --yes`.
+- Prompts name the command file to follow (`commands/<name>.md`) and do not
+  use slash commands, so the same prompt works in both tools.
 
 ## Open decisions
 

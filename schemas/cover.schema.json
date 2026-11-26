@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://everything-ai-comics.dev/schemas/cover.schema.json",
+  "title": "Cover",
+  "description": "The front cover of one issue (production/issues/<ISS_ID>/cover/cover.yaml): one image with its concept, the characters and props it shows, the exact cover lettering, and the approval state. compile-prompts.js --cover compiles it; renders and reviews sit beside it like a page's.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "issue", "concept", "lettering", "status", "approved_render"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^CV_\\d{3}$",
+      "description": "Cover ID: CV_<issue number>, e.g. CV_001 for ISS_001."
+    },
+    "issue": { "type": "string", "pattern": "^ISS_\\d{3}$", "description": "Issue the cover belongs to." },
+    "concept": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The one image the cover shows, as a drawable moment."
+    },
+    "composition": { "type": "string", "description": "Framing and placement notes, including where the title sits." },
+    "location": {
+      "type": ["string", "null"],
+      "pattern": "^LOC_[A-Z][A-Z0-9_]*$",
+      "description": "Location shown, or null for a cover with no setting."
+    },
+    "time_of_day": { "enum": ["dawn", "day", "dusk", "night"], "description": "Time of day of the setting." },
+    "cast": {
+      "type": "array",
+      "description": "Characters drawn on the cover, once each. May be empty.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["character", "action"],
+        "properties": {
+          "character": { "type": "string", "pattern": "^CHAR_[A-Z][A-Z0-9_]*$", "description": "Character ID." },
+          "wardrobe": {
+            "type": "string",
+            "pattern": "^WARD_[A-Z][A-Z0-9_]*$",
+            "description": "Outfit drawn. Default: the character's default_wardrobe."
+          },
+          "action": { "type": "string", "minLength": 1, "description": "The visible pose or action." },
+          "acting": { "type": "string", "description": "Expression and body language." },
+          "state": {
+            "type": "array",
+            "description": "Physical state tags visible on the cover.",
+            "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }
+          },
+          "holding": {
+            "type": "array",
+            "description": "Props in this character's hands.",
+            "items": { "type": "string", "pattern": "^PROP_[A-Z][A-Z0-9_]*$" }
+          }
+        }
+      }
+    },
+    "props": {
+      "type": "array",
+      "description": "Props in view that nobody holds.",
+      "items": { "type": "string", "pattern": "^PROP_[A-Z][A-Z0-9_]*$" }
+    },
+    "lettering": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title"],
+      "description": "The exact text of the cover.",
+      "properties": {
+        "mode": {
+          "enum": ["in_image", "overlay"],
+          "description": "in_image: the model letters the cover. overlay: the art stays free of text and the title is added afterwards. Default: project.lettering.mode."
+        },
+        "title": { "type": "string", "minLength": 1, "description": "Exact words of the title." },
+        "issue_line": {
+          "type": ["string", "null"],
+          "description": "Exact words of the issue line (number, issue title), or null."
+        },
+        "tagline": { "type": ["string", "null"], "description": "Exact words of the tagline, or null." },
+        "credits": { "type": ["string", "null"], "description": "Exact words of the credit line, or null." }
+      }
+    },
+    "generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "How the cover is generated.",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Image provider. Default: project.default_providers.image."
+        }
+      }
+    },
+    "status": {
+      "enum": ["draft", "approved"],
+      "description": "draft: no render chosen yet. approved: approved_render is the cover that ships."
+    },
+    "approved_render": {
+      "type": ["string", "null"],
+      "pattern": "^CV_\\d{3}_V\\d{2}$",
+      "description": "The approved cover render, or null while the cover is a draft. Approval needs a review with verdict pass or fixed."
+    },
+    "notes": { "type": "string", "description": "Free-form notes for people. Never read by scripts." }
+  }
+}

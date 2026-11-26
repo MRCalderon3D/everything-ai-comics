@@ -1,0 +1,74 @@
+# Schema: schemas/visual-review.schema.json
+# Review of a cover. `page` holds the cover ID. Position, movement and role causality
+# belong to the panel ledger, which a cover is outside of, so they are not applicable.
+
+page: CV_001
+render: CV_001_V01
+supersedes: null
+reviewer: visual-reviewer
+independent: true
+
+compared_against:
+  references: [LOOK_NOIR_INK_MASTER_V01, CHAR_MARA_TURN_MASTER_V01, LOC_FERRY_DECK_PLATE_MASTER_V01]
+  neighbors: []
+
+checks:
+  identity:
+    result: pass
+    evidence: Broken nose and cropped grey hair match Mara's sheet, even at this small size in the doorway.
+  cast_count:
+    result: pass
+    evidence: One Mara in the doorway. No second figure on the deck or under the tarpaulin.
+  position:
+    result: not_applicable
+    evidence: A cover has no ledger row to compare a position with.
+  movement:
+    result: not_applicable
+    evidence: A cover is one image. No change of position can be shown or skipped.
+  role_causality:
+    result: not_applicable
+    evidence: A cover is not part of the sequence of panels.
+  object_identity:
+    result: pass
+    evidence: The flare gun has the wide stubby barrel and the lanyard ring. The tarpaulin has rope eyelets along its hem.
+  object_custody:
+    result: pass
+    evidence: The flare gun is in Mara's right hand, as cover.yaml states. The tarpaulin lies on the crates.
+  physical_state:
+    result: not_applicable
+    evidence: cover.yaml lists no state tag for Mara.
+  wardrobe:
+    result: pass
+    evidence: Oilskin coat, bare head, torn left cuff.
+  spatial_logic:
+    result: pass
+    evidence: The wheelhouse is raised aft with the ladder below it, and the crates sit near the bow, as on the location plate.
+  drawing_clarity:
+    result: pass
+    evidence: Mara's silhouette reads against the lit doorway. The hand and the gun are separate shapes.
+  lettering:
+    result: pass
+    evidence: The title and the issue line are exact and in capitals. Neither touches Mara or the crates.
+  page_structure:
+    result: pass
+    evidence: One full-bleed image in portrait format. No panel borders.
+  style_fidelity:
+    result: pass
+    evidence: Solid spotted blacks, hard shadow edges and no grey tone, as in the look master.
+
+findings: []
+
+gates:
+  style_fidelity: pass
+  narrative_continuity: pass
+
+verdict: pass
+repair_cycle: 0
+reviewed_at: "2026-11-26"
+
+human_approval:
+  status: approved
+  by: example
+  at: "2026-11-26"
+
+notes: Example data. The file on disk is a flat placeholder, so this evidence shows the form of a cover review and describes no real drawing.

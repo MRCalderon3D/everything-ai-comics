@@ -71,11 +71,15 @@ out of style.
     compiled with no reference image; later versions attach the approved
     look. Candidates land in `production/references/style/` as
     `<LOOK_ID>_V##`. Compare each with the written rules, correct whichever
-    is wrong, and repeat until they agree. Save the pick as
-    `<LOOK_ID>_MASTER_V##` and register it with `kind: look` and
-    `default_role: style`.
-11. Freeze on approval. Set `project.style.look_refs` and
-    `project.style.style_block`. From here on the block is reused verbatim
+    is wrong, and repeat until they agree. Submit the pick for review under
+    its candidate name.
+11. Freeze on approval. Once the user approves the look page, run
+    `node scripts/approve-asset.js --candidate <LOOK_ID>_V## --root <workspace>`.
+    It copies the pick to `<LOOK_ID>_MASTER_V##`, registers it with
+    `kind: look` and `default_role: style`, and sets
+    `project.style.look_refs` and `project.style.style_block`. It refuses
+    while the block file is missing or empty, and a later version of the
+    look needs `--supersede`. From here on the block is reused verbatim
     in every request and the look master is attached to every request with
     role `style`. Repeating a style word in a prompt is no substitute for
     attaching the image.

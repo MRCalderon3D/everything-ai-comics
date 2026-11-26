@@ -1,15 +1,22 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * build-edition.js: assemble an edition and export it as PDF, CBZ, and a web
- * reader.
+ * build-edition.js: assemble an edition and export it as PDF, CBZ, a web
+ * reader, a folder of numbered images, and an EPUB.
  *
  * Reads editions/<ED_ID>/edition.yaml, which lists the exact render of every
- * page, and enforces the edition rules of docs/data-model.md:
+ * page and, optionally, of the cover, and enforces the edition rules of
+ * docs/data-model.md:
  *   - every listed render has a visual review with verdict pass or fixed
  *     (otherwise the build refuses, unless --draft, which marks every export)
  *   - pages are listed once each, in page-number order, with no gaps
  *   - an export file that already exists is never overwritten (unless --force)
+ *
+ * When the edition names a cover, the cover is the first page of every
+ * format. A page or cover with a lettered_file ships that file.
+ *
+ * draftEdition() composes an edition document from the current state of an
+ * issue without writing anything.
  *
  * This script checks files and review verdicts. It does not look at the
  * artwork: a passing build means the listed renders were reviewed, and the
@@ -26,9 +33,10 @@ const ws = require('./lib/workspace');
 const { imageInfo } = require('./lib/image-info');
 const { createZip } = require('./lib/zip');
 const { buildPdf } = require('./lib/pdf');
+const { buildEpub, uuidFrom } = require('./lib/epub');
 const { escapeXml } = require('./lib/svg');
 
-const FORMATS = ['pdf', 'cbz', 'web'];
+const FORMATS = ['pdf', 'cbz', 'web', 'images', 'epub'];
 const DEFAULT_FORMATS = ['pdf', 'cbz'];
 /** Aspect ratios closer than this are treated as equal (pixel rounding). */
 const ASPECT_SAME = 0.002;
@@ -36,15 +44,17 @@ const ASPECT_SAME = 0.002;
 const ASPECT_TOLERANCE = 0.02;
 
 const HELP = `
-build-edition.js: export an edition as PDF, CBZ, and a web reader.
+build-edition.js: export an edition as PDF, CBZ, a web reader, numbered
+images, and EPUB.
 
 Usage:
-  node scripts/build-edition.js --edition <edition.yaml> [--formats pdf,cbz,web] [--draft] [--force]
+  node scripts/build-edition.js --edition <edition.yaml> [--formats pdf,cbz,web,images,epub] [--draft] [--force]
 
 Options:
   --edition <file>   The edition.yaml to build (editions/<ED_ID>/edition.yaml). Required.
-  --formats <list>   Comma-separated: pdf, cbz, web. Default: the pdf, cbz and
-                     web targets of project.yaml "deliverables", else pdf,cbz.
+  --formats <list>   Comma-separated: pdf, cbz, web, images, epub. Default: the
+                     pdf, cbz, web, images and epub targets of project.yaml
+                     "deliverables", else pdf,cbz.
   --draft            Build even when a listed render has no passing review.
                      Every export gets -DRAFT in its name, the PDF is stamped
                      on every page, and the web reader shows a draft banner.
@@ -52,20 +62,30 @@ Options:
   --help             Show this help.
 
 Checks before anything is written:
-  - every page has "page", "render" and "file", and the file exists
+  - every page has "page", "render" and "file", and the file exists; the
+    same for "cover" when the edition names one
   - every render has a review with verdict pass or fixed (skipped by --draft,
     which still prints each verdict)
   - pages are listed once each, in page-number order, starting at 1, no gaps
   - all pages share one aspect ratio: a small difference is a warning, a
-    larger one stops the build (webtoon projects only compare widths)
+    larger one stops the build (webtoon projects only compare widths, and
+    leave the cover out of the comparison)
 
 Output, under editions/<ED_ID>/exports/:
   <title>-<issue>-ed<edition>[-DRAFT].pdf      one page image per PDF page
   <title>-<issue>-ed<edition>[-DRAFT].cbz      001.png, 002.png ... plus ComicInfo.xml
   <title>-<issue>-ed<edition>[-DRAFT]-web/     index.html reader plus pages/
+  <title>-<issue>-ed<edition>[-DRAFT]-images/  001.png, 002.png ..., and the
+  <title>-<issue>-ed<edition>[-DRAFT]-images.zip with the same files
+  <title>-<issue>-ed<edition>[-DRAFT].epub     EPUB 3, fixed layout, one image per page
 
-"lettered_file" replaces "file" when it is set. It must be a PNG or JPEG: an
-overlay SVG from letter-pages.js has to be exported to an image first.
+When the edition has a "cover", the cover is the first page of every format:
+000-cover.<ext> in the CBZ, the web reader, the images and the EPUB, marked
+FrontCover in ComicInfo.xml and cover-image in the EPUB.
+
+"lettered_file" replaces "file" when it is set, for a page and for the cover.
+It must be a PNG or JPEG: an overlay SVG from letter-pages.js has to be
+exported to an image first.
 
 An existing export is skipped, not overwritten. --force replaces it only while
 the edition has status "draft" (or the build is --draft); a reviewed or
@@ -135,7 +155,7 @@ function comicInfoXml(meta) {
   add('Manga', meta.readingDirection === 'rtl' ? 'YesAndRightToLeft' : 'No');
   lines.push('  <Pages>');
   meta.pages.forEach((page, index) => {
-    lines.push(`    <Page Image="${index}" ImageSize="${page.size}" ImageWidth="${page.width}" ImageHeight="${page.height}" />`);
+    lines.push(`    <Page Image="${index}"${page.type ? ` Type="${escapeXml(page.type)}"` : ''} ImageSize="${page.size}" ImageWidth="${page.width}" ImageHeight="${page.height}" />`);
   });
   lines.push('  </Pages>', '</ComicInfo>', '');
   return lines.join('\n');
@@ -146,7 +166,7 @@ function webReaderHtml(meta) {
   const rtl = meta.readingDirection === 'rtl';
   const webtoon = meta.comicFormat === 'webtoon';
   const images = meta.pages.map((page, index) =>
-    `  <img class="page" id="p${index + 1}" src="${escapeXml(page.src)}" alt="Page ${index + 1}" width="${page.width}" height="${page.height}"${index > 1 ? ' loading="lazy"' : ''}>`
+    `  <img class="page" id="p${index + 1}" src="${escapeXml(page.src)}" alt="${escapeXml(page.label || `Page ${index + 1}`)}" width="${page.width}" height="${page.height}"${index > 1 ? ' loading="lazy"' : ''}>`
   ).join('\n');
   const draft = meta.draft ? `\n<div class="draft" role="note">${escapeXml(meta.draftNote || 'DRAFT')}</div>` : '';
   return `<!DOCTYPE html>
@@ -271,8 +291,61 @@ function editionText(originalText, edition) {
 }
 
 /**
+ * The file one edition entry ships (a page or the cover): lettered_file when
+ * set, else file. Checks that it is the listed render's own file, reads it,
+ * and looks up the render's review. Reports through `error` and returns null
+ * when the file cannot ship.
+ * @returns {{relFile:string, file:string, data:Buffer, info:object, verdict:string, passes:boolean}|null}
+ */
+function shippedFile(root, label, renderId, entry, error, warn) {
+  const lettered = entry.lettered_file ? String(entry.lettered_file) : null;
+  const relFile = (lettered || String(entry.file)).replace(/\\/g, '/');
+  const file = path.resolve(ws.abs(root, relFile));
+  const baseName = path.basename(relFile);
+  const stem = baseName.slice(0, baseName.length - path.extname(baseName).length);
+  if (!isInside(root, file)) {
+    error('file-outside', `${label}: ${relFile} points outside the workspace`, { page: label });
+    return null;
+  }
+  if (lettered ? !baseName.startsWith(renderId) : stem !== renderId) {
+    error('file-render', `${label}: ${relFile} is not the file of render ${renderId}; the review covers the render, so the two must match`, { page: label });
+    return null;
+  }
+  if (/\.svg$/i.test(relFile)) {
+    error('file-svg', `${label}: ${relFile} is an SVG overlay; export it to PNG or JPEG (browser or vector tool) and list that image as lettered_file`, { page: label });
+    return null;
+  }
+  if (!fs.existsSync(file) || !fs.statSync(file).isFile()) {
+    error('file-missing', `${label}: image not found: ${relFile}`, { page: label });
+    return null;
+  }
+  let info;
+  let data;
+  try {
+    data = fs.readFileSync(file);
+    info = imageInfo(data);
+  } catch (err) {
+    error('file-unreadable', `${label}: ${relFile}: ${err.message}`, { page: label });
+    return null;
+  }
+
+  let review = null;
+  try {
+    review = ws.loadReview(root, renderId);
+  } catch (err) {
+    error('yaml', err.message, { page: label });
+  }
+  if (review && review.render && review.render !== renderId) {
+    warn('review-render', `${label}: the review file of ${renderId} says it reviews ${review.render}`, { page: label });
+  }
+  const verdict = review ? String(review.verdict || 'no verdict') : 'no review';
+  return { relFile, file, data, info, verdict, passes: ws.reviewPasses(review) };
+}
+
+/**
  * Check an edition against the edition rules and collect what is needed to
- * export it. Writes nothing.
+ * export it: the pages in order, with the cover first when the edition
+ * names one (its entry carries `cover: true`). Writes nothing.
  */
 function inspectEdition(root, edition, project, options, result) {
   const error = (code, message, more) => result.errors.push({ code, message, ...(more || {}) });
@@ -335,58 +408,30 @@ function inspectEdition(root, edition, project, options, result) {
       error('render-id', `${pageId}: render "${renderId}" is not a render of this page`, { page: pageId });
       return;
     }
-
-    // The file that ships: lettered_file when set, else file.
-    const lettered = entry.lettered_file ? String(entry.lettered_file) : null;
-    const relFile = (lettered || String(entry.file)).replace(/\\/g, '/');
-    const file = path.resolve(ws.abs(root, relFile));
-    const baseName = path.basename(relFile);
-    const stem = baseName.slice(0, baseName.length - path.extname(baseName).length);
-    if (!isInside(root, file)) {
-      error('file-outside', `${pageId}: ${relFile} points outside the workspace`, { page: pageId });
-      return;
-    }
-    if (lettered ? !baseName.startsWith(renderId) : stem !== renderId) {
-      error('file-render', `${pageId}: ${relFile} is not the file of render ${renderId}; the review covers the render, so the two must match`, { page: pageId });
-      return;
-    }
-    if (/\.svg$/i.test(relFile)) {
-      error('file-svg', `${pageId}: ${relFile} is an SVG overlay; export it to PNG or JPEG (browser or vector tool) and list that image as lettered_file`, { page: pageId });
-      return;
-    }
-    if (!fs.existsSync(file) || !fs.statSync(file).isFile()) {
-      error('file-missing', `${pageId}: image not found: ${relFile}`, { page: pageId });
-      return;
-    }
-    let info;
-    let data;
-    try {
-      data = fs.readFileSync(file);
-      info = imageInfo(data);
-    } catch (err) {
-      error('file-unreadable', `${pageId}: ${relFile}: ${err.message}`, { page: pageId });
-      return;
-    }
-
-    let review = null;
-    try {
-      review = ws.loadReview(root, renderId);
-    } catch (err) {
-      error('yaml', err.message, { page: pageId });
-    }
-    if (review && review.render && review.render !== renderId) {
-      warn('review-render', `${pageId}: the review file of ${renderId} says it reviews ${review.render}`, { page: pageId });
-    }
-    const verdict = review ? String(review.verdict || 'no verdict') : 'no review';
-    pages.push({
-      page: pageId, render: renderId, number, relFile, file, data, info,
-      verdict, passes: ws.reviewPasses(review),
-    });
+    const shipped = shippedFile(root, pageId, renderId, entry, error, warn);
+    if (shipped) pages.push(Object.assign({ page: pageId, render: renderId, number, side: pageDoc && pageDoc.side }, shipped));
   });
 
+  // The cover, when the edition names one: the first page of every export.
+  let cover = null;
+  if (edition.cover !== null && edition.cover !== undefined) {
+    const entry = edition.cover;
+    const coverId = ws.coverIdOfIssue(edition.issue);
+    if (!entry || typeof entry !== 'object' || !entry.render || !entry.file) {
+      error('cover-entry', 'cover: needs "render" and "file"');
+    } else if (!coverId || ws.coverOfRender(String(entry.render)) !== coverId) {
+      error('render-id', `cover: render "${entry.render}" is not a cover render of ${edition.issue} (expected ${coverId || 'CV_###'}_V##)`, { page: coverId });
+    } else {
+      const shipped = shippedFile(root, coverId, String(entry.render), entry, error, warn);
+      if (shipped) cover = Object.assign({ page: coverId, render: String(entry.render), cover: true }, shipped);
+    }
+  }
+  // Everything that ships, in export order.
+  const sheets = cover ? [cover, ...pages] : pages;
+
   // Review gate.
-  const failing = pages.filter((p) => !p.passes);
-  result.gate = pages.map((p) => ({ page: p.page, render: p.render, verdict: p.verdict, passes: p.passes }));
+  const failing = sheets.filter((p) => !p.passes);
+  result.gate = sheets.map((p) => ({ page: p.page, render: p.render, verdict: p.verdict, passes: p.passes }));
   if (failing.length) {
     const lines = failing.map((p) => `    ${p.page}  ${p.render}  ${p.verdict}`).join('\n');
     if (options.draft) {
@@ -410,8 +455,9 @@ function inspectEdition(root, edition, project, options, result) {
     warn('page-count', `${edition.issue} declares ${issue.page_count} page${issue.page_count === 1 ? '' : 's'}, the edition lists ${listed.length}`);
   }
 
-  // One aspect ratio (paged), or one width (webtoon).
-  if (pages.length > 1) {
+  // One aspect ratio (paged, the cover included), or one width (webtoon:
+  // the cover of an episode is not a scroll segment, so it is left out).
+  if (pages.length && sheets.length > 1) {
     if (project.comic_format === 'webtoon') {
       const widths = [...new Set(pages.map((p) => p.info.width))];
       if (widths.length > 1) warn('width', `scroll segments have different widths (${widths.join(', ')} px); the reader scales them to one column`);
@@ -419,7 +465,7 @@ function inspectEdition(root, edition, project, options, result) {
       const ratios = pages.map((p) => p.info.width / p.info.height).sort((a, b) => a - b);
       const common = ratios[Math.floor(ratios.length / 2)];
       const reference = pages.find((p) => p.info.width / p.info.height === common);
-      for (const p of pages) {
+      for (const p of sheets) {
         const diff = Math.abs(p.info.width / p.info.height - common) / common;
         if (diff <= ASPECT_SAME) continue;
         const text = `${p.page} is ${p.info.width}x${p.info.height}, which is ${(diff * 100).toFixed(1)}% off the edition's page shape (${reference.info.width}x${reference.info.height} on ${reference.page})`;
@@ -438,7 +484,7 @@ function inspectEdition(root, edition, project, options, result) {
       warn('aspect-project', `pages are ${first.info.width}x${first.info.height}, project.yaml declares ${project.page.aspect_ratio}`);
     }
   }
-  return pages;
+  return sheets;
 }
 
 /**
@@ -446,14 +492,16 @@ function inspectEdition(root, edition, project, options, result) {
  *
  * @param {string} editionFile  Path to edition.yaml.
  * @param {object} [options]
- * @param {string|string[]} [options.formats]  "pdf,cbz,web" or an array.
+ * @param {string|string[]} [options.formats]  "pdf,cbz,web,images,epub" or an array.
  * @param {boolean} [options.draft]
  * @param {boolean} [options.force]
  * @param {Date} [options.now]  Build time (tests pass a fixed date).
  * @returns {{ok:boolean, errors:Array, warnings:Array, draft:boolean,
  *   formats:string[], written:Array<{format,file}>, skipped:Array<{format,file,reason}>,
  *   shipped:Array<{page,render,verdict}>, gate:Array, root:string|null, edition:string|null}}
- *   File paths in `written` and `skipped` are workspace-relative.
+ *   File paths in `written` and `skipped` are workspace-relative. When the
+ *   edition has a cover it is the first entry of `shipped` and `gate`, with
+ *   the cover ID as its `page`.
  */
 function buildEdition(editionFile, options = {}) {
   const result = {
@@ -509,9 +557,9 @@ function buildEdition(editionFile, options = {}) {
     return result;
   }
 
-  const pages = inspectEdition(root, edition, project, options, result);
+  const inspected = inspectEdition(root, edition, project, options, result);
   if (formats.includes('pdf')) {
-    for (const p of pages.filter((x) => x.info.format === 'webp')) {
+    for (const p of inspected.filter((x) => x.info.format === 'webp')) {
       error('pdf-webp', `${p.page}: ${p.relFile} is a WebP image, which the PDF export cannot embed; convert the page to PNG or JPEG, or leave pdf out of --formats`);
     }
   }
@@ -523,8 +571,15 @@ function buildEdition(editionFile, options = {}) {
   const baseName = `${slugify(project.title || edition.title)}-${issueNumber}-ed${editionNumber}${options.draft ? '-DRAFT' : ''}`;
   const exportsDir = path.join(path.dirname(file), 'exports');
   const now = options.now instanceof Date ? options.now : new Date();
-  const digits = Math.max(3, String(pages.length).length);
-  const pageName = (index, info) => `${String(index + 1).padStart(digits, '0')}.${info.ext}`;
+  // Pages are numbered from 001; the cover, when there is one, sorts before
+  // them as 000-cover.
+  const digits = Math.max(3, String(inspected.filter((p) => !p.cover).length).length);
+  let pageCount = 0;
+  const pages = inspected.map((p) => {
+    if (p.cover) return Object.assign({}, p, { name: `${'0'.repeat(digits)}-cover.${p.info.ext}`, label: 'Cover' });
+    pageCount++;
+    return Object.assign({}, p, { name: `${String(pageCount).padStart(digits, '0')}.${p.info.ext}`, label: `Page ${pageCount}` });
+  });
 
   let issue = null;
   try {
@@ -542,71 +597,140 @@ function buildEdition(editionFile, options = {}) {
       : `DRAFT: ${unreviewed} of ${pages.length} page${pages.length === 1 ? '' : 's'} ${unreviewed === 1 ? 'has' : 'have'} no passing review`;
   }
 
-  const builders = {
+  // Each format: the path it is built at, the path recorded in edition.yaml,
+  // every path that must be free before it is built, and how to write it.
+  const targets = {
     pdf() {
-      const trim = project.page && project.page.trim_mm;
-      return buildPdf(pages.map((p) => ({ data: p.data, name: `${p.page} (${p.relFile})` })), {
-        title: displayTitle,
-        draft: !!options.draft,
-        pageSizeMm: trim && trim.width > 0 && trim.height > 0 && project.comic_format !== 'webtoon' ? trim : undefined,
-        readingDirection: project.reading_direction,
-        language: project.language,
-        creationDate: now,
-      });
+      const target = path.join(exportsDir, `${baseName}.pdf`);
+      return {
+        recorded: target,
+        occupies: [target],
+        write() {
+          const trim = project.page && project.page.trim_mm;
+          writeFileEnsuring(target, buildPdf(pages.map((p) => ({ data: p.data, name: `${p.page} (${p.relFile})` })), {
+            title: displayTitle,
+            draft: !!options.draft,
+            pageSizeMm: trim && trim.width > 0 && trim.height > 0 && project.comic_format !== 'webtoon' ? trim : undefined,
+            readingDirection: project.reading_direction,
+            language: project.language,
+            creationDate: now,
+          }));
+        },
+      };
     },
     cbz() {
-      const entries = pages.map((p, i) => ({ name: pageName(i, p.info), data: p.data }));
-      const notes = draftNote
-        ? `${edition.id} ${draftNote}`
-        : (edition.label ? `${edition.id}, ${edition.label}` : String(edition.id));
-      entries.push({
-        name: 'ComicInfo.xml',
-        compress: true,
-        data: comicInfoXml({
-          title: (issue && issue.title) || displayTitle,
-          series: project.title || displayTitle,
-          number: issue && issue.number != null ? issue.number : Number(issueNumber),
-          summary: issue && issue.summary,
-          notes,
-          genre: project.genre,
-          language: project.language,
-          blackAndWhite: project.color_mode === 'monochrome' ? 'Yes' : (project.color_mode ? 'No' : null),
-          readingDirection: project.reading_direction,
-          pages: pages.map((p) => ({ size: p.data.length, width: p.info.width, height: p.info.height })),
-        }),
-      });
-      return createZip(entries);
+      const target = path.join(exportsDir, `${baseName}.cbz`);
+      return {
+        recorded: target,
+        occupies: [target],
+        write() {
+          const entries = pages.map((p) => ({ name: p.name, data: p.data }));
+          const notes = draftNote
+            ? `${edition.id} ${draftNote}`
+            : (edition.label ? `${edition.id}, ${edition.label}` : String(edition.id));
+          entries.push({
+            name: 'ComicInfo.xml',
+            compress: true,
+            data: comicInfoXml({
+              title: (issue && issue.title) || displayTitle,
+              series: project.title || displayTitle,
+              number: issue && issue.number != null ? issue.number : Number(issueNumber),
+              summary: issue && issue.summary,
+              notes,
+              genre: project.genre,
+              language: project.language,
+              blackAndWhite: project.color_mode === 'monochrome' ? 'Yes' : (project.color_mode ? 'No' : null),
+              readingDirection: project.reading_direction,
+              pages: pages.map((p) => ({
+                size: p.data.length, width: p.info.width, height: p.info.height, type: p.cover ? 'FrontCover' : null,
+              })),
+            }),
+          });
+          writeFileEnsuring(target, createZip(entries));
+        },
+      };
+    },
+    web() {
+      const target = path.join(exportsDir, `${baseName}-web`);
+      return {
+        recorded: path.join(target, 'index.html'),
+        occupies: [target],
+        write() {
+          for (const p of pages) writeFileEnsuring(path.join(target, 'pages', p.name), p.data);
+          writeFileEnsuring(path.join(target, 'index.html'), webReaderHtml({
+            title: displayTitle,
+            language: project.language,
+            readingDirection: project.reading_direction,
+            comicFormat: project.comic_format,
+            draft: !!options.draft,
+            draftNote,
+            pages: pages.map((p) => ({
+              src: `pages/${p.name}`, width: p.info.width, height: p.info.height, label: p.label,
+            })),
+          }));
+        },
+      };
+    },
+    // One numbered image per page, as a folder and as a zip of the same files.
+    images() {
+      const dir = path.join(exportsDir, `${baseName}-images`);
+      const zip = path.join(exportsDir, `${baseName}-images.zip`);
+      return {
+        recorded: zip,
+        occupies: [zip, dir],
+        write() {
+          for (const p of pages) writeFileEnsuring(path.join(dir, p.name), p.data);
+          writeFileEnsuring(zip, createZip(pages.map((p) => ({ name: p.name, data: p.data }))));
+        },
+      };
+    },
+    epub() {
+      const target = path.join(exportsDir, `${baseName}.epub`);
+      return {
+        recorded: target,
+        occupies: [target],
+        write() {
+          writeFileEnsuring(target, buildEpub(pages.map((p) => ({
+            name: p.name,
+            data: p.data,
+            width: p.info.width,
+            height: p.info.height,
+            mime: p.info.mime,
+            label: p.label,
+            cover: !!p.cover,
+            side: p.side,
+          })), {
+            title: `${displayTitle}${options.draft ? ' (DRAFT)' : ''}`,
+            // Stable per edition and build kind, so a rebuilt file is the same publication.
+            identifier: uuidFrom(`${slugify(project.title || edition.title)}:${edition.id}${options.draft ? ':draft' : ''}`),
+            language: project.language,
+            readingDirection: project.reading_direction,
+            comicFormat: project.comic_format,
+            modified: now,
+            description: draftNote ? `${edition.id} ${draftNote}` : ((issue && issue.summary) || null),
+            draftNote,
+          }));
+        },
+      };
     },
   };
 
   for (const format of formats) {
-    const target = format === 'web'
-      ? path.join(exportsDir, `${baseName}-web`)
-      : path.join(exportsDir, `${baseName}.${format}`);
-    const recorded = ws.rel(root, format === 'web' ? path.join(target, 'index.html') : target);
-    if (fs.existsSync(target)) {
+    const target = targets[format]();
+    const recorded = ws.rel(root, target.recorded);
+    const taken = target.occupies.filter((p) => fs.existsSync(p));
+    if (taken.length) {
       if (!options.force) {
         result.skipped.push({ format, file: recorded, reason: 'exists' });
         continue;
       }
-      if (format === 'web') fs.rmSync(target, { recursive: true, force: true });
+      // A forced directory export starts from an empty directory.
+      for (const p of taken) {
+        if (fs.statSync(p).isDirectory()) fs.rmSync(p, { recursive: true, force: true });
+      }
     }
     try {
-      if (format === 'web') {
-        const entries = pages.map((p, i) => ({ name: pageName(i, p.info), page: p }));
-        for (const entry of entries) writeFileEnsuring(path.join(target, 'pages', entry.name), entry.page.data);
-        writeFileEnsuring(path.join(target, 'index.html'), webReaderHtml({
-          title: displayTitle,
-          language: project.language,
-          readingDirection: project.reading_direction,
-          comicFormat: project.comic_format,
-          draft: !!options.draft,
-          draftNote,
-          pages: entries.map((e) => ({ src: `pages/${e.name}`, width: e.page.info.width, height: e.page.info.height })),
-        }));
-      } else {
-        writeFileEnsuring(target, builders[format]());
-      }
+      target.write();
     } catch (err) {
       error('export', `${format}: ${err.message}`);
       continue;
@@ -640,6 +764,155 @@ function buildEdition(editionFile, options = {}) {
   result.shipped = pages.map((p) => ({ page: p.page, render: p.render, verdict: p.verdict }));
   result.ok = result.errors.length === 0;
   return result;
+}
+
+const ORDINALS = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'];
+
+/** "PG_001_002_V02" -> "V02". */
+function versionTag(renderId) {
+  const m = /_(V\d{2})$/.exec(String(renderId));
+  return m ? m[1] : String(renderId);
+}
+
+/** The lettered image stored next to a render (<RENDER_ID>.lettered.png or .jpg), workspace-relative, or null. */
+function letteredFileOf(root, renderFile, renderId) {
+  for (const ext of ['.png', '.jpg', '.jpeg']) {
+    const candidate = path.join(path.dirname(renderFile), `${renderId}.lettered${ext}`);
+    if (fs.existsSync(candidate)) return ws.rel(root, candidate);
+  }
+  return null;
+}
+
+/**
+ * Compose an edition from the current state of an issue. Writes nothing.
+ *
+ * The edition takes the next free ID of the issue (one above the highest
+ * edition directory), status draft, every page of the issue that has a
+ * current render, in page order, and the cover when cover.yaml is approved.
+ * A lettered image stored next to a render (letter-pages.js
+ * registerLetteredFile) is listed as its lettered_file. When the issue
+ * already has an edition, the new one supersedes the latest and `changes`
+ * says which renders differ.
+ *
+ * The returned object is a plain edition document: it serializes to a file
+ * that follows schemas/edition.schema.json. It also carries `blockers`, a
+ * non-enumerable array (so it never reaches the YAML) of what keeps this
+ * edition from being final: [{ page, render, code, message }], with code
+ * no_render, render_missing, no_review, or not_passing. `page` is the cover
+ * ID for the cover. An edition with blockers builds only with --draft; a
+ * page with no render at all is left out of `pages`, which leaves a gap
+ * that even a draft build refuses.
+ *
+ * @param {{root: string, issue: string, now?: Date}} options
+ * @returns {object} the edition document, plus the non-enumerable `blockers`
+ * @throws an Error with `code` when the issue does not exist
+ */
+function draftEdition(options = {}) {
+  const root = options.root;
+  const issueId = String(options.issue || '');
+  const fail = (code, message) => Object.assign(new Error(message), { code });
+  if (!root || !ws.ID.issue.test(issueId)) {
+    throw fail('bad_arguments', `draftEdition needs { root, issue: "ISS_###" }, got issue "${options.issue}"`);
+  }
+  const issue = ws.loadIssue(root, issueId);
+  if (!issue) throw fail('issue_missing', `${issueId}: issues/${issueId}/issue.yaml not found`);
+  const project = ws.loadProject(root) || {};
+  const blockers = [];
+  const block = (page, render, code, message) => blockers.push({ page, render, code, message });
+  /** Record why a listed render cannot enter a final edition, if it cannot. */
+  const gate = (label, renderId) => {
+    const review = ws.loadReview(root, renderId);
+    if (ws.reviewPasses(review)) return;
+    if (!review) block(label, renderId, 'no_review', `${renderId} has no review; a final edition needs verdict pass or fixed`);
+    else block(label, renderId, 'not_passing', `the review of ${renderId} has verdict ${review.verdict || 'none'}; a final edition needs pass or fixed`);
+  };
+
+  const pages = [];
+  for (const entry of ws.listPages(root, issueId)) {
+    const renderId = entry.doc && entry.doc.current_render ? String(entry.doc.current_render) : null;
+    if (!renderId) {
+      block(entry.id, null, 'no_render', `${entry.id} has no current render`);
+      continue;
+    }
+    const file = ws.pageOfRender(renderId) === entry.id ? ws.renderFile(root, renderId) : null;
+    if (!file) {
+      block(entry.id, renderId, 'render_missing', `${entry.id} names ${renderId} as its current render and no such image is on disk`);
+      continue;
+    }
+    pages.push({
+      page: entry.id,
+      render: renderId,
+      file: ws.rel(root, file),
+      lettered_file: letteredFileOf(root, file, renderId),
+    });
+    gate(entry.id, renderId);
+  }
+  if (!pages.length && !blockers.length) block(null, null, 'no_render', `${issueId} has no pages`);
+
+  // The cover enters only once it is approved.
+  let cover = null;
+  const coverDoc = ws.loadCover(root, issueId);
+  if (coverDoc && coverDoc.status === 'approved' && coverDoc.approved_render) {
+    const renderId = String(coverDoc.approved_render);
+    const coverId = ws.coverIdOfIssue(issueId);
+    const file = ws.coverOfRender(renderId) === coverId ? ws.renderFile(root, renderId) : null;
+    if (!file) {
+      block(coverId, renderId, 'render_missing', `cover.yaml approves ${renderId} and no such image is on disk`);
+    } else {
+      cover = { render: renderId, file: ws.rel(root, file), lettered_file: letteredFileOf(root, file, renderId) };
+      gate(coverId, renderId);
+    }
+  }
+
+  // Next free ID: one above the highest edition directory of this issue.
+  const prefix = `ED_${issueId.slice(4)}_`;
+  const earlier = ws.listEditions(root).filter((id) => id.startsWith(prefix));
+  const highest = earlier.reduce((max, id) => Math.max(max, Number(id.slice(prefix.length))), 0);
+  if (highest >= 99) throw fail('edition_ids_exhausted', `${issueId} already has 99 editions`);
+  const number = highest + 1;
+  const supersedes = earlier.length ? earlier[earlier.length - 1] : null;
+
+  // What changed since the edition this one replaces.
+  const changes = [];
+  let previous = null;
+  try {
+    previous = supersedes ? ws.loadEdition(root, supersedes) : null;
+  } catch (err) {
+    previous = null;
+  }
+  if (previous) {
+    const before = new Map((Array.isArray(previous.pages) ? previous.pages : [])
+      .filter((p) => p && p.page).map((p) => [p.page, p]));
+    for (const p of pages) {
+      const old = before.get(p.page);
+      if (!old) changes.push(`${p.page} added with ${versionTag(p.render)}`);
+      else if (old.render !== p.render) changes.push(`${p.page} uses ${versionTag(p.render)} instead of ${versionTag(old.render)}`);
+      else if ((old.lettered_file || null) !== p.lettered_file) changes.push(`${p.page} ships ${p.lettered_file ? 'its lettered file' : 'the unlettered render'}`);
+    }
+    for (const id of before.keys()) {
+      if (!pages.some((p) => p.page === id)) changes.push(`${id} removed`);
+    }
+    const oldCover = previous.cover && previous.cover.render ? previous.cover.render : null;
+    if (cover && !oldCover) changes.push(`cover added with ${versionTag(cover.render)}`);
+    else if (cover && oldCover !== cover.render) changes.push(`cover uses ${versionTag(cover.render)} instead of ${versionTag(oldCover)}`);
+    else if (!cover && oldCover) changes.push('cover removed');
+  }
+
+  const edition = {
+    id: `${prefix}${String(number).padStart(2, '0')}`,
+    issue: issueId,
+    title: issue.title && project.title ? `${project.title} - ${issue.title}` : String(project.title || issue.title || issueId),
+    label: `${ORDINALS[number - 1] || `${number}th`} edition`,
+    status: 'draft',
+    supersedes,
+    changes,
+  };
+  if (cover) edition.cover = cover;
+  edition.pages = pages;
+  edition.exports = [];
+  edition.created_at = (options.now instanceof Date ? options.now : new Date()).toISOString().slice(0, 10);
+  Object.defineProperty(edition, 'blockers', { value: blockers, enumerable: false });
+  return edition;
 }
 
 function main() {
@@ -676,7 +949,9 @@ function main() {
   console.log(`build-edition: ${result.edition}${result.draft ? ' DRAFT' : ''}, ${what}. Renders shipped and their review verdicts: ${shipped}`);
 }
 
-module.exports = { buildEdition, resolveFormats, editionText, comicInfoXml, webReaderHtml, slugify, FORMATS };
+module.exports = {
+  buildEdition, draftEdition, resolveFormats, editionText, comicInfoXml, webReaderHtml, slugify, FORMATS,
+};
 
 if (require.main === module) {
   try {

@@ -16,12 +16,13 @@ function asSortedSet(list) {
 
 // counts declared in conventions.md headers
 assert.strictEqual(rosters.counts.agents, 16);
-assert.strictEqual(rosters.counts.commands, 26);
+assert.strictEqual(rosters.counts.commands, 27);
 assert.strictEqual(rosters.counts.skills, 29);
-assert.strictEqual(rosters.counts.providers, 6);
+assert.strictEqual(rosters.counts.providers, 7);
 assert.strictEqual(rosters.counts.rules, 35);
 assert.strictEqual(rosters.agents.length, 16, `parsed ${rosters.agents.length} agent names`);
-assert.strictEqual(rosters.commands.length, 26);
+assert.strictEqual(rosters.commands.length, 27);
+assert.ok(rosters.commands.includes('cover'));
 assert.strictEqual(rosters.skills.length, 29);
 
 // every roster lists as many names as its header declares
@@ -32,10 +33,12 @@ for (const key of ['contexts', 'schemas', 'profiles', 'manifests', 'scripts', 'h
 }
 assert.deepStrictEqual(rosters.contexts, ['development', 'preproduction', 'production', 'publishing', 'review']);
 assert.deepStrictEqual(rosters.profiles, ['full', 'writing-room', 'layout', 'generation', 'publishing']);
-assert.strictEqual(rosters.schemas.length, 18);
+assert.strictEqual(rosters.schemas.length, 19);
 assert.ok(rosters.schemas.includes('visual-review') && rosters.schemas.includes('edition'));
-assert.strictEqual(rosters.scripts.length, 13);
+assert.ok(rosters.schemas.includes('cover'));
+assert.strictEqual(rosters.scripts.length, 14);
 assert.ok(rosters.scripts.includes('build-edition.js') && rosters.scripts.includes('letter-pages.js'));
+assert.ok(rosters.scripts.includes('approve-asset.js'));
 assert.deepStrictEqual(rosters.hooks, ['validate-after-write.js', 'protect-approved-assets.js',
   'detect-continuity-drift.js', 'require-cost-confirmation.js']);
 assert.deepStrictEqual(asSortedSet(rosters.manifests), asSortedSet(MANIFEST_FILES),
@@ -61,7 +64,7 @@ assert.deepStrictEqual(PROVIDER_KINDS, ['image']);
 assert.deepStrictEqual(Object.keys(rosters.providers), ['image']);
 assert.strictEqual(rosters.providers.image.length, rosters.counts.providers);
 assert.deepStrictEqual(rosters.providers.image,
-  ['fal', 'replicate', 'comfyui', 'gemini', 'harness-native', 'manual']);
+  ['fal', 'replicate', 'comfyui', 'gemini', 'harness-native', 'codex-cli', 'manual']);
 assert.deepStrictEqual(
   asSortedSet(manifests['image-providers.json'].providers.map((p) => p.id)),
   asSortedSet(rosters.providers.image),

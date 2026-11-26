@@ -39,10 +39,10 @@ style:                                 # global anchors. The detail lives in sty
   notes: ""
 
 default_providers:
-  image: harness-native                # fal | replicate | comfyui | gemini | harness-native | manual
+  image: harness-native                # fal | replicate | comfyui | gemini | harness-native | codex-cli | manual
 
 deliverables:
-  - target: pdf                        # pdf | cbz | web | social-carousel | print
+  - target: pdf                        # pdf | cbz | web | images | epub | social-carousel | print
     notes: Reading copy.
 
 content:

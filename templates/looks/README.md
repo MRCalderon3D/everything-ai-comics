@@ -14,11 +14,13 @@ plain YAML: maps, lists, strings, and one block scalar for the style block.
 2. Run `/style-bible`. It fills `style/style-bible.md` from the preset's
    `line`, `inking`, `tone`, `rendering`, and `lettering_style` fields and
    checks that `color_mode` agrees with `project.yaml`.
-3. Run `/visual-development` to generate a look page from the block. When a
-   candidate is approved, register it in `references/manifest.yaml` as your
-   look master (for example `LOOK_NOIR_INK_MASTER_V01`), list it under
-   `style.look_refs` in `project.yaml`, and attach it to every request with
-   the role `style`.
+3. Run `/visual-development` to generate a look page from the block. When
+   you approve a candidate, run
+   `node scripts/approve-asset.js --candidate <LOOK_ID>_V## --root production`.
+   It registers the file in `references/manifest.yaml` as your look master
+   (for example `LOOK_NOIR_INK_MASTER_V01`) and lists it under
+   `style.look_refs` in `project.yaml`. From then on it is attached to every
+   request with the role `style`.
 
 A preset is a draft. The approved look of a production is the frozen block
 plus the approved look master image, and both live in the workspace.

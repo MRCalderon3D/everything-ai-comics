@@ -32,7 +32,7 @@ const agentNames = agents.map((a) => a.name);
 // commands.json
 const commands = manifests['commands.json'].commands;
 assert.strictEqual(manifests['commands.json'].version, 1);
-assert.strictEqual(commands.length, 26, `expected 26 commands, got ${commands.length}`);
+assert.strictEqual(commands.length, 27, `expected 27 commands, got ${commands.length}`);
 for (const c of commands) {
   assert.ok(c.name && c.file && c.description, `command entry incomplete: ${c.name}`);
   assert.strictEqual(c.file, `commands/${c.name}.md`);
@@ -96,14 +96,14 @@ assert.deepStrictEqual(rules.layers.find((l) => l.name === 'webtoon').rules, ['s
 // image providers (the only provider kind)
 const img = manifests['image-providers.json'].providers;
 assert.deepStrictEqual(img.map((p) => p.id).sort(),
-  ['comfyui', 'fal', 'gemini', 'harness-native', 'manual', 'replicate']);
+  ['codex-cli', 'comfyui', 'fal', 'gemini', 'harness-native', 'manual', 'replicate']);
 for (const p of img) {
   assert.ok(p.file && typeof p.label === 'string' && Array.isArray(p.env) &&
     p.capabilities && typeof p.capabilities === 'object',
     `provider entry incomplete: ${p.id}`);
   assert.strictEqual(p.file, `providers/image/${p.id}.js`);
 }
-for (const id of ['harness-native', 'manual']) {
+for (const id of ['harness-native', 'codex-cli', 'manual']) {
   assert.deepStrictEqual(img.find((p) => p.id === id).env, [], `${id} needs no env var`);
 }
 for (const name of ['audio-providers.json', 'video-providers.json']) {

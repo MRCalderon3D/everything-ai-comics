@@ -22,6 +22,7 @@
     "build:reference-plan": "node scripts/build-reference-plan.js",
     "compile:prompts": "node scripts/compile-prompts.js",
     "generate:assets": "node scripts/generate-assets.js",
+    "approve:asset": "node scripts/approve-asset.js",
     "letter": "node scripts/letter-pages.js",
     "build:edition": "node scripts/build-edition.js",
     "board": "node scripts/build-board.js"

@@ -14,9 +14,13 @@ const common = require('../providers/lib/common');
 const schemaLib = require('../scripts/lib/schema');
 
 const ROOT = path.resolve(__dirname, '..');
-const ROSTER = ['fal', 'replicate', 'comfyui', 'gemini', 'harness-native', 'manual'];
+const ROSTER = ['fal', 'replicate', 'comfyui', 'gemini', 'harness-native', 'codex-cli', 'manual'];
 const PAGE_RATIOS = ['2:3', '3:4', '9:16', '1:1'];
 const HANDOFF = ['harness-native', 'manual'];
+// Providers that cannot name the image model before the tool reports it:
+// the handoffs, and codex-cli, where Codex's own image tool picks it.
+const MODEL_UNREPORTED = HANDOFF.concat('codex-cli');
+const NO_ENV = HANDOFF.concat('codex-cli');
 
 function schema(name) {
   const file = path.join(ROOT, 'schemas', `${name}.schema.json`);
@@ -84,7 +88,7 @@ async function checkProvider(entry, network) {
   for (const ratio of PAGE_RATIOS) {
     assert.ok(caps.aspectRatios.includes(ratio), `${where}: comic page ratio ${ratio} must be supported`);
   }
-  if (HANDOFF.includes(mod.id)) assert.deepStrictEqual(mod.env, [], `${where}: handoff providers need no env`);
+  if (NO_ENV.includes(mod.id)) assert.deepStrictEqual(mod.env, [], `${where}: handoff and CLI providers need no env`);
 
   // compile(): pure, request spec shape, scope carried in meta
   const pkg = samplePackage(mod);
@@ -179,8 +183,8 @@ async function checkProvider(entry, network) {
   assert.deepStrictEqual(record.cost, { currency: 'USD', amount: null, estimated: false, reported: false },
     `${where}: cost must be unreported, not invented`);
   assert.strictEqual(record.seed, null, `${where}: seed must be null when none is pinned`);
-  if (HANDOFF.includes(mod.id)) {
-    assert.strictEqual(record.model, 'unreported', `${where}: a handoff cannot know the model`);
+  if (MODEL_UNREPORTED.includes(mod.id)) {
+    assert.strictEqual(record.model, 'unreported', `${where}: the model is unknown until the tool reports it`);
     assert.deepStrictEqual(record.metadata_unavailable, ['model', 'cost', 'seed']);
     assert.strictEqual(record.request.endpoint, null);
   } else {

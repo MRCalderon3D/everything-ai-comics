@@ -24,9 +24,13 @@ issue, and an edition lists the exact render of every page and exports it.
   `lettering` check of the review.
 - The issue-wide continuity pass: page boundaries, the `enters_from` and
   `exits_to` chain, and the state the next issue opens from (`opens_from`).
+- The cover, when the issue has one: planned in `cover/cover.yaml`,
+  generated and reviewed like a page, and approved by the user before an
+  edition lists it.
 - Edition assembly from reviewed renders only. `scripts/build-edition.js`
   refuses a render without a `pass` or `fixed` review unless `--draft` is
-  given, and a draft export is labelled as a draft.
+  given, and a draft export is labelled as a draft. It exports PDF, CBZ, a
+  web reader, numbered images, and EPUB, with the cover first.
 - New editions for corrections: the next `ED_<issue>_##`, with `supersedes`
   and `changes` filled in.
 
@@ -42,7 +46,7 @@ issue, and an edition lists the exact render of every page and exports it.
 
 ## Typically active
 
-- Commands: `/lettering`, `/continuity-review`, `/build-edition`.
+- Commands: `/lettering`, `/cover`, `/continuity-review`, `/build-edition`.
 - Agents: letterer, visual-reviewer, continuity-editor, prepress-specialist,
   production-qa, editor-in-chief for the sign-off.
 - Rule layers: `common/` (approval-policy, asset-provenance,

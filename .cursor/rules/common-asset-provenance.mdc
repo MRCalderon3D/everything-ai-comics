@@ -61,7 +61,8 @@ exists. Deleting a request file or a referenced image orphans the record.
 ## Unavailable metadata
 
 Some tools return an image and nothing else. `harness-native` and `manual`
-usually report neither model, nor cost, nor seed.
+usually report neither model, nor cost, nor seed. `codex-cli` reports the
+image model only when Codex names it, and never a cost or a seed.
 
 - An unreported model is recorded as `model: unreported`.
 - An unreported cost is `cost.amount: null` with `reported: false`. An
@@ -84,6 +85,10 @@ usually report neither model, nor cost, nor seed.
   and which decision it controls: identity, style, or costume.
 - An approved entry carries `approved_by` and `approved_at`. A replaced entry
   stays in the registry with `status: superseded`.
+- `scripts/approve-asset.js` writes the entry of a master promoted from a
+  candidate. It adds `promoted_from` (the candidate) and `generation_record`
+  (the run that produced it, or `null` when no record is on file), and
+  `superseded_by` on an entry it replaces.
 
 ## Lineage rules
 

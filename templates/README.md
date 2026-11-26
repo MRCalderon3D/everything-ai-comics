@@ -33,6 +33,7 @@ For a filled-in workspace, read [examples/the-night-ferry/](../examples/the-nigh
 | `page/lettering.yaml` | `production/issues/<ISS_ID>/pages/<PG_ID>/lettering.yaml` | `lettering` |
 | `page/reference-plan.yaml` | `production/issues/<ISS_ID>/pages/<PG_ID>/reference-plan.yaml` | `reference-plan` |
 | `review/visual-review.yaml` | `production/issues/<ISS_ID>/pages/<PG_ID>/reviews/<RENDER_ID>.review.yaml` | `visual-review` |
+| `cover/cover.yaml` | `production/issues/<ISS_ID>/cover/cover.yaml` | `cover` |
 | `continuity/final-state.yaml` | `production/continuity/<ISS_ID>.final-state.yaml` | `continuity-state` |
 | `edition/edition.yaml` | `production/editions/<ED_ID>/edition.yaml` | `edition` |
 | `references/manifest.yaml` | `production/references/manifest.yaml` | none (read by scripts) |
@@ -76,9 +77,20 @@ own.
 - `review/visual-review.yaml` is a first review with one open blocking
   finding, so its verdict is `flagged`. A `pass` review has an empty
   `findings` list and no failed check. A `fixed` review keeps the finding,
-  sets its status to `fixed`, and adds a `recheck`.
+  sets its status to `fixed`, and adds a `recheck`. The commented `source`
+  and `region` lines are for a change a person asked for; those findings
+  are written by `scripts/lib/review-requests.js`.
 - `page/lettering.yaml` is used only when `lettering.mode` is `overlay`. Its
   text must equal the text in `page.yaml`.
+- `cover/cover.yaml` is a draft cover: `status: draft` and
+  `approved_render: null`. Its character, wardrobe, prop, and location are
+  the ones in the entity templates. A cover is optional, so
+  `create-project.js` does not copy it; `/cover` does. A cover review starts
+  from `review/visual-review.yaml` with the cover ID in `page`, no panel on
+  any finding, and `position`, `movement`, and `role_causality` set to
+  `not_applicable`.
+- `edition/edition.yaml` has `cover: null`. The commented block under it
+  shows the entry for an approved cover render.
 - `style/style-block.txt` opens with instructions on `#` lines. Delete them
   when the block is final; the block is pasted into every request as it is.
 - `looks/` has its own [README](looks/README.md).

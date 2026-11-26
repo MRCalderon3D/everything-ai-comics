@@ -5,7 +5,8 @@
  *
  * Checks: Node version, repo integrity (manifests vs disk), harness wrapper
  * freshness, image provider env vars (reports SET/missing by NAME only;
- * values are never printed), and with --target: install-manifest plus every
+ * values are never printed), the codex binary the codex-cli provider runs
+ * (found or not, and its version; never a failure), and with --target: install-manifest plus every
  * workspace found there (layout, comic_format and its rule layer, default
  * image provider).
  */
@@ -17,6 +18,7 @@ const { loadManifests, entries, ruleLayers, MANIFEST_FILES, PROVIDER_KINDS } = r
 const { createReport } = require('./lib/report');
 const { parseArgs, helpIfRequested } = require('./lib/cli');
 const workspace = require('./lib/workspace');
+const { resolveBinary, binaryVersion } = require('../providers/lib/cli-spawn');
 
 const HELP = `
 doctor.js — diagnose the scaffold and provider environment.
@@ -31,6 +33,11 @@ Options:
 
 Provider env vars: FAL_KEY, REPLICATE_API_TOKEN, COMFYUI_HOST, GOOGLE_API_KEY.
 Their values are NEVER printed, only whether each is set.
+
+The codex-cli provider needs the codex binary instead of a key. The doctor
+says whether it is found (on PATH, or at CODEX_BIN) and prints its version;
+a missing binary is reported, not counted as a failure. Its optional
+settings are CODEX_BIN, CODEX_IMAGE_TIMEOUT_MS and CODEX_IMAGE_MODEL.
 `;
 
 const COMIC_FORMATS = ['paged', 'webtoon'];
@@ -132,6 +139,33 @@ function checkEnv(report, manifests) {
   if (keyless.length) report.info(`no env var needed: ${keyless.join(', ')}`);
 }
 
+/**
+ * The codex-cli provider draws through the Codex command-line tool. Report
+ * whether the binary is there and which version it is. A missing binary is
+ * information, never a failure: every other provider works without it.
+ */
+function checkCliTools(report, manifests) {
+  const ids = entries(manifests, 'image-providers.json', 'providers').map((p) => p.id);
+  if (!ids.includes('codex-cli')) return;
+  report.section('Command-line tools (provider codex-cli)');
+  const bin = resolveBinary('codex', 'CODEX_BIN');
+  if (!bin.found) {
+    report.info(`codex not found (${bin.error}): codex-cli is limited to dry-run. Install the Codex CLI or set CODEX_BIN.`);
+  } else {
+    const where = `${bin.source === 'env' ? 'CODEX_BIN' : 'PATH'}: ${bin.path}`;
+    const version = binaryVersion(bin);
+    if (version.ok) report.pass(`codex found (${where}), version: ${version.version || 'not printed'}`);
+    else report.info(`codex found (${where}) but "--version" did not answer: ${version.error}`);
+  }
+  const timeout = process.env.CODEX_IMAGE_TIMEOUT_MS;
+  if (timeout !== undefined) {
+    const ok = /^\d+$/.test(timeout) && Number(timeout) > 0;
+    report.info(ok ? `CODEX_IMAGE_TIMEOUT_MS is ${timeout} ms per image`
+      : `CODEX_IMAGE_TIMEOUT_MS is "${timeout}", not a positive number of milliseconds: the default of 900000 applies`);
+  }
+  if (process.env.CODEX_IMAGE_MODEL) report.info(`CODEX_IMAGE_MODEL is set: Codex sessions run with -m ${process.env.CODEX_IMAGE_MODEL}`);
+}
+
 /** Workspace roots inside a target: every child directory holding project.yaml. */
 function findWorkspaces(targetDir) {
   const roots = [];
@@ -220,6 +254,7 @@ function main() {
   const manifests = checkRepo(report);
   checkHarnesses(report);
   checkEnv(report, manifests);
+  checkCliTools(report, manifests);
   if (flags.target && flags.target !== true) {
     checkTarget(report, path.resolve(String(flags.target)), manifests);
   }

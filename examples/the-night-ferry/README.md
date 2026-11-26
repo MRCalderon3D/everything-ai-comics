@@ -6,12 +6,12 @@ decides not to hand him over.
 
 It is small on purpose. Two pages are enough to show a source adaptation with
 a user change, a panel ledger that has something to track, a failed review, a
-repair, and a draft edition.
+repair, a cover, and a draft edition.
 
 ## The images are placeholders
 
 Every PNG in this workspace is a flat placeholder: the four reference
-"masters" and the three page renders. They let paths resolve and give the
+"masters", the three page renders, and the cover render. They let paths resolve and give the
 scripts files to work with. They are not art, and the reviews do not describe
 them. The review files show what a finding and its evidence look like when a
 real page is inspected.
@@ -37,9 +37,10 @@ the-night-ferry/
     scenes/SC_001_01.yaml           one scene on the ferry deck
     pages/PG_001_001/               page.yaml, reference-plan.yaml, prompts/, renders/, reviews/
     pages/PG_001_002/               page.yaml, reference-plan.yaml, prompts/, renders/, reviews/
+    cover/                          cover.yaml (approved), prompts/, renders/CV_001_V01.png, reviews/
   generations/                      one record per generation attempt
   continuity/ISS_001.final-state.yaml
-  editions/ED_001_01/edition.yaml   draft edition, no exports yet
+  editions/ED_001_01/edition.yaml   draft edition with the cover first, no exports yet
 ```
 
 ## What to read first
@@ -79,8 +80,21 @@ Page 2 was rendered twice.
 
 `PG_001_001_V01` passed on the first render. The edition `ED_001_01` lists
 `PG_001_001_V01` and `PG_001_002_V02`. `V01` of page 2 stays on disk and out
-of the edition. Human approval is `pending` on every review, because a
+of the edition. Human approval is `pending` on every page review, because a
 verdict and an approval are separate decisions.
+
+## The cover
+
+`issues/ISS_001/cover/cover.yaml` plans one image with no panels: Mara in
+the wheelhouse doorway, the flare gun lowered, the tarpaulin lifted at one
+corner. Its prompt package attaches the look master, Mara's sheet, and the
+deck plate, and lists the two cover strings.
+
+`CV_001_V01` passed its review. That review uses the same fourteen checks
+as a page review. `position`, `movement`, and `role_causality` are marked
+`not_applicable`, because a cover has no ledger and no panels around it.
+The render was then approved, so `cover.yaml` has `status: approved` and
+the edition lists it under `cover:`.
 
 ## Run the scripts against it
 
@@ -99,6 +113,9 @@ node scripts/build-board.js --issue examples/the-night-ferry/issues/ISS_001 --ou
 # compile the prompt package for a page (writes prompts/harness-native.yaml next to page.yaml)
 node scripts/compile-prompts.js --page examples/the-night-ferry/issues/ISS_001/pages/PG_001_001/page.yaml
 
+# compile the cover package (writes cover/prompts/harness-native.yaml)
+node scripts/compile-prompts.js --cover ISS_001 --root examples/the-night-ferry
+
 # build the edition (writes under editions/ED_001_01/exports/, never overwrites)
 node scripts/build-edition.js --edition examples/the-night-ferry/editions/ED_001_01/edition.yaml --formats cbz
 ```
@@ -111,12 +128,14 @@ Four scripts write into the workspace when you point them at it:
 - `build-reference-plan.js --page <page.yaml>` rewrites `reference-plan.yaml`
   next to the page.
 - `compile-prompts.js --page <page.yaml>` rewrites
-  `prompts/harness-native.yaml` next to the page.
+  `prompts/harness-native.yaml` next to the page, and `--cover ISS_001`
+  rewrites the one under `cover/prompts/`.
 - `generate-assets.js --page <page.yaml>` is a dry run by default and adds a
   generation record and its `GEN_*.request.json` under `generations/`.
 - `build-edition.js` adds files under `editions/ED_001_01/exports/`
   (`the-night-ferry-001-ed01.cbz`) and lists them under `exports` in
-  `edition.yaml`.
+  `edition.yaml`. The formats are `pdf`, `cbz`, `web`, `images`, and
+  `epub`, and the cover is `000-cover.png` in each.
 
 `letter-pages.js` has nothing to do here. The project letters in the image
 (`lettering.mode: in_image`), so there is no `lettering.yaml`.

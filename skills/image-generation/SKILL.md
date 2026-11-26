@@ -27,8 +27,9 @@ tool reported.
 - A compiled prompt package (`prompt-package` schema) whose `source_hashes`
   match its sources.
 - The provider adapter and its capabilities: fal, replicate, comfyui,
-  gemini, harness-native, or manual (`manifests/image-providers.json`), with
-  the environment variables the provider requires.
+  gemini, harness-native, codex-cli, or manual
+  (`manifests/image-providers.json`), with the environment variables the
+  provider requires. codex-cli needs the `codex` binary instead.
 - The page's `continuity` block and the review status of the previous page.
 - Confirmation of scope and cost from the user or the orchestrator.
 
@@ -42,13 +43,15 @@ tool reported.
    plan, the page's aspect ratio, `textRendering` for in-image lettering,
    `imageEditing` for a repair. The declared values are in
    `manifests/image-providers.json`. Reference slots: fal 4, replicate 1,
-   comfyui 8, gemini 3, harness-native 4, manual 4. replicate and comfyui
+   comfyui 8, gemini 3, harness-native 4, codex-cli 4, manual 4. replicate and comfyui
    cannot edit, so they cannot run a repair. No provider declares reliable
    text rendering: comfyui is `none` and is refused for `in_image` pages,
    the rest are `unreliable`. fal's default model ignores reference images
    unless the package pins another model (`compile-prompts.js --model`).
    `harness-native` and `manual` call no network; they write a handoff for
-   the harness's own image tool or for a person.
+   the harness's own image tool or for a person. `codex-cli` starts the
+   Codex CLI (`codex exec`) and saves the image it draws; it needs the
+   `codex` binary and no key.
 3. Dry-run first, always:
    `node scripts/generate-assets.js --page <page.yaml>` for a page,
    `--asset <ENTITY_ID> [--root <workspace>]` for every sheet package of an
@@ -76,14 +79,14 @@ tool reported.
    a sheet (TAG names the kind and its variant, such as `TURN`,
    `WARD_OILSKIN`, or `SHEET` for a prop),
    `references/style/<LOOK_ID>_V##.png` for a look page. A live
-   API run saves the image there itself. With `harness-native` or `manual`
+   API run or a `codex-cli` run saves the image there itself. With `harness-native` or `manual`
    the tool or the person saves it at the path the request file gives
    under `body.output.path`. A sheet candidate never takes a `_MASTER`
    name. A file already in `renders/` is never overwritten, renamed, or
    deleted.
 8. Complete the generation record (`GEN_<page or entity id>_<attempt##>`).
-   An API run fills `output_render`, `media_files`, and `status` itself. A
-   handoff record stays `dry_run` until the image exists: then set
+   An API run or a `codex-cli` run fills `output_render`, `media_files`,
+   and `status` itself. A handoff record stays `dry_run` until the image exists: then set
    `status`, `media_files`, and `response.summary` by hand. Write `model`,
    `cost.amount`, and `seed` only if the tool reported them. Otherwise
    leave `model: unreported`, `cost.amount: null` with `reported: false`,

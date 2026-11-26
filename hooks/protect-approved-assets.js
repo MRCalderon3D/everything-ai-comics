@@ -5,8 +5,8 @@
  * Blocks three kinds of overwrite, each of which would destroy evidence:
  *   1. a reference asset whose status is "approved" in references/manifest.yaml
  *      (approved masters are immutable);
- *   2. any existing file under a page's renders/ directory (a repair is a
- *      sibling version, never an overwrite);
+ *   2. any existing file under a page's or a cover's renders/ directory (a
+ *      repair is a sibling version, never an overwrite);
  *   3. any existing file under editions/<ED_ID>/exports/ (a rebuilt edition
  *      gets a new ID).
  * In every case the message says which next version to create instead.
@@ -21,6 +21,8 @@ const {
 } = require('./lib');
 
 const RENDER_PATH = /^issues\/[^/]+\/pages\/([^/]+)\/renders\/([^/]+)$/;
+/** A cover's renders: issues/ISS_001/cover/renders/CV_001_V01.png. The cover ID carries the issue number. */
+const COVER_RENDER_PATH = /^issues\/ISS_(\d{3})\/cover\/renders\/([^/]+)$/;
 const EXPORT_PATH = /^editions\/([^/]+)\/exports\/.+$/;
 
 function pad2(n) {
@@ -85,6 +87,19 @@ async function handle(event) {
       `protect-approved-assets: BLOCKED write to ${shown}. A render is never overwritten: ` +
       'earlier versions stay on disk for comparison and for the review trail.\n' +
       `Create the next version instead (${next}) and point page.yaml current_render at it once it is reviewed.\n`
+    );
+    return 2;
+  }
+
+  // Cover renders follow the same rule as page renders.
+  const coverRender = COVER_RENDER_PATH.exec(rel);
+  if (coverRender) {
+    if (!exists) return 0;
+    const next = nextRenderId(path.dirname(file), `CV_${coverRender[1]}`);
+    process.stderr.write(
+      `protect-approved-assets: BLOCKED write to ${shown}. A cover render is never overwritten: ` +
+      'earlier versions stay on disk for comparison and for the review trail.\n' +
+      `Create the next version instead (${next}) and approve it in cover.yaml once it is reviewed.\n`
     );
     return 2;
   }
