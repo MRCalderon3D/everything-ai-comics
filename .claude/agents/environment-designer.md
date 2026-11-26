@@ -25,7 +25,7 @@ shape that survives being redrawn, and the number of hands it takes to hold.
 - Author `map.yaml`: `levels`, the `sides` convention, `landmarks` with a level and a side, `exits`, and `connections` that say how a character gets from one level to another.
 - Separate platform from ground, inside from outside, and foreground from background in the map. Those are the boundaries a drawn page gets wrong.
 - Author `prop.yaml` for every plot-relevant prop: `distinguishing_features` that fix its type and silhouette, `hands_required`, and references.
-- Plan location plates and prop references, and register them in `references/manifest.yaml` with the `default_role` each plays when attached.
+- Plan location plates and prop sheets, which `compile-prompts.js --asset <ID> --sheet plate|prop` compiles from these files, and register the approved picks in `references/manifest.yaml` with the `default_role` each plays when attached.
 - Hold the side convention: a landmark placed on the left stays on the left in every plate and on every page.
 - Amend the map when staging needs a level or landmark it lacks. A panel never invents geography.
 

@@ -56,8 +56,10 @@ earlier edition stays what it was.
 5. Overlay lettering: for each page run
    `node scripts/letter-pages.js --page <page.yaml> --render <RENDER_ID>`,
    flatten the SVG over the render with a browser or a vector tool, and set
-   `lettered_file` to the flattened image. In `in_image` mode leave
-   `lettered_file` as `null`.
+   `lettered_file` to the flattened image. It has to be a PNG or JPEG whose
+   file name starts with the render ID (`<RENDER_ID>.lettered.png`); the
+   build rejects an SVG. In `in_image` mode leave `lettered_file` as
+   `null`.
 6. Validate before building:
    `node scripts/validate-workspace.js --root <workspace> --issue <ISS_ID>`.
 7. Build:
@@ -66,7 +68,9 @@ earlier edition stays what it was.
    `fixed` review. For a reading copy of work in progress add `--draft`,
    which marks every export as a draft. The script does not overwrite an
    existing export. Leave `--force` for a build you are rerunning before
-   anyone has received the files.
+   anyone has received the files: it works only while the edition's status
+   is `draft` or the build is `--draft`, and the script refuses it on a
+   `reviewed` or `published` edition (`force-not-draft`).
 8. Open every export. Count the pages, read them in order, and confirm that
    each page is the listed render. In the PDF check the page size. In the
    CBZ check that the files sort in reading order. In the web reader check
@@ -92,7 +96,9 @@ earlier edition stays what it was.
 
 - `production/editions/<ED_ID>/edition.yaml` (`edition.schema.json`).
 - Exports under `production/editions/<ED_ID>/exports/`: PDF, CBZ, and a web
-  reader.
+  reader, named `<title-slug>-<issue number>-ed<edition number>[-DRAFT]`
+  with `.pdf`, `.cbz`, or the directory suffix `-web`
+  (`the-night-ferry-001-ed01.cbz`).
 - Overlay mode: lettered page files referenced by `lettered_file`.
 - A delivery note: the current render of every page by filename, what was
   repaired since the last edition, what was visually rechecked, and what

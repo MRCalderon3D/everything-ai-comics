@@ -54,27 +54,47 @@ with one default role, and from then on outranks any prompt.
    sheet whose parent is not `approved` is blocked. On a "next" from the
    user with a parent still in review, state the blocker and ask for the
    verdict.
-2. Design each sheet for reading, in the comic's own drawing style: faces
-   clear, background plain, scale consistent between views. Keep dramatic
-   lighting for the pages. A recurring secondary character gets at least an
-   identity strip. For characters listed in each other's
-   `visually_adjacent_to`, state the difference in the prompt of both
-   sheets.
-3. Write one asset-scoped prompt package per sheet (`page: null`, `asset`
-   set to the entity ID) from the bible fields, the frozen style block, and,
-   once it exists, the look master as a `style` reference. Nothing is
-   written freehand. Save it beside the sheets in the entity's `refs/`
-   directory.
+2. Check the bible entries each sheet is compiled from. A sheet is drawn for
+   reading, in the comic's own drawing style: faces clear, background
+   plain, scale consistent between views, dramatic lighting kept for the
+   pages. The compiler writes that brief; the entity file supplies the
+   subject. A recurring secondary character gets at least a turnaround.
+   Characters listed in each other's `visually_adjacent_to` get the
+   difference stated in both sheets, taken from their
+   `distinguishing_features`.
+3. Compile one prompt package per sheet:
+   `node scripts/compile-prompts.js --asset <ENTITY_ID> --sheet <kind> --root production [--provider <id>] [--model <id>]`.
+   The kinds are `turnaround`, `expressions`, and `wardrobe` for a
+   character, `plate` for a location, `prop` for a prop, `look` for a look,
+   and `detail` with `--subject "<text>"` for a close study of any entity.
+   `--outfit <WARD_ID>` picks the outfit of a wardrobe sheet and
+   `--expressions a,b,c` the list of an expression sheet. The script writes
+   an asset-scoped package (`page: null`, `asset` set to the entity ID, id
+   `PP_<ENTITY_ID>_<PROVIDER>-<TAG>`) to
+   `<entity dir>/refs/prompts/<provider>.<kind>.yaml`, and a look page to
+   `references/style/prompts/<provider>.<LOOK_ID>.yaml`. It attaches the
+   approved look master as a `style` reference and, for expression and
+   wardrobe sheets, the character's approved identity master. It refuses a
+   sheet while no look master is approved; the first look page is the one
+   request compiled without an image. Nothing is written freehand. One
+   package file exists per entity, provider, and kind, so a second wardrobe
+   or detail sheet of the same entity is compiled after the first has been
+   generated.
 4. Cost gate: estimate the batch (sheets x variants x provider rate), show
-   it, and wait for an explicit confirmation. Run `node
-   scripts/generate-assets.js --package <prompt-package.yaml> --provider
-   <id>` for the dry run, and add `--live --yes` only after the user
-   confirms. The hook `require-cost-confirmation.js` blocks a live call
-   without it.
-5. Save each returned image under the entity's `refs/` (the look under
-   `production/references/style/`) with a versioned ID. Complete its
-   generation record. When the tool does not report the model, the cost, or
-   the seed, write `unreported` or `null` and list the field in
+   it, and wait for an explicit confirmation. Run
+   `node scripts/generate-assets.js --asset <ENTITY_ID> --root production`
+   for the dry run of every sheet package of the entity, or
+   `--package <prompt-package.yaml>` for one, and add `--live --yes` only
+   after the user confirms. The hook `require-cost-confirmation.js` blocks
+   a live call without `--yes`. Each run of a package produces one
+   candidate, so `variants` is the number of runs per sheet.
+5. Find each returned image where the script put it: the next free
+   `<ENTITY_ID>_<TAG>_V##.png` in the entity's `refs/` directory, or
+   `production/references/style/<LOOK_ID>_V##.png` for a look page. A
+   candidate never takes a `_MASTER` name. The record and its
+   `GEN_*.request.json` are under `production/generations/<ENTITY_ID>/`.
+   When the tool does not report the model, the cost, or the seed, the
+   record keeps `unreported` or `null` and lists the field in
    `metadata_unavailable`.
 6. Open every returned file. The owning designer compares it with the bible:
    each entry of `distinguishing_features`, the wardrobe layers, the map's
@@ -82,7 +102,8 @@ with one default role, and from then on outranks any prompt.
    per sheet or order a re-roll with corrected wording. After the project's
    `repair_policy.max_cycles` rounds without a usable candidate, fix the
    bible text instead of rolling again.
-7. Name the pick `<ENTITY>_<KIND>_MASTER_V##` and register it in
+7. Promote the pick. Save it as `<ENTITY_ID>_<TAG>_MASTER_V##` (a look
+   page as `<LOOK_ID>_MASTER_V##`) and register it in
    `production/references/manifest.yaml`: `id`, `entity`, `kind`, `path`,
    `status: review`, `sha256`, and a single `default_role` (`identity` for
    a turnaround, `style` for a look page, `spatial_continuity` for a plate,
@@ -103,12 +124,13 @@ with one default role, and from then on outranks any prompt.
 
 - `production/characters/<CHAR_ID>/refs/`, `production/locations/<LOC_ID>/refs/`,
   `production/props/<PROP_ID>/refs/`, and `production/references/style/`:
-  candidate and master images with their prompt packages
-  (`schemas/prompt-package.schema.json`).
+  candidate and master images, with their prompt packages in the `prompts/`
+  directory beside them (`schemas/prompt-package.schema.json`).
 - `production/references/manifest.yaml`, the registry with the new entries
   (no schema as a whole).
-- `production/generations/<ASSET_ID>/GEN_<asset-id>_<attempt##>.yaml`, one
-  per attempt; validates against `schemas/generation-record.schema.json`.
+- `production/generations/<ENTITY_ID>/GEN_<ENTITY_ID>_<attempt##>.yaml`, one
+  per attempt, with its `.request.json` beside it; validates against
+  `schemas/generation-record.schema.json`.
 - `references` updated in the entity files, `style.look_refs` in
   `production/project.yaml`.
 
@@ -121,11 +143,15 @@ with one default role, and from then on outranks any prompt.
   refuses edits to it. A change is a new `_V##`, a new manifest entry, and
   `status: superseded` on the old one.
 - A photograph or an outside drawing brought in through `/ingest-references`
-  can condition a sheet. It does not replace the sheet: identity masters are
-  drawn in the comic's style.
-- With `harness-native` or `manual` the script writes a handoff package and
-  calls no network. The harness image tool or a person produces the image,
-  and steps 5 to 8 apply to the file that comes back.
+  informs a sheet through the description its analysis wrote into the
+  bible. It does not replace the sheet: identity masters are drawn in the
+  comic's style.
+- With `harness-native` or `manual` the script writes a handoff package
+  (the `GEN_*.request.json`) and calls no network. The harness image tool
+  or a person produces the image and saves it at the target path the
+  request names, and steps 5 to 8 apply to that file.
+- fal's default model ignores reference images. Pin a multi-image model
+  with `--model` when compiling, or the look master is not used.
 - Related: `/character-bible`, `/location-bible`, `/prop-bible`,
   `/style-bible` (plan the sheets), `/reference-plan` (assigns approved
   masters to pages).

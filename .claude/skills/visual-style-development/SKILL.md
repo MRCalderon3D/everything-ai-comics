@@ -61,11 +61,18 @@ out of style.
    paragraph of literal description for the image model. Describe traits
    and avoid artists' names. This file is model-facing and exempt from the
    prose rules.
-10. Generate the look master through `/visual-development`: a test page in
-    the style with a character, a setting, panel borders, and a balloon.
-    Compare it with the written rules, correct whichever is wrong, and
-    repeat until they agree. Save it as `LOOK_<NAME>_MASTER_V##` under
-    `production/references/style/` and register it with `kind: look` and
+10. Generate the look page through `/visual-development`:
+    `node scripts/compile-prompts.js --asset <LOOK_ID> --sheet look --root <workspace>`
+    writes `references/style/prompts/<provider>.<LOOK_ID>.yaml`, and
+    `node scripts/generate-assets.js --asset <LOOK_ID> --root <workspace>`
+    runs it. The brief is a sample page of three or four bordered panels
+    with an anonymous figure, a plain setting, and, in `in_image` lettering
+    mode, one balloon and one caption. The first look page of a project is
+    compiled with no reference image; later versions attach the approved
+    look. Candidates land in `production/references/style/` as
+    `<LOOK_ID>_V##`. Compare each with the written rules, correct whichever
+    is wrong, and repeat until they agree. Save the pick as
+    `<LOOK_ID>_MASTER_V##` and register it with `kind: look` and
     `default_role: style`.
 11. Freeze on approval. Set `project.style.look_refs` and
     `project.style.style_block`. From here on the block is reused verbatim

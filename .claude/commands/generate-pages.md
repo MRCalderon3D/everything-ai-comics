@@ -33,8 +33,8 @@ pixels.
 - `provider` (string, optional, default `generation.provider` of the page,
   then `default_providers.image` in `project.yaml`): an ID from
   `manifests/image-providers.json`.
-- `--dry-run` (flag, default on): write request specs and pending records;
-  call nothing.
+- `--dry-run` (flag, default on): write request specs and `dry_run`
+  records; call nothing.
 - `--live` (flag, optional, default off): call the provider, after the cost
   confirmation.
 
@@ -80,18 +80,24 @@ pixels.
    match the current files. Set the page's `status` to `prompted`.
 6. Generate. Run `node scripts/generate-assets.js --page <page.yaml>
    --provider <id>` for the dry run, and add `--live --yes` after the
-   confirmation from step 2. With `harness-native` or `manual` the script
-   writes a handoff package; the harness image tool or a person produces
-   the image from it.
-7. Save the returned image as the next free version,
-   `renders/<PG_ID>_V##.png` (or `.jpg`). Never write over an existing
-   version and never reuse a number.
+   confirmation from step 2. Each run writes a record and a
+   `GEN_*.request.json` under `production/generations/<PG_ID>/`. With
+   `harness-native` or `manual` the request file is the handoff package;
+   the harness image tool or a person produces the image from it. A live
+   run refuses a package whose page or style block changed after it was
+   compiled.
+7. Confirm the returned image sits at the next free version,
+   `renders/<PG_ID>_V##.png` (or `.jpg`). A live API run saves it there
+   itself. With a handoff provider, save it at the target path the request
+   file names. Never write over an existing version and never reuse a
+   number.
 8. Complete the generation record under `production/generations/<PG_ID>/`:
    `provider`, `prompt_package`, `output_render`, `media_files`, `status`.
-   Record what the tool reported and nothing else. An unreported model is
-   the literal `unreported`. An unreported cost is `amount: null` with
-   `reported: false`. An unreported seed is `null`. List each of them in
-   `metadata_unavailable`.
+   An API run fills them. A handoff record stays `dry_run` until the image
+   exists and is completed by hand. Record what the tool reported and
+   nothing else. An unreported model is the literal `unreported`. An
+   unreported cost is `amount: null` with `reported: false`. An unreported
+   seed is `null`. Each of them stays listed in `metadata_unavailable`.
 9. Open the saved file and look at it before using it for anything: the
    right page, the planned panel count, the cast present, lettering present
    or absent according to the mode. A successful call means an image
@@ -117,7 +123,8 @@ pixels.
   validates against `schemas/prompt-package.schema.json`.
 - `production/generations/<PG_ID>/GEN_<PG_ID>_<attempt##>.yaml`, one per
   request, dry runs included; validates against
-  `schemas/generation-record.schema.json`.
+  `schemas/generation-record.schema.json`. Beside each one,
+  `GEN_<PG_ID>_<attempt##>.request.json` holds the request as sent.
 - `production/issues/<ISS_ID>/pages/<PG_ID>/page.yaml`, with `status` and
   `current_render` updated (`schemas/page.schema.json`).
 
@@ -132,9 +139,13 @@ pixels.
   confirmed. Each gets its own version and record, and one is chosen at
   review.
 - `generation.mode: per_panel` generates each panel as a working image.
-  The page still ends as one render with one `<PG_ID>_V##` ID, assembled in
-  an image tool to the layout in `page.yaml` and noted in the record's
-  `response.summary`. The review is of the assembled page.
+  Compile each panel with `compile-prompts.js --page <page.yaml> --panel
+  <PN_ID>`, which writes `prompts/<provider>.<PN_ID>.yaml`; `--page` then
+  runs the panel packages, and each panel image is kept beside its record.
+  The scaffold has no compositor. The page still ends as one render with
+  one `<PG_ID>_V##` ID, assembled outside the scaffold in an image tool to
+  the layout in `page.yaml`, saved by hand in `renders/`, and noted in the
+  record's `response.summary`. The review is of the assembled page.
 - Format differences: a webtoon page is one scroll segment with the
   segment's aspect ratio from `project.yaml`. Check the provider supports
   that ratio before the batch.

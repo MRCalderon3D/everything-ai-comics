@@ -97,7 +97,9 @@ issue and scene summaries, beats, and the panel script in every `page.yaml`.
 - `story-bible.schema.json` requires the fact registry with provenance, and a
   timeline entry requires `order` and `event`.
 - `scripts/validate-workspace.js` schema-checks the bible, the series plan,
-  and the issue and scene files, and resolves the IDs they cite.
+  and the issue and scene files. It checks that issue, scene, and page files
+  list each other consistently and that a scene's location and cast exist.
+  IDs cited inside the bible and the series plan are not resolved.
 - `scripts/check-continuity.js` verifies that each issue's pages form one
   unbroken `enters_from` / `exits_to` chain (`PAGE_CHAIN`) and that state
   tags carry from one appearance to the next (`STATE_DROPPED`).

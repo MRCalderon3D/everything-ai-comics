@@ -19,7 +19,8 @@ tool reported.
 ## Use When
 
 - A page has a compiled prompt package and is next in line.
-- A character sheet, location plate, or look master needs rendering.
+- A character sheet, location plate, prop sheet, or look page needs
+  rendering.
 - A repair package is ready to be run against a flagged render.
 
 ## Inputs
@@ -40,35 +41,53 @@ tool reported.
    page will copy its setting, including its mistakes.
 2. Check the provider against the task: enough reference slots for the
    plan, the page's aspect ratio, `textRendering` for in-image lettering,
-   `imageEditing` for a repair. `harness-native` and `manual` call no
-   network; they write a handoff for the harness's own image tool or for a
-   person.
+   `imageEditing` for a repair. The declared values are in
+   `manifests/image-providers.json`. Reference slots: fal 4, replicate 1,
+   comfyui 8, gemini 3, harness-native 4, manual 4. replicate and comfyui
+   cannot edit, so they cannot run a repair. No provider declares reliable
+   text rendering: comfyui is `none` and is refused for `in_image` pages,
+   the rest are `unreliable`. fal's default model ignores reference images
+   unless the package pins another model (`compile-prompts.js --model`).
+   `harness-native` and `manual` call no network; they write a handoff for
+   the harness's own image tool or for a person.
 3. Dry-run first, always:
-   `node scripts/generate-assets.js --page <page.yaml>` (or
-   `--package <prompt-package.yaml>` for an asset). It writes the request
-   and a generation record with `status: dry_run` under
-   `production/generations/`. Read what would be sent: prompt, references
-   in order, parameters.
+   `node scripts/generate-assets.js --page <page.yaml>` for a page,
+   `--asset <ENTITY_ID> [--root <workspace>]` for every sheet package of an
+   entity, or `--package <prompt-package.yaml>` for one package. It writes
+   two files under `production/generations/<PG_ID or ENTITY_ID>/`: the
+   record `GEN_<scope>_<attempt##>.yaml` with `status: dry_run`, and
+   `GEN_<scope>_<attempt##>.request.json`, the request as it would be sent.
+   Read the request file: prompt, references in order with their roles,
+   parameters, and the target file.
 4. State the cost and get an explicit yes. `--issue <issue dir>` in dry-run
-   mode is the way to estimate a whole issue. Live calls need
-   `--live --yes`; a missing environment variable aborts the run, and the
-   answer is to set the variable, never to paste a credential into a file
-   or a prompt.
+   mode is the way to estimate a whole issue; it skips pages whose status
+   is `reviewed` or `approved`. Live calls need `--live --yes`; a missing
+   environment variable aborts the run, and the answer is to set the
+   variable, never to paste a credential into a file or a prompt. A live
+   run also refuses a package whose page or style block changed after it
+   was compiled.
 5. Run the live call for one page. Never loop live calls over an issue
    without a review between pages.
 6. Open the actual returned file. A successful call means an image exists.
    It says nothing about whether the page is right, or whether the file is
    a full page at all.
-7. Save the file as the next versioned candidate:
-   `issues/<ISS_ID>/pages/<PG_ID>/renders/<PG_ID>_V##.png`. Take the next
-   free number. A file already in `renders/` is never overwritten, renamed,
-   or deleted.
-8. Complete the generation record (`GEN_<page-id>_<attempt##>`):
-   `provider`, `prompt_package`, `output_render`, `media_files`, `status`,
-   `created_at`. Write `model`, `cost.amount`, and `seed` only if the tool
-   reported them. Otherwise set `model: unreported`, `cost.amount: null`
-   with `reported: false`, `seed: null`, and list them in
-   `metadata_unavailable`. Never invent a value to fill the form.
+7. Confirm where the file was saved. The target is always the next free
+   version: `issues/<ISS_ID>/pages/<PG_ID>/renders/<PG_ID>_V##.png` for a
+   page, `<ENTITY_ID>_<TAG>_V##.png` in the entity's `refs/` directory for
+   a sheet, `references/style/<LOOK_ID>_V##.png` for a look page. A live
+   API run saves the image there itself. With `harness-native` or `manual`
+   the tool or the person saves it at the path the request file gives
+   under `body.output.path`. A sheet candidate never takes a `_MASTER`
+   name. A file already in `renders/` is never overwritten, renamed, or
+   deleted.
+8. Complete the generation record (`GEN_<page or entity id>_<attempt##>`).
+   An API run fills `output_render`, `media_files`, and `status` itself. A
+   handoff record stays `dry_run` until the image exists: then set
+   `status`, `media_files`, and `response.summary` by hand. Write `model`,
+   `cost.amount`, and `seed` only if the tool reported them. Otherwise
+   leave `model: unreported`, `cost.amount: null` with `reported: false`,
+   `seed: null`, and keep them listed in `metadata_unavailable`. Never
+   invent a value to fill the form.
 9. Set the page's `current_render` to the new render and `status` to
    `rendered`. Hand it to `/visual-review`. The specialist who generated
    the page does not sign off its review.
@@ -78,11 +97,12 @@ tool reported.
 
 ## Outputs
 
-- Page renders under `issues/<ISS_ID>/pages/<PG_ID>/renders/`, or reference
-  art under the entity's `refs/` directory.
+- Page renders under `issues/<ISS_ID>/pages/<PG_ID>/renders/`, or sheet
+  candidates under the entity's `refs/` directory (look pages under
+  `references/style/`).
 - One generation record per attempt under
-  `production/generations/<PG_ID or ASSET_ID>/` (`generation-record`
-  schema), dry runs included.
+  `production/generations/<PG_ID or ENTITY_ID>/` (`generation-record`
+  schema), dry runs included, each with its `GEN_*.request.json` beside it.
 - `current_render` and `status: rendered` on the page.
 
 ## Quality Bar

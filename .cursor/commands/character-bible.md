@@ -25,7 +25,7 @@ and reviews check identity against.
 - `character` (ID, optional): a single `CHAR_*` to build or rebuild; default
   is every character in the story bible.
 - `detail` (enum, optional, default by `role`): `principal` (full sheet
-  plan) | `supporting` (identity strip and one wardrobe state) |
+  plan) | `supporting` (a turnaround and one wardrobe state) |
   `background` (description only).
 
 ## Invokes Agents
@@ -61,13 +61,15 @@ and reviews check identity against.
    (`WARD_<CHARACTER>_<NAME>`), `description`, `layers`, `accessories`,
    `hands` (`bare` | `gloved` | `bandaged`), and `used_in`. Set
    `default_wardrobe` in the character file.
-6. Plan the reference sheets, named `CHAR_<NAME>_<KIND>_MASTER_V##`: a
-   turnaround for every principal, expressions where the acting needs them,
-   one wardrobe sheet per outfit. A recurring secondary character gets an
-   identity reference too, at least a small strip, whenever they have to be
-   recognized across panels. List the planned sheets in the file's `notes`;
-   `references` stays empty until `/visual-development` registers the
-   assets.
+6. Plan the reference sheets by kind: a `turnaround` for every principal,
+   `expressions` where the acting needs them, one `wardrobe` sheet per
+   outfit beyond the default. A recurring secondary character gets a
+   turnaround too, whenever they have to be recognized across panels. List
+   the planned sheets in the file's `notes`. `/visual-development` compiles
+   each one from this file with `compile-prompts.js --asset <CHAR_ID>
+   --sheet <kind>`, and the approved pick is registered as
+   `<CHAR_ID>_<TAG>_MASTER_V##` (`CHAR_MARA_TURN_MASTER_V01`). `references`
+   stays empty until then.
 7. Apply pending user changes from the story bible to the description and
    the wardrobe in the same run, and note which registered sheets no longer
    match.

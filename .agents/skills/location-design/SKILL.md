@@ -65,10 +65,18 @@ first panel.
    used in `architecture` and the landmark IDs in `map.yaml` must match.
 9. Plan the establishing plate: the location drawn in the comic's style,
    empty of characters, seen from the viewpoint of the map's side
-   convention, with every landmark visible. It is generated through
-   `/visual-development`, saved as `LOC_<NAME>_PLATE_MASTER_V##` under
-   `production/locations/<LOC_ID>/refs/`, and registered with `kind: plate`
-   and `default_role: spatial_continuity`. List it in `references`.
+   convention, with every landmark visible. `/visual-development` compiles
+   it with
+   `node scripts/compile-prompts.js --asset <LOC_ID> --sheet plate --root <workspace>`,
+   which writes `locations/<LOC_ID>/refs/prompts/<provider>.plate.yaml`
+   from `location.yaml` and `map.yaml`, and generates it with
+   `node scripts/generate-assets.js --asset <LOC_ID> --root <workspace>`.
+   The candidate lands in `production/locations/<LOC_ID>/refs/` as
+   `<LOC_ID>_PLATE_V##`. The approved pick is saved as
+   `<LOC_ID>_PLATE_MASTER_V##` and registered with `kind: plate` and
+   `default_role: spatial_continuity`. List it in `references`. Write the
+   map first: without `map.yaml` the script warns that the plate states no
+   sides, levels, or landmarks.
 10. Version changes. An approved location is immutable. When the story
     damages or alters the place, the altered state gets a new plate with
     the next `_V##`.

@@ -60,13 +60,17 @@ for word in every generation request, next to the look master image.
    `lettering` block of `project.yaml`: `font_family`, `case`,
    `max_words_per_balloon`, `max_words_per_panel`, balloon and caption
    shapes, and the treatment of sound effects. Confirm `lettering.mode`
-   against the provider's `textRendering` capability.
+   against the provider's `textRendering` capability. No provider declares
+   `reliable`. With `unreliable`, `in_image` lettering works only when every
+   string is checked in review. With `none` (comfyui) the compiler refuses
+   `in_image` pages, so the project uses `overlay`.
 5. Write `production/style/style-block.txt`: one paragraph of literal,
    model-facing drawing instructions taken from the style bible. Then
    freeze it. Every request reuses it verbatim, and a compiled prompt
    package records its hash in `source_hashes.style_block`.
 6. Plan the look master, `LOOK_<NAME>_MASTER_V##`: a sample page in the
-   style that `/visual-development` generates and the user approves. It is
+   style that `/visual-development` compiles with `compile-prompts.js
+   --asset <LOOK_ID> --sheet look`, generates, and the user approves. It is
    attached as an image, with the role `style`, to every request. A style
    word repeated in a prompt does not replace it.
 7. Set `style.style_block` and `style.influences` in `project.yaml`. Leave

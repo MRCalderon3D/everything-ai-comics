@@ -98,15 +98,18 @@ fact it replaces (see `writing/adaptation-fidelity.md`).
 
 - `scripts/validate-workspace.js` schema-checks every structured file in the
   workspace and resolves the cross-references between them.
-- `prompt-package.schema.json` requires `source_hashes` on every package, so
-  a stale package can be detected by comparing hashes with the current files.
+- `prompt-package.schema.json` requires `source_hashes` on every package.
+  `scripts/generate-assets.js` compares the page and style-block hashes with
+  the current files: a dry run warns about a stale package and a live run
+  refuses it.
 - `hooks/validate-after-write.js` re-validates a schema-known file on write.
 - `hooks/protect-approved-assets.js` blocks writes to approved reference
   assets.
 - `npm run validate` fails when the harness wrappers have drifted from the
   source layers.
-- The letterer compares overlay text with `page.yaml` before
-  `scripts/letter-pages.js` runs, and the `lettering` check of the visual
-  review compares the rendered words with it again.
+- `scripts/letter-pages.js` stops when overlay text differs from
+  `page.yaml`, `scripts/validate-workspace.js` reports the same mismatch,
+  and the `lettering` check of the visual review compares the rendered
+  words with the page file again.
 - Same-tier conflicts and canon changes go to human review before work
   continues.

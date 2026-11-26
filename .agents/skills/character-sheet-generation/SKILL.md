@@ -35,31 +35,49 @@ describe them again from text.
 ## Process
 
 1. Check the preconditions. The character file has distinguishing features
-   and an adjacency list, and a look master is approved. Without an approved
-   look there is no style to draw the sheet in; stop and finish the look
+   and an adjacency list, the style block is written, and a look master is
+   approved. Without an approved look there is no style to draw the sheet
+   in, and `compile-prompts.js` refuses the sheet. Stop and finish the look
    first.
 2. Plan the set by role. A protagonist or antagonist gets a turnaround
    (front, three-quarter, profile, back, full figure), an expression sheet
    with the five or six expressions the script calls for, and one wardrobe
    sheet per outfit beyond the default. A recurring secondary character gets
-   at least a small identity strip: front and three-quarter heads and one
-   full figure. Background characters get nothing.
-3. Write an asset-scoped prompt package (`page: null`, `asset: <CHAR_ID>`,
-   id `PP_<asset-id>_<PROVIDER>`) and save it beside the sheets in the
-   character's `refs/` directory. Its text comes from `prompt_summary`,
-   `distinguishing_features`, and the outfit `description`, followed by the
-   style block verbatim. Attach the look master with role `style`. Attach
-   an identity photograph, if there is one, with role `identity`.
-4. Ask for sheet conditions and nothing else: plain light background, even
-   light, no cast shadow across the face, neutral stance, every figure at
-   the same scale with feet on one baseline, heads the same size across an
-   expression sheet. Dramatic lighting belongs on the pages. A sheet lit
-   like a scene hides the features and teaches every later page the same
-   shadow.
+   at least a turnaround. Background characters get nothing.
+3. Compile one package per sheet, the turnaround first:
+   `node scripts/compile-prompts.js --asset <CHAR_ID> --sheet turnaround --root <workspace>`.
+   The other kinds are `expressions` (`--expressions a,b,c` replaces the
+   default list: neutral, wary, angry, afraid, in pain, relieved),
+   `wardrobe` (`--outfit <WARD_ID>`, default the character's
+   `default_wardrobe`), and `detail` with `--subject "<text>"` for a close
+   study of one feature. The script writes
+   `characters/<CHAR_ID>/refs/prompts/<provider>.<kind>.yaml`, an
+   asset-scoped package (`page: null`, `asset: <CHAR_ID>`, id
+   `PP_<CHAR_ID>_<PROVIDER>-<TAG>`, with TAG `TURN`, `EXPR`, `WARD`, or
+   `DETAIL`). The prompt opens with the style block verbatim and takes its
+   subject from `prompt_summary`, the `description` fields,
+   `distinguishing_features`, and the outfit entry, plus one line for each
+   character in `visually_adjacent_to` that states the difference. The
+   look master is attached with role `style`. Expression and wardrobe
+   sheets also attach the character's approved identity master with role
+   `identity`, so approve the turnaround before compiling them. Without an
+   approved one the script still compiles and notes that the sheet is drawn
+   from the written description only. The package file is named for the
+   kind, so a second outfit or a second detail study replaces the package
+   of the first: generate one before compiling the next.
+4. Read the brief the script wrote. It asks for sheet conditions and
+   nothing else: plain light background, even light, no cast shadow across
+   the face, neutral stance, every figure at the same scale with feet on
+   one baseline, heads the same size across an expression sheet. Dramatic
+   lighting belongs on the pages. A sheet lit like a scene hides the
+   features and teaches every later page the same shadow. When the wording
+   about the character is wrong, correct the character file and compile
+   again. Do not edit the compiled `prompt`.
 5. Dry-run first:
-   `node scripts/generate-assets.js --package <prompt-package.yaml>`. Read
-   the request it would send, confirm the cost, then repeat with
-   `--live --yes`.
+   `node scripts/generate-assets.js --asset <CHAR_ID> --root <workspace>`
+   runs every sheet package compiled for the character, and
+   `--package <file>` runs one. Read the `GEN_*.request.json` it writes,
+   confirm the cost, then repeat with `--live --yes`.
 6. Open every returned file. Check that it is a drawing in the look's
    style: same line, same black placement, same degree of simplification as
    the look master. A grayscale portrait is not a stylized drawing, however
@@ -72,13 +90,15 @@ describe them again from text.
    `visually_adjacent_to`. Shrunk to panel size, the two must still be
    told apart at a glance. If they cannot, the design goes back to
    `character-consistency`.
-9. Save candidates as `CHAR_<NAME>_<KIND>_V##` under
-   `production/characters/<CHAR_ID>/refs/`. The selected one is saved as
-   `CHAR_<NAME>_<KIND>_MASTER_V##` (for example `CHAR_MARA_TURN_MASTER_V01`)
-   and registered in `production/references/manifest.yaml` with `entity`,
+9. Promote the pick. Generation saves each candidate as
+   `<CHAR_ID>_<TAG>_V##` (for example `CHAR_MARA_TURN_V01.png`) under
+   `production/characters/<CHAR_ID>/refs/`, always the next free version
+   and never under a `_MASTER` name. Save the selected candidate as
+   `<CHAR_ID>_<TAG>_MASTER_V##` (for example `CHAR_MARA_TURN_MASTER_V01`)
+   and register it in `production/references/manifest.yaml` with `entity`,
    `kind`, `path`, `status: review`, and `default_role` (`identity`, or
-   `wardrobe` for an outfit sheet). Each generated file has its generation
-   record under `production/generations/<ASSET_ID>/`.
+   `wardrobe` for an outfit sheet). Each attempt has its generation record
+   and request file under `production/generations/<CHAR_ID>/`.
 10. Record approval per reference. The user approves each sheet
     individually; write `status: approved`, `approved_by`, and
     `approved_at`, then add the asset ID to `character.references` and to
@@ -89,6 +109,8 @@ describe them again from text.
 
 ## Outputs
 
+- Sheet packages under `production/characters/<CHAR_ID>/refs/prompts/`
+  (`prompt-package` schema).
 - Sheet images under `production/characters/<CHAR_ID>/refs/`.
 - Registry entries in `production/references/manifest.yaml`, with status and
   approval per asset.
@@ -103,7 +125,7 @@ describe them again from text.
 - Plain background, even light, consistent scale.
 - Every outfit in `wardrobe.yaml` that appears on a page has a sheet or is
   covered by the turnaround.
-- Every recurring secondary character has at least an identity strip.
+- Every recurring secondary character has at least a turnaround.
 - Every sheet has a registry entry, a status, and a generation record.
   Reference plans cite only assets with `status: approved`.
 

@@ -61,7 +61,9 @@ edition gets a new ID and says what it replaces and what changed.
    attempt.
 5. Overlay lettering: run `/lettering` for any page without a lettered
    output, flatten the SVG over the render in a browser or a vector tool,
-   and set `lettered_file` to the flattened PNG or JPEG. In `in_image` mode
+   and set `lettered_file` to the flattened PNG or JPEG. Its file name
+   starts with the render ID (`<RENDER_ID>.lettered.png`); the build
+   rejects an SVG and a file named for another render. In `in_image` mode
    leave it `null`.
 6. For a correction, set `supersedes` to the earlier edition and list in
    `changes` which page now uses which render and why ("PG_001_002 uses V02
@@ -73,8 +75,13 @@ edition gets a new ID and says what it replaces and what changed.
    production/editions/<ED_ID>/edition.yaml --formats pdf,cbz,web`. The
    script refuses a render without a `pass` or `fixed` review unless
    `--draft` is given, and it skips an export file that already exists.
-   Keep `--force` for rerunning a build nobody has received yet. Once an
-   export has gone to anyone, the answer is a new edition.
+   Without `--formats` it builds the `pdf`, `cbz`, and `web` targets listed
+   in `deliverables`, or `pdf` and `cbz` when none is listed. Keep `--force`
+   for rerunning a build nobody has received yet. It replaces exports only
+   while the edition's status is `draft` or the build is `--draft`; on a
+   `reviewed` or `published` edition the script stops with
+   `force-not-draft`. Once an export has gone to anyone, the answer is a
+   new edition.
 9. Open every export. Count the pages, read them in order, and confirm
    each page is the listed render. Check the page size in the PDF, the
    sort order of the files in the CBZ, and that the web reader advances in
@@ -98,8 +105,11 @@ edition gets a new ID and says what it replaces and what changed.
 - `production/editions/<ED_ID>/edition.yaml`, validates against
   `schemas/edition.schema.json`.
 - `production/editions/<ED_ID>/exports/`: the PDF, the CBZ, and the web
-  reader directory, named by title, issue, and edition, with `-DRAFT` in
-  the name for a draft build.
+  reader directory, named
+  `<title-slug>-<issue number>-ed<edition number>[-DRAFT]` with the
+  extension `.pdf` or `.cbz`, or the suffix `-web` for the reader directory
+  (`the-night-ferry-001-ed01.cbz`, `the-night-ferry-001-ed01-web/`).
+  `-DRAFT` marks a draft build.
 - `production/issues/<ISS_ID>/issue.yaml` and
   `production/story/series-plan.yaml`, `status` updated on publication.
 - The delivery note, in the conversation.
@@ -118,9 +128,11 @@ edition gets a new ID and says what it replaces and what changed.
 - Format differences: a paged edition exports one image per page. A
   webtoon edition exports the segments as one vertical column and follows
   `rules/webtoon/episode-deliverables.md`.
-- `build-edition.js` rewrites `edition.yaml` through the YAML library when
-  it records the exports, so comments written by hand in that file are
-  lost.
+- `build-edition.js` records the exports by replacing only the `exports`
+  block of `edition.yaml`, so comments elsewhere in the file survive and
+  comments inside that block do not. When the block cannot be replaced
+  safely it rewrites the whole file through the YAML library, loses the
+  comments, and says so.
 - Related: `/continuity-review` (gate), `/lettering` (overlay output),
   `/visual-review` (the verdicts this command reads), `/full-production`
   (runs this last).

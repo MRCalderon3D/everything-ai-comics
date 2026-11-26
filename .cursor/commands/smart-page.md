@@ -115,7 +115,8 @@ compiled from files that already agree with each other.
    style block verbatim, the grid, each panel's moment and positions, the
    stated difference between adjacent characters, the state constraints,
    the exact `lettering_text` in `in_image` mode, and the references in
-   attachment order. Set each page's `status` to `prompted`.
+   attachment order. For a page in `per_panel` mode, compile each panel
+   with `--panel <PN_ID>`. Set each page's `status` to `prompted`.
 10. Validate and review the set. Run `node scripts/validate-workspace.js
     --root production --issue <ISS_ID>` and `node scripts/build-board.js
     --issue production/issues/<ISS_ID>`. Then run the self-evaluation gates

@@ -48,22 +48,27 @@ problem belongs to the plan or the references.
    changed object means a prop without `distinguishing_features`. Fix the
    bible, the ledger, or the reference plan first. Sending the same
    ambiguous description again produces the same picture.
-4. Write the repair precisely, in the finding's `repair` field and then in
-   the package: the edit target (the flagged render), the failing panels by
-   ID, the exact changes ("panel 3: give Oskar a round face and a hooded
-   jacket, matching image 2"), and the locked elements ("all lettering,
-   panel borders, Mara in every panel, panels 1, 2, and 4 entirely").
-5. Split the work when findings are of different kinds. Identity repairs
-   go in one request; prop and state repairs go in another. A combined
-   request tends to carry out the most visible change and skip the rest.
-   Each request produces its own version and counts as one cycle, so order
-   them with the blocking findings first.
+4. Write the repair precisely in each finding's `repair` and `expected`
+   fields. The compiler builds the package from the review: the edit target
+   (the flagged render), the failing panels, the exact changes ("Panel 3:
+   Give Oskar a round face and a hooded jacket."), and the locked elements
+   (the panels no finding names, all lettering, the panel borders, the
+   drawing style).
+5. Expect one request per cycle. The compiler sends every open blocking
+   finding of the review together, or every open finding when none is
+   blocking. A combined request tends to carry out the most visible change
+   and skip the rest. What it skips stays `open` in the new review, and the
+   next cycle carries only that, so an identity repair and a prop or state
+   repair end up in separate requests. Each request produces its own
+   version and counts as one cycle.
 6. Compile the repair package:
    `node scripts/compile-prompts.js --page <page.yaml> --repair <review.yaml>`.
    Check `mode: repair`, `edit_target`, and the `repair` block (`of_render`,
-   `findings`, `changes`, `locked`). If the provider lacks `imageEditing`,
-   the repair is a full regeneration from the corrected plan; it is still
-   a sibling version and still a cycle.
+   `findings`, `changes`, `locked`). The script refuses a review at the
+   cycle limit, a review with no open finding, and a provider without
+   `imageEditing` (replicate, comfyui). For those providers, compile with
+   `--provider` for one that can edit, or regenerate the page in full from
+   the corrected plan; it is still a sibling version and still a cycle.
 7. Generate under `image-generation`: dry run, confirmation, live call.
    Save the result as the next version (`<PG_ID>_V##`). Never write over
    the flagged file.

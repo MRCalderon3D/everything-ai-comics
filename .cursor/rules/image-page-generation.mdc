@@ -49,8 +49,9 @@ fields of `page.yaml`. Used by `/generate-pages`, `/repair-page`, and
   chain. Page N+1 is not requested until page N's render has been opened
   and reviewed.
 - Use `scripts/generate-assets.js --issue` for dry runs: cost estimates and
-  handoff packages for a whole issue. Live runs go through `--page` or
-  `--package`, so that nobody renders an issue unattended.
+  handoff packages for a whole issue. It skips pages whose `status` is
+  `reviewed` or `approved`. Live runs go through `--page` or `--package`,
+  so that nobody renders an issue unattended.
 - Reference art for different entities may be generated in the same
   session, since one sheet does not condition another. Pages may not.
 - Parallel candidates of the same page are allowed when the cost was
@@ -67,11 +68,19 @@ fields of `page.yaml`. Used by `/generate-pages`, `/repair-page`, and
   critical references exceed the provider's limit, when a dense page (seven
   or more panels by default) loses panels or merges them in `full_page`, or
   when the same identity defect survived a repair cycle.
-- In `per_panel` mode the panel images are working files. The page still
-  ends as one render with one `<PAGE_ID>_V##` ID, assembled to the layout in
-  `page.yaml`, and the review is of that assembled page. The scaffold's
-  scripts do not composite panels, so the assembly is done in an image
-  tool and noted in the generation record's `response.summary`.
+- Each panel is compiled on its own:
+  `compile-prompts.js --page <page.yaml> --panel <PN_ID>` writes
+  `prompts/<provider>.<PN_ID>.yaml` with the id
+  `PP_<PAGE_ID>_<PROVIDER>-P##`, carrying only the references that panel
+  needs. `build-reference-plan.js` checks the budget against the fullest
+  panel, and `generate-assets.js --page` runs the panel packages it finds.
+- In `per_panel` mode the panel images are working files. A panel request
+  yields no page render: its image is kept beside its record under
+  `generations/<PAGE_ID>/`. The scaffold has no compositor, so the panels
+  are assembled to the layout in `page.yaml` outside the scaffold, in an
+  image tool. The result is saved by hand as the next `<PAGE_ID>_V##` in
+  `renders/` and the assembly is noted in the generation record's
+  `response.summary`. The review is of that assembled page.
 - `per_panel` pairs naturally with `overlay` lettering, since balloons often
   cross what would be separate requests.
 - The mode is a planning decision. Changing it after a failed render counts
@@ -122,7 +131,9 @@ fields of `page.yaml`. Used by `/generate-pages`, `/repair-page`, and
 ## Generation records and unavailable metadata
 
 - Every request produces one record under `generations/<scope>/`, dry runs
-  included.
+  included, and a `GEN_*.request.json` beside it. The request file is the
+  handoff package for `harness-native` and `manual`, and it keeps the
+  request as sent after the prompt package is recompiled for a repair.
 - `model` is the model string the tool reported, or the literal
   `unreported`. `cost.amount` is the reported number, or `null` with
   `cost.reported: false`. `seed` is the reported integer, or `null`.

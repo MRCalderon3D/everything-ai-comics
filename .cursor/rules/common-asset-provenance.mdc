@@ -35,8 +35,8 @@ material the user supplies.
 
 Every generation, live or dry-run, produces a record that conforms to
 `schemas/generation-record.schema.json` and is stored under
-`generations/<PG_ID or ASSET_ID>/`. Its ID is `GEN_<page-id>_<attempt##>` or
-`GEN_<asset-id>_<attempt##>`. Each record MUST carry:
+`generations/<PG_ID or ENTITY_ID>/`. Its ID is `GEN_<page-id>_<attempt##>` or
+`GEN_<entity-id>_<attempt##>`. Each record MUST carry:
 
 - `provider`, and `model` as the provider reported it.
 - `prompt_package`: the ID of the compiled package that was sent. The package
@@ -49,8 +49,14 @@ Every generation, live or dry-run, produces a record that conforms to
 - `seed` when the provider exposes it.
 - `status` and an ISO 8601 `created_at`.
 
-The prompt package and the reference versions it names are kept for as long
-as the render exists. Deleting a package orphans its record.
+`generate-assets.js` writes a `GEN_*.request.json` beside each record: the
+prompt, the ordered reference images with their roles, and the target file.
+For `harness-native` and `manual` it is the handoff package. It keeps the
+request as sent after the prompt package is recompiled for a repair, which
+overwrites `prompts/<provider>.yaml`.
+
+The reference versions a package names are kept for as long as the render
+exists. Deleting a request file or a referenced image orphans the record.
 
 ## Unavailable metadata
 
@@ -87,19 +93,24 @@ usually report neither model, nor cost, nor seed.
 - Failed and rejected attempts keep their records and their files. Set the
   record's `status` to `failed` or `rejected`. NEVER delete a record or a
   render to hide a bad attempt.
-- A master promoted from a generation keeps its generation record. The
-  registry entry and the record point at the same file.
+- A master promoted from a generation keeps its generation record. Promotion
+  copies the chosen candidate to the `_MASTER` name; the candidate file the
+  record names stays in place.
 
 ## Validation
 
 - `scripts/validate-workspace.js` schema-checks every record against
   `generation-record.schema.json`, which accepts `unreported` and `null` in
   the fields above and requires `cost.reported` and `cost.estimated`.
-- `scripts/generate-assets.js` writes a record under `generations/` for every
-  run, dry-run included.
+- `scripts/generate-assets.js` writes a record and a request file under
+  `generations/` for every run, dry-run included.
+- `scripts/validate-workspace.js` fails a record whose `metadata_unavailable`
+  list contradicts its `model`, `cost`, or `seed` fields, and a cost amount
+  that was neither reported nor marked as an estimate.
 - `scripts/build-reference-plan.js` and `scripts/compile-prompts.js` look
-  assets up in `references/manifest.yaml`. A hand-written package that points
-  at an unregistered file is a finding for `production-qa`.
+  assets up in `references/manifest.yaml` and attach only approved ones.
+  `scripts/validate-workspace.js` reports a page, reference plan, or page
+  prompt package that cites an unregistered asset.
 - No script can tell a reported value from an invented one. `production-qa`
   compares records with what the tool returned, and unexplained gaps in a
   lineage go to human review.

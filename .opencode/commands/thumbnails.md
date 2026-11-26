@@ -28,10 +28,8 @@ is free.
 - `pages` (ID or range, optional): limit the run; default is every page
   with `status: scripted` or later that has no thumbnail.
 - `render` (enum, optional, default `text`): `text` (a written rough, free)
-  | `sketch` (a rough image from the provider, cost-gated).
-- `provider` (string, optional, default from `project.yaml`): used only
-  with `render: sketch`.
-- `--live` (flag, optional, default off): call the provider for sketches.
+  | `sketch` (a rough image from the harness's image tool or from a person,
+  cost-gated when the tool charges).
 
 ## Invokes Agents
 
@@ -52,10 +50,13 @@ is free.
    and `level`, the direction they face, and the area kept clear for each
    lettering element. Save the rough in the page's `thumbnails/` directory
    with a round number (`thumb-01.md`) and keep earlier rounds.
-3. With `render: sketch`, cost gate first: estimate pages x provider rate,
-   show it, and wait for confirmation. The sketch asks for composition
-   only and is saved as `thumbnails/thumb-##.png` with a generation
-   record.
+3. With `render: sketch`, cost gate first: estimate pages x the tool's
+   rate, show it, and wait for confirmation. The scaffold's scripts compile
+   finished pages and reference sheets only, so a sketch has no prompt
+   package and does not go through `generate-assets.js`. Ask the harness's
+   image tool, or a person, for composition only, from the written rough.
+   Save the result as `thumbnails/thumb-##.png` and note the tool and any
+   cost in the round's `thumb-##.md`.
 4. Run the reading test on the whole page. The eye moves through the panels
    in `layout.reading_order` without help from arrows. Balloons are met in
    their `order`. The largest panel is the one the page's `purpose` points
@@ -81,9 +82,8 @@ is free.
 - `production/issues/<ISS_ID>/pages/<PG_ID>/thumbnails/thumb-##.md`, the
   written rough, one file per round (human document, no schema).
 - With `render: sketch`:
-  `production/issues/<ISS_ID>/pages/<PG_ID>/thumbnails/thumb-##.png` and a
-  record under `production/generations/<PG_ID>/`
-  (`schemas/generation-record.schema.json`).
+  `production/issues/<ISS_ID>/pages/<PG_ID>/thumbnails/thumb-##.png`, with
+  the tool and its cost noted in the written rough of the same round.
 - `production/issues/<ISS_ID>/pages/<PG_ID>/page.yaml`, corrected where the
   test failed (`schemas/page.schema.json`).
 

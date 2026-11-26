@@ -75,11 +75,15 @@ on top of the finished art (`overlay`).
    size states the volume, its position marks the source, and its shape
    follows the motion that made it. Keep each one short, place it at the
    thing that makes the noise, and do not put it in a balloon.
-8. Choose the mode from `lettering.mode`. Use `in_image` only with a provider
-   whose `textRendering` is `reliable`, or when the user accepts repair
-   cycles for text. Otherwise use `overlay`.
-9. `in_image`: the page prompt carries every string and its placement, and
-   the prompt package lists the strings under `lettering_text`. After
+8. Choose the mode from `lettering.mode`. No provider declares
+   `textRendering: reliable`, so use `in_image` only when the user accepts
+   repair cycles for text, and never with a provider whose value is `none`
+   (comfyui): the compiler refuses it. Otherwise use `overlay`.
+9. `in_image`: the page prompt carries every string with its panel, type,
+   speaker, and reading order, and asks for balloons clear of faces, hands,
+   and the action. It carries no coordinates, so reserve the room a balloon
+   needs in the panel's `framing.composition`. The prompt package lists the
+   strings under `lettering_text`. After
    generation, the review's `lettering` check compares each drawn string
    with `page.yaml` letter by letter. A wrong letter is a finding and a
    repair. Nobody retypes text into the image by hand.
@@ -105,8 +109,8 @@ on top of the finished art (`overlay`).
   page-wide `order` (`page.schema.json`).
 - Overlay mode: `production/issues/<ISS_ID>/pages/<PG_ID>/lettering.yaml`
   (`lettering.schema.json`) and `renders/<RENDER_ID>.lettered.svg`.
-- In-image mode: placement notes per panel that `prompt-compilation` carries
-  into the request.
+- In-image mode: placement notes per panel for the reviewer, and the room
+  each balloon needs written into the panel's `framing.composition`.
 - A lettering check per page: strings compared, budgets counted, order
   traced.
 

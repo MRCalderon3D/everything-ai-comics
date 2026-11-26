@@ -74,8 +74,9 @@ manifest with their origin.
    put the choice to the user: supersede the canon, or demote the item to
    inspiration. Nothing is merged without that answer.
 7. Write the promotion plan: which items can go through `draft` to `review`
-   to `approved` as they are, and which should condition a sheet in
-   `/visual-development` because they are not in the comic's style.
+   to `approved` as they are, and which should only inform a sheet in
+   `/visual-development`, through the description written in step 4,
+   because they are not in the comic's style.
 8. Run `node scripts/validate-workspace.js --root production`, then the
    self-evaluation gates on the files this run touched. Report the items
    ingested, the role given to each, the conflicts, and the plan.
@@ -93,7 +94,7 @@ manifest with their origin.
 ## Notes
 
 - Run this before `/visual-development` whenever the user has material, so
-  the sheets are generated from their references.
+  the sheets are compiled from bible entries that already describe it.
 - One role per image holds from the moment a file is registered. If one
   picture is needed for both a face and a coat, crop it into two files and
   register each.

@@ -89,8 +89,9 @@ every render that depicts a `LOC_*` entity.
   landmark the map does not define (`UNKNOWN_REFERENCE`, ledger rule 11). For
   a location with no `map.yaml` this is a warning, and the location still
   needs its map under this rule.
-- `scripts/validate-workspace.js` schema-checks location and map files and
-  resolves the IDs they cite.
+- `scripts/validate-workspace.js` schema-checks location and map files,
+  checks that each ID matches its directory, and reports a scene whose
+  `location` has no location file.
 - `hooks/detect-continuity-drift.js` is advisory: it warns on write and never
   blocks.
 - Whether the drawn architecture, dressing, light, and sides match the plate

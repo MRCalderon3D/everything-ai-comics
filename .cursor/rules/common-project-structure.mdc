@@ -50,10 +50,10 @@ production/
 ├── project.yaml               # project.schema.json
 ├── story/                     # source/ (source text), story-bible.yaml, series-plan.yaml
 ├── style/                     # style-bible.md, style-block.txt (frozen prompt block), color-script.md
-├── characters/                # <CHAR_ID>/character.yaml, wardrobe.yaml, refs/
-├── locations/                 # <LOC_ID>/location.yaml, map.yaml, refs/
-├── props/                     # <PROP_ID>/prop.yaml, refs/
-├── references/                # manifest.yaml (registry of ALL reference material), inbox/, style/, docs/
+├── characters/                # <CHAR_ID>/character.yaml, wardrobe.yaml, refs/ (sheets, prompts/)
+├── locations/                 # <LOC_ID>/location.yaml, map.yaml, refs/ (plates, prompts/)
+├── props/                     # <PROP_ID>/prop.yaml, refs/ (sheets, prompts/)
+├── references/                # manifest.yaml (registry of ALL reference material), inbox/, style/ (look pages, prompts/), docs/
 ├── issues/
 │   └── <ISS_ID>/
 │       ├── issue.yaml         # issue.schema.json
@@ -64,10 +64,10 @@ production/
 │               ├── lettering.yaml         # lettering.schema.json (overlay mode only)
 │               ├── reference-plan.yaml    # reference-plan.schema.json
 │               ├── thumbnails/            # rough layouts
-│               ├── prompts/               # <provider>.yaml (prompt-package.schema.json)
+│               ├── prompts/               # <provider>.yaml, <provider>.<PN_ID>.yaml (prompt-package.schema.json)
 │               ├── renders/               # <PG_ID>_V##.png|jpg versioned candidates, never overwritten
 │               └── reviews/               # <RENDER_ID>.review.yaml (visual-review.schema.json)
-├── generations/               # <PG_ID or ASSET_ID>/GEN_*.yaml (generation-record.schema.json)
+├── generations/               # <PG_ID or ENTITY_ID>/GEN_*.yaml (generation-record.schema.json), GEN_*.request.json
 ├── continuity/                # <ISS_ID>.final-state.yaml (continuity-state.schema.json)
 └── editions/
     └── <ED_ID>/               # edition.yaml (edition.schema.json), exports/
@@ -91,7 +91,12 @@ production/
   reviews. A review file sits in `reviews/` and is named after the render it
   judges.
 - Generation records live under `generations/`, in a directory named after
-  the page or asset they produced.
+  the page or the entity they were made for. Each record has its request
+  file, `GEN_*.request.json`, beside it.
+- The prompt package of a reference sheet sits in a `prompts/` directory
+  inside the entity's `refs/`, and a look page's in
+  `references/style/prompts/`. `compile-prompts.js --asset` writes them
+  there.
 - One continuity file per issue, written at the end of the issue. Per-panel
   state lives in the ledger rows of `page.yaml`.
 - Each edition has its own directory. Exports go in its `exports/` and are
