@@ -1,0 +1,165 @@
+/* Tokens, reset and type. The palette comes from the drawing board: paper,
+   ink, non-photo blue for guides and anything interactive, and the yellow of
+   a caption box for the one thing to do next. */
+
+:root {
+  --paper: #eceff2;
+  --surface: #ffffff;
+  --surface-2: #f5f6f8;
+  --ink: #14171c;
+  --ink-2: #434956;
+  --ink-3: #626a78;
+  --line: #c7ccd5;
+  --rule: #14171c;
+  --blue: #1a659b;
+  --blue-wash: #dcedf8;
+  --caption: #ffd84a;
+  --caption-ink: #14171c;
+  --bad: #ae241c;
+  --bad-wash: #fbe8e6;
+  --ok: #19654a;
+  --ok-wash: #e2f1ea;
+  --warn: #7d5200;
+  --warn-wash: #fff2cc;
+  --shade: rgba(20, 23, 28, 0.55);
+  --art-bg: #dfe3e8;
+  --gutter-ink: #14171c;
+
+  --font-display: "Bahnschrift", "DIN Alternate", "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif;
+  --font-body: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Noto Sans", sans-serif;
+  --font-file: "Cascadia Mono", "Consolas", "SF Mono", "Menlo", "DejaVu Sans Mono", monospace;
+
+  --step--1: 0.8125rem;
+  --step-0: 0.9375rem;
+  --step-1: 1.0625rem;
+  --step-2: 1.3125rem;
+  --step-3: 1.75rem;
+  --step-4: 2.375rem;
+
+  --gap: 12px;
+  --gutter: 20px;
+  --radius: 3px;
+  --topbar: 52px;
+  --rail: 212px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #13161b;
+    --surface: #1c2027;
+    --surface-2: #242932;
+    --ink: #e9ebee;
+    --ink-2: #bbc0ca;
+    --ink-3: #959ca8;
+    --line: #3b414c;
+    --rule: #aab0bb;
+    --blue: #7cc3f0;
+    --blue-wash: #173146;
+    --bad: #ff948a;
+    --bad-wash: #3b1c19;
+    --ok: #7fd3b0;
+    --ok-wash: #14301f;
+    --warn: #f2c14e;
+    --warn-wash: #3a2e10;
+    --shade: rgba(0, 0, 0, 0.7);
+    --art-bg: #0d0f13;
+    --gutter-ink: #05070a;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #13161b;
+  --surface: #1c2027;
+  --surface-2: #242932;
+  --ink: #e9ebee;
+  --ink-2: #bbc0ca;
+  --ink-3: #959ca8;
+  --line: #3b414c;
+  --rule: #aab0bb;
+  --blue: #7cc3f0;
+  --blue-wash: #173146;
+  --bad: #ff948a;
+  --bad-wash: #3b1c19;
+  --ok: #7fd3b0;
+  --ok-wash: #14301f;
+  --warn: #f2c14e;
+  --warn-wash: #3a2e10;
+  --shade: rgba(0, 0, 0, 0.7);
+  --art-bg: #0d0f13;
+  --gutter-ink: #05070a;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { color-scheme: light dark; }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: var(--step-0)/1.5 var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-stretch: 87%;
+  line-height: 1.15;
+  margin: 0;
+  letter-spacing: 0.005em;
+}
+h1 { font-size: var(--step-4); }
+h2 { font-size: var(--step-3); }
+h3 { font-size: var(--step-2); }
+h4 { font-size: var(--step-1); }
+
+p { margin: 0 0 0.75em; max-width: 72ch; }
+p:last-child { margin-bottom: 0; }
+ul, ol { margin: 0; padding: 0; list-style: none; }
+img { max-width: 100%; display: block; }
+a { color: var(--blue); text-underline-offset: 0.15em; }
+a:hover { text-decoration-thickness: 2px; }
+small, .small { font-size: var(--step--1); }
+code, pre, .file-text { font-family: var(--font-file); font-size: 0.8125rem; }
+pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+hr { border: 0; border-top: 1px solid var(--line); margin: var(--gutter) 0; }
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+legend { padding: 0; }
+summary { cursor: pointer; }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+:focus { outline: none; }
+:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.muted { color: var(--ink-2); }
+.faint { color: var(--ink-3); }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+[hidden] { display: none !important; }
+
+.skip-link {
+  position: absolute; left: 8px; top: -60px; z-index: 100;
+  background: var(--caption); color: var(--caption-ink);
+  padding: 8px 12px; border: 2px solid var(--rule);
+}
+.skip-link:focus { top: 8px; }
+
+.boot { padding: 12vh var(--gutter); max-width: 40rem; margin: 0 auto; color: var(--ink-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
