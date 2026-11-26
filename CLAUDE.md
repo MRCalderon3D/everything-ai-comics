@@ -24,6 +24,7 @@ npm test                  # node tests/run-all.js: scaffold self-tests
 npm run validate          # full validation gate (what CI runs)
 npm run doctor            # diagnose an install: env, providers, harness wiring
 npm run sync:harnesses    # regenerate .claude/ .codex/ .cursor/ .opencode/ .agents/
+npm run studio            # the web studio at http://127.0.0.1:4310 (STUDIO_FAKE_AI=1 for no real AI)
 ```
 
 Run a single test file directly: `node tests/<file>.test.js`.
@@ -75,6 +76,15 @@ cross-references, and an example workspace that no longer passes its gates.
   mechanical gate. Tests and `npm run validate` run against it.
 - `scripts/lib/workspace.js`: the one place that knows the workspace layout.
   Scripts and hooks go through it.
+- `studio/`: the web studio, a local app for people who do not work from an
+  editor (`npm run studio`). `studio/server/` is a zero-dependency HTTP
+  server that calls the scripts as modules and runs the Claude Code and Codex
+  CLIs for the AI steps; `studio/web/` is the browser app in plain ES
+  modules with no build step; `studio/prompts/` holds the prompt templates;
+  `studio/docs/api.md` is the API contract, with examples recorded from a
+  fake-mode run (`node studio/test-support/record-api-examples.js`). Tests
+  are `tests/studio-*.test.js` and run with `STUDIO_FAKE_AI=1`, so they
+  never call a real tool.
 
 The full authoring contract is `docs/conventions.md` (rosters, frontmatter
 formats, ID scheme, command → agent → skill map, provider interface, manifest

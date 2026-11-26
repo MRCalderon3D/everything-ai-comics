@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Web studio (`studio/`, `npm run studio`): a local web app that runs the
+  pipeline from the browser. It creates a project from a description, defines
+  the style from a preset, a text, or reference images, writes and draws
+  character sheets, plans and draws pages in a queue, shows the check of each
+  page with its evidence, takes corrections on a region or a panel, makes an
+  optional cover, and publishes PDF, CBZ, EPUB, a web reader, or numbered
+  images. Every screen has the text, the images, and a chat that can change
+  the files. Each finished step is a commit in the project's own git
+  repository, and the History screen restores an earlier point. The AI runs
+  through the Claude Code and Codex command-line tools with no API key. The
+  server and the browser app have no dependencies. The interface is in
+  English and Spanish.
 - Image provider `codex-cli`: draws through the Codex command-line tool the
   user is signed in to. A live run starts `codex exec` with the reference
   images attached in order and the prompt on stdin, and saves the result as

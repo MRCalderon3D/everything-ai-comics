@@ -28,6 +28,11 @@ says nothing about a drawing, and reports keep the two results apart.
 The craft behind each step is in [workflow.md](workflow.md). The list of
 commands in pipeline order is in [commands/README.md](../commands/README.md).
 
+This guide is for working from an editor. The same pipeline can be run from
+the browser with the web studio: `npm run studio` starts it, and
+[studio/README.md](../studio/README.md) explains it. A project made in one
+opens in the other.
+
 ## 1. Get set up
 
 Clone and open the folder in your assistant. There is no install step.

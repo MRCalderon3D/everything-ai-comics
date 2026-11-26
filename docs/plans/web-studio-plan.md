@@ -208,15 +208,30 @@ Three things changed from the first draft of this plan:
 - Prompts name the command file to follow (`commands/<name>.md`) and do not
   use slash commands, so the same prompt works in both tools.
 
-## Open decisions
+### First complete run (2026-11-26)
+
+A two-page comic with a cover went through the studio with the real tools:
+project setup 92 s, style 152 s, look page 157 s, each character with its
+sheet about three minutes, the plan for two pages 496 s, the two pages 1914 s,
+the cover 491 s, the five export formats 5 s. Every job finished and the
+workspace validated with no errors.
+
+The run showed one wrong default. Every page ended flagged after two
+repairs, although the first renders were good: the findings were all minor
+(a title in capitals, a watch on the other wrist) and the studio repaired
+any open finding. Each repair cost about five minutes and added small new
+defects. The policy in the table below came out of that. With it, a second
+review of the same two pages gave one pass and one pass with a note.
+
+## Decisions
 
 | Decision | Recommendation |
 |---|---|
 | Local app or hosted service | Decided: local. Each user runs it with their own Claude Code or Codex login. |
 | Who draws | Decided: Codex. No paid APIs in the first version. |
-| Where the code lives | `studio/` in this repository, separate package. |
+| Where the code lives | Decided: `studio/` in this repository, with no dependencies. |
 | How much of the plan the person sees before generation | A short readable page plan to approve. The ledger stays behind an "advanced" switch, but its errors are always shown. |
-| Automatic repair before showing a page | Up to the project's repair limit, then show the page as flagged with the evidence. |
+| Automatic repair before showing a page | Decided after the first real run: only blocking findings and failed gates start a repair, up to the project's repair limit. A page with minor findings passes and lists them as notes. A change request that arrives at the limit goes into the page plan and the page is drawn again. |
 
 ## Risks
 

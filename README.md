@@ -25,12 +25,16 @@ Rendered pages are judged by looking at them.
 
 ---
 
-There is no comic in this repository and no application to run. It holds a
-scaffold: rules, agents, commands, skills, and contexts that a coding
-assistant loads, and a set of Node.js scripts that check what the assistant
-writes. You open a project in Claude Code, Codex, Cursor, or OpenCode and run
-slash commands. The work accumulates as YAML and Markdown in a `production/`
-workspace: canon, bibles, page plans, prompt packages, reviews, editions.
+There is no comic in this repository. It holds a scaffold: rules, agents,
+commands, skills, and contexts that a coding assistant loads, and a set of
+Node.js scripts that check what the assistant writes. You open a project in
+Claude Code, Codex, Cursor, or OpenCode and run slash commands. The work
+accumulates as YAML and Markdown in a `production/` workspace: canon, bibles,
+page plans, prompt packages, reviews, editions.
+
+People who would rather not work from an editor can use the
+[web studio](#web-studio), a local app that drives the same scaffold from the
+browser and writes the same files.
 
 Image models draw a convincing single page. Across a sequence they swap one
 character's face for another's and lose track of who is holding what. The
@@ -124,6 +128,65 @@ The commands a newcomer meets first:
 The full walkthrough is [docs/getting-started.md](docs/getting-started.md).
 Every command is listed in pipeline order in
 [commands/README.md](commands/README.md).
+
+## Web studio
+
+The studio is a web app that runs on your own machine. You describe a comic,
+pick a style, add characters, write what happens on each page, and get drawn
+pages with a written check of each one. It has no dependencies to install:
+
+```bash
+npm run studio
+```
+
+That serves `http://127.0.0.1:4310` and opens the browser. The interface is
+in English and Spanish.
+
+![The overview of a project in the studio: the nine steps and what comes next](docs/images/studio-overview.png)
+
+The AI behind it is the command-line tools you are already signed in to.
+Claude Code plans, writes, and reviews. Codex draws. No API key is involved,
+and usage counts against those subscriptions. With only one of the two
+installed the studio still works: without Codex you draw the pages elsewhere
+and upload them, and without Claude Code, Codex does all three jobs and each
+review is marked as not independent.
+
+| Step | What you do |
+|---|---|
+| Story | Describe what the comic is about. The studio writes the story bible and the series plan, and you edit them. |
+| Style | Pick a preset, describe a style, or upload reference images. Approve a look page, which freezes the style. |
+| Characters | Add each character from a description, a photo, or both. Approve the drawn sheet. |
+| Pages | Write what happens, on one page or several. Read the plan per page, then start the drawing queue. |
+| Check | Read the verdict of each page with its evidence: what was expected and what is on the page. |
+| Corrections | Mark a region or pick a panel, write the change, and compare the new version with the old one. |
+| Cover | Optional. Describe it or let the AI propose one. |
+| Publish | Build PDF, CBZ, EPUB, a web reader, or one image per page. |
+
+Every step shows the text and the images of what is being made. You change
+anything by editing it or by asking the chat on that screen. Each finished
+step is a commit in a local git repository inside the project, so the History
+screen can take the project back to an earlier point.
+
+![The check of a page: the verdict, the evidence, and the page beside it](docs/images/studio-check.png)
+
+A project made in the studio is an ordinary workspace. Open its folder in
+your editor and the slash commands work on it, and the other way round.
+
+A check is an AI reading the image next to the plan and the reference
+sheets. It catches a lot and it is not a guarantee, so the studio always
+shows the evidence and leaves the decision to you. Blocking problems are
+repaired automatically, up to the project's repair limit. Smaller
+observations are listed as notes, and any note can become a correction.
+
+Timings from the first complete run with the real tools, a two-page comic
+with a cover: the story took a minute and a half, the style two and a half,
+each drawing two to five minutes, the plan for two pages eight minutes, and
+a review under a minute.
+
+Details are in [studio/README.md](studio/README.md). The HTTP API is in
+[studio/docs/api.md](studio/docs/api.md), and the plan the studio was built
+from, with the results of the three spikes, is in
+[docs/plans/web-studio-plan.md](docs/plans/web-studio-plan.md).
 
 ## Repository model
 

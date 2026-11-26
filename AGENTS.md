@@ -9,7 +9,10 @@ harness-specific framing).
 A layered workflow scaffold for AI-assisted comic creation. The deliverables are
 Markdown (rules, agents, commands, skills, contexts), JSON (schemas, manifests),
 YAML templates, an example workspace, and a zero-dependency Node.js tooling
-layer. There is no app, no build, no UI.
+layer. The scaffold has no build and no UI of its own. `studio/` is a
+separate layer on top of it: a local web app with no dependencies
+(`npm run studio`), documented in `studio/README.md`. Its tests are
+`tests/studio-*.test.js`.
 
 ## Working here
 

@@ -12,7 +12,11 @@ A layered workflow scaffold for AI-assisted comic creation: rules, agents,
 commands, skills, and contexts that a coding assistant (Claude Code, Codex,
 Cursor, OpenCode) loads to take a project from source text to a published
 edition. It generates and maintains structured files inside a `production/`
-workspace. It is not an app and has no UI.
+workspace. The scaffold itself has no UI. `studio/` is a separate layer: a
+local web app, with no dependencies, that drives the scaffold through the
+Claude Code and Codex command-line tools and writes the same workspace files
+(`studio/README.md`, `studio/docs/api.md`). Nothing in the scaffold depends
+on it.
 
 Language: **English**, everywhere. Style: imperative, concise, no marketing prose.
 
