@@ -1,0 +1,152 @@
+---
+name: text-humanization
+description: Write and rewrite prose so it reads like a person wrote it, removing the catalogued AI-writing tells.
+origin: everything-ai-comics
+category: story
+---
+
+# Text Humanization
+
+## Purpose
+
+Make every piece of human-facing prose this scaffold produces read like it
+was written by a person with moderate hurry and good judgment. That covers
+loglines, summaries, bible entries, character notes, panel descriptions,
+dialogue, captions, review findings, and edition notes. The catalogue of
+tells is based on Wikipedia's "Signs of AI writing". This skill applies by
+default to all generated text (see `rules/writing/prose-style.md`). It does
+not wait to be asked for.
+
+## Use When
+
+- Any command or agent is about to write or rewrite prose in `production/`.
+- The user asks to humanize, rewrite, draft, fix, or improve a text, or asks
+  that something "not sound like AI", "sound natural", or "sound human".
+- `/humanize` is invoked on a file or on pasted text.
+
+## Inputs
+
+- The text to rewrite, or the brief for new text.
+- Target register: script, bible entry, review notes, back-cover copy,
+  solicitation text.
+- The original author's voice, when rewriting. Keep its idioms and its
+  personality.
+- The `--check` flag, when the user wants an audit and no rewrite.
+
+## Process
+
+1. If rewriting: preserve meaning, facts, and intent. Never summarize content
+   away and never invent new information.
+2. If drafting: write from scratch under these rules from the first line.
+3. Sweep for the banned vocabulary and structures below and rewrite every
+   hit. Rewrite the sentence; swapping in a synonym keeps the tell.
+4. Vary sentence and paragraph length. Break any mechanical rhythm.
+5. With `--check`, stop before rewriting: list each finding with its
+   pattern, its location, and a suggested fix, and leave the text as it is.
+6. Otherwise deliver clean text. Do not annotate or explain the edits unless
+   asked.
+
+## Banned patterns
+
+### Vocabulary tells
+
+Never use these or close variants: delve, dive into, tapestry, vibrant,
+metaphorical landscape, realm, testament to, crucial, pivotal, essential,
+key as a filler adjective, comprehensive, seamless, robust, holistic,
+innovative, cutting-edge, powerful, game-changer, revolutionize, foster,
+leverage, unlock, elevate, embark on a journey, "in today's fast-paced
+world", "in the ever-evolving...", "it's important to note", "it's worth
+noting", "it's worth mentioning", "stands as", "serves as", "plays a vital
+role", "rich cultural heritage", and underscores, highlights, showcasing, or
+reflecting used as analytical filler. As paragraph openers: moreover,
+furthermore, additionally.
+
+### Structural tells
+
+- Negative parallelism: "it's not X, it's Y" and "not just X, but Y".
+  Banned.
+- Rule of three on autopilot ("fast, reliable, and secure"). At most one
+  three-item run per text, and only when the content really comes in threes.
+- Present-participle analytical tails glued to plain facts ("..., ensuring
+  consistency", "..., highlighting its enduring influence"). State the fact
+  and stop.
+- Vague attribution: "experts agree", "many believe". Name the source or cut
+  the claim.
+- Summary closers ("In conclusion", "In summary", "Overall", "Ultimately")
+  and restating what a section just said. Trust the reader.
+- Artificial balance: "while challenges remain, the future looks bright".
+- Significance inflation: tying a small fact to grand themes ("a step
+  toward...", "contributes to the broader...").
+
+### Formatting tells
+
+Bold sprinkled through body text. Bullet lists for content that belongs in
+prose. Emoji in headings. Title Case In Every Heading. Em dashes as a verbal
+tic (use commas, periods, colons, or parentheses). Rigid
+Introduction/Challenges/Future/Conclusion scaffolding. Paragraphs of uniform
+length.
+
+### Tone tells
+
+Promotional enthusiasm the content has not earned ("stunning", "remarkable",
+"exceptional"), and brochure or press-release voice in documents that are
+working notes.
+
+## What to do instead
+
+- Mix short and long sentences, the way people talk.
+- Use concrete, subject-specific vocabulary. Put data before adjectives, let
+  facts speak, and let the reader conclude.
+- Vary the connectors, or use none when the thread is obvious.
+- Small human moves are fine: a sentence starting with "And" or "But", an
+  occasional rhetorical question, a colloquialism that fits the register.
+- Match the register the user or the document demands. If it is truly
+  ambiguous, ask once.
+- Write in the user's language unless the target document is repository
+  content, which is English. Lettering text follows `project.language`.
+
+## Outputs
+
+- The rewritten or newly drafted text, in place of the original when a file
+  was given.
+- With `--check`: a findings list (pattern, location, suggested fix) and no
+  rewrite.
+
+## Quality Bar
+
+- Zero hits from the banned-pattern lists on a final pass.
+- Meaning, facts, and authorial voice intact after a rewrite.
+- Reads aloud without a detectable template rhythm.
+- Dialogue and captions still fit the `project.lettering` word budgets after
+  a rewrite.
+
+## Common Failure Modes
+
+- Swapping banned words for synonyms while keeping the inflated register.
+- "Humanizing" structured data. YAML fields, IDs, enums, and provider prompt
+  packages are out of scope. Prompt text answers to `prompt-compilation`,
+  which needs dense literal description and no conversational prose. The
+  frozen `style/style-block.txt` is never touched.
+- Adding errors or slang to fake humanity. Natural is not sloppy.
+- Losing comic script format while relaxing the prose inside it
+  (`rules/writing/comic-script-format.md` still applies).
+- Rewriting `lettering[].text` on a page that already has a render. With
+  in-image lettering the picture now disagrees with the script and the
+  lettering check fails. Route that change through `/panel-script`.
+- Smoothing a character's voice into the narrator's. A character who speaks
+  in fragments keeps speaking in fragments.
+
+## Related Agents
+
+- script-editor
+- comic-writer
+
+## Related Commands
+
+- humanize
+
+## Notes
+
+Every prose-producing command inherits this skill through
+`rules/writing/prose-style.md`. `/humanize` exists for retrofitting existing
+text and for spot checks with `--check`.

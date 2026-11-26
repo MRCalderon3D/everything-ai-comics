@@ -1,0 +1,124 @@
+---
+name: source-analysis
+description: Decompose source prose or a script into events, entities, and a complete fact registry.
+origin: everything-ai-comics
+category: story
+---
+
+# Source Analysis
+
+## Purpose
+
+Read the source text and write down what it states: the events in order, who
+and what is present, and every fact a drawing could get wrong. The result is
+the fact registry in `story/story-bible.yaml`. Bibles, page plans, and prompts
+all trace back to it, so a fact missed here is a fact some later page will
+invent.
+
+## Use When
+
+- New source text (a prose chapter, a short story, an existing script) lands
+  in `production/story/source/`.
+- The source is revised and events, entities, or facts may have changed.
+- A bible or page plan cites a character, place, or object with no fact
+  behind it.
+
+## Inputs
+
+- Source files under `production/story/source/`.
+- `production/project.yaml` for title, language, and publication type.
+- The existing `production/story/story-bible.yaml` when re-analyzing, so fact
+  IDs stay stable.
+
+## Process
+
+1. Number the paragraphs of each source file and cite them as
+   `story/source/<file>#p<N>` (a range is `#p3-p5`). Every claim written
+   below points at one of these anchors through `source_ref`.
+2. List the events in story order as `timeline` entries: `order`, `event`,
+   and `issue` once a series plan exists. One entry per thing that happens.
+   When the source tells events out of order, `order` still follows story
+   time and the event text says how the source presents it.
+3. Register the entities. Characters get `CHAR_<NAME>` and a row in
+   `characters` with a `role`. Locations get `LOC_<NAME>`. Props get
+   `PROP_<NAME>` when someone handles them, when the text names them twice,
+   or when the plot depends on them. The story bible has no location or prop
+   list of its own, so each one enters the registry through at least one fact
+   that carries its ID in `affects`.
+4. Record physical description in the source's own words: age, build, hair,
+   face, clothing, and any mark. Quote the wording inside the fact statement.
+   "Cropped grey hair" stays "cropped grey hair".
+5. Follow every object through the text. Write a fact for who holds it at its
+   first appearance and a fact for each time it changes hands, is dropped, or
+   is put away. An object the narration stops mentioning is still wherever it
+   was left.
+6. Record injuries and physical states as facts: which body part, which side,
+   when it happens, and whether the source says it heals. "Oskar has a cut on
+   his left hand" is a fact. "Oskar is hurt" is an open question.
+7. Write each fact as one checkable statement: `id` (`FACT_###`, never
+   reused), `statement`, `provenance: source`, `source_ref`, `replaces: null`,
+   and `affects` with every entity the fact constrains.
+8. Record what the source leaves unresolved under `open_questions`, each with
+   `question`, `blocking`, and `resolution: null`. Set `blocking: true` when a
+   drawing depends on the answer: which hand, who holds the object, where
+   someone stands, what someone wears. Never fill the gap with a guess.
+9. On a re-analysis, keep existing fact IDs and append new ones. A fact the
+   revised source no longer supports is reported to the user and stays in
+   the file until they decide.
+10. Run `node scripts/validate-workspace.js --root <workspace>` and fix
+    schema errors before handing the registry on.
+
+## Outputs
+
+- `production/story/story-bible.yaml` (`story-bible` schema) with `facts`,
+  `characters`, `timeline`, and `open_questions` filled from the source.
+- The entity list that `/character-bible`, `/location-bible`, and
+  `/prop-bible` start from: every `CHAR_*`, `LOC_*`, and `PROP_*` ID named in
+  `characters` or in a fact's `affects`.
+
+## Quality Bar
+
+- Every fact has a `source_ref` that resolves to a numbered paragraph.
+- Every entity ID appears in at least one fact.
+- Timeline `order` values are unique and cover the whole source span with no
+  skipped event.
+- Every injury fact names a body part and a side, or has a matching open
+  question.
+- Every object that changes hands has a custody chain with no missing step,
+  or an open question where the source is silent.
+- This skill writes no fact with a provenance other than `source`.
+
+## Common Failure Modes
+
+- Summarizing where a registry is needed. "They fight on the deck" loses who
+  strikes whom, with what, and where the weapon ends up.
+- Paraphrasing a description into a new fact: "cropped grey hair" becomes
+  "short silver hair" and the two wordings later compile into two characters.
+- Recording an injury without its side. The cut then moves from the left hand
+  to the right between pages.
+- Merging two unnamed people ("the guard" in paragraph 3 and "the guard" in
+  paragraph 9) who the source never says are the same person.
+- Losing an object once the narration looks elsewhere. The dropped gun is
+  still on the deck three paragraphs later.
+- Answering an open question silently because the answer seemed obvious.
+- Renumbering facts on a re-analysis, which breaks every `replaces` link and
+  every panel note that cites a fact.
+
+## Related Agents
+
+- comic-writer
+- script-editor
+- editor-in-chief
+
+## Related Commands
+
+- source-analyze
+- story-bible
+
+## Notes
+
+Analysis describes the source and changes nothing. Cuts, user changes, and
+additions belong to `adaptation`, which adds its own facts with their own
+provenance and leaves the `source` facts as written. The policy behind this is
+`rules/writing/adaptation-fidelity.md`; the rule for unanswered questions is
+`rules/common/ask-dont-assume.md`.

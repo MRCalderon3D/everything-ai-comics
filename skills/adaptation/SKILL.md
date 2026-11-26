@@ -1,0 +1,149 @@
+---
+name: adaptation
+description: "Turn prose into comic story: separate source facts, user changes, and additions, then compress for the page."
+origin: everything-ai-comics
+category: story
+---
+
+# Adaptation
+
+## Purpose
+
+Turn the analyzed source into a story a comic can tell. Three kinds of fact
+are kept apart at all times: what the source says, what the user changed, and
+what the adaptation adds. A user change is carried through every artifact
+that depends on it in one pass. Then the prose is compressed into moments
+that can be drawn, with a decision for each event about whether it is shown,
+captioned, or left to the gutter.
+
+## Use When
+
+- Source analysis is done and the story bible or series plan is next.
+- The user changes a source fact: a character's age, role, or clothing, the
+  place an event happens, who survives.
+- The source holds more material than the page budget allows.
+- A scene needs a moment the source only implies.
+
+## Inputs
+
+- `production/story/story-bible.yaml`: `facts`, `timeline`, `open_questions`
+  from `source-analysis`.
+- The user's changes, in their own words.
+- `production/project.yaml`: `comic_format`, `publication`, `content`, and
+  the `lettering` word budgets.
+- `production/story/series-plan.yaml` when page budgets exist.
+- Every bible, page, reference, and prompt package already written, because
+  a user change has to reach them.
+
+## Process
+
+1. Keep the `source` facts untouched. Record each user instruction that
+   alters canon as a new fact with `provenance: user_change`, `replaces`
+   set to the fact it overrides, and `affects` listing every entity it
+   touches. The replaced fact stays in the registry so anyone can see what
+   the book said.
+2. Propagate each user change before any other work. Walk its `affects` list
+   and update together: the character's `description` and `prompt_summary`,
+   the outfits in `wardrobe.yaml`, the character's `voice` and every
+   lettering line already written, the reference assets drawn under the old
+   fact (set them to `status: superseded` in `references/manifest.yaml` and
+   plan new sheets), and the compiled prompt packages, which are recompiled.
+   If Oskar becomes a deckhand's daughter, the sheet, the hooded jacket, the
+   pronouns in every caption, and each prompt that describes "a boy" change
+   in the same pass.
+3. Search the workspace for leftovers of the old fact: old clothing words,
+   old titles and forms of address in dialogue, old asset IDs in
+   `page.references` and reference plans. Anything that cannot be updated now
+   (an approved render that shows the old version) becomes an open question
+   with `blocking: true`.
+4. Sort the timeline into three bins. Shown: any action that changes who
+   holds an object, where someone stands, someone's physical state, or who
+   did what to whom. Captioned: time, place, and context that no drawing can
+   show. Gutter: what the reader fills in without help, such as crossing open
+   ground, routine work, or hours passing.
+5. Test every gutter candidate. The reader must be able to infer it without
+   guessing identity, position, or cause. A handoff, a pickup, a fall, a
+   wound, a climb to another level, or an arrival that a later action depends
+   on is drawn, even in a small panel. A caption cannot repair a drawing that
+   shows something impossible.
+6. Compress the prose into drawable moments: one instant, one visible actor,
+   one visible action. Turn interior thought into behavior first and into a
+   caption only when behavior cannot carry it. Merge consecutive source beats
+   that would produce the same picture. Cut description the art will show.
+7. Fit dialogue to the page. Keep the source's wording where it fits the
+   `project.lettering` budgets. When a line is trimmed, split, or rewritten,
+   that is an adaptation edit: the panel script notes the source paragraph
+   it came from.
+8. Record everything the comic needs and the source lacks as a fact with
+   `provenance: addition`. Minor design details (a jacket color, a secondary
+   character's haircut) stay visibly provisional: the entity keeps
+   `status: draft` and a non-blocking open question lists the detail until
+   the user confirms it. A new event, a changed motive, or a line that alters
+   meaning is a blocking open question, asked before any page is planned.
+9. Record cuts. For each issue, `source_span` in the series plan states what
+   the issue covers, and its `summary` or `notes` names the passages dropped.
+   Check with `narrative-structure` that no cut removes a setup whose payoff
+   survives.
+10. Resolve every blocking open question with the user, write the answer in
+    `resolution`, and run
+    `node scripts/validate-workspace.js --root <workspace>`.
+
+## Outputs
+
+- `production/story/story-bible.yaml` with facts in all three provenances,
+  `replaces` and `affects` filled, and open questions updated.
+- For each user change: the updated character, wardrobe, page lettering,
+  reference registry entries, and recompiled prompt packages.
+- Source spans and cut notes in `production/story/series-plan.yaml`.
+- A short propagation report: which files changed for which fact, and what
+  is still waiting on a decision.
+
+## Quality Bar
+
+- Every fact carries one of the three provenance values. Every `user_change`
+  has a `replaces` target and a non-empty `affects` list.
+- After a user change, a search for the replaced wording finds it only in
+  the replaced fact and in superseded assets.
+- Every design addition sits on an entity with `status: draft` or has a
+  recorded user confirmation.
+- Each planned moment names one visible actor and one visible action.
+- Every action left to the gutter can be inferred without guessing who,
+  where, or who holds what.
+- No blocking open question is unresolved when page planning starts.
+
+## Common Failure Modes
+
+- Updating the character sheet and nothing else. The soldier who became a
+  civilian still gets called "Sergeant" and still wears a tactical vest in
+  three prompts.
+- Editing a source fact in place, so the record of what the book said is
+  gone.
+- An addition passing as source: an invented scar enters the prompts as
+  canon and nobody asked the author.
+- Carrying the narrator over as wall-to-wall captions that repeat what the
+  picture shows.
+- Hiding a critical handoff in the gutter and asking a caption to explain
+  why the object is suddenly in another hand.
+- Compressing two people's actions into one, which puts a character in two
+  places on the same page.
+- Turning every line of interior monologue into a thought balloon.
+- Cutting a quiet scene that held the only setup for a later payoff.
+
+## Related Agents
+
+- comic-writer
+- script-editor
+- editor-in-chief
+
+## Related Commands
+
+- source-analyze
+- series-plan
+
+## Notes
+
+The policy is `rules/writing/adaptation-fidelity.md`. When the user gives a
+change in passing ("make him older"), write the fact first and propagate
+second; a change that lives only in the conversation is lost by the next
+session. Questions go to the user under `rules/common/ask-dont-assume.md`,
+one batch at a time.

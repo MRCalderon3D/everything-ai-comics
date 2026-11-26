@@ -1,0 +1,124 @@
+---
+name: location-design
+description: Define each location's architecture, dressing, light, and time-of-day states.
+origin: everything-ai-comics
+category: visual
+---
+
+# Location Design
+
+## Purpose
+
+Give every location a fixed physical identity: its structure, what is in it,
+where the light comes from, and how it changes with the time of day. The
+same deck has to be the same deck in forty panels drawn from different
+angles, and that only happens when the place is written down before the
+first panel.
+
+## Use When
+
+- Building the location bible from the entities found in source analysis.
+- A location comes back from generation with different architecture or
+  dressing on different pages.
+- A scene needs a time-of-day state the location does not have yet.
+- A location needs its establishing plate.
+
+## Inputs
+
+- Facts that name the location in `production/story/story-bible.yaml`, with
+  the source's quoted description.
+- Scene files that use the location, for `time_of_day` and the action staged
+  there.
+- `production/style/style-bible.md` for how the style draws light and
+  shadow.
+- `production/locations/<LOC_ID>/location.yaml` when revising.
+
+## Process
+
+1. Assign the ID (`LOC_<NAME>`) and decide the scope. One location is one
+   continuous space the reader keeps oriented in. The ferry deck and its
+   wheelhouse are one location with two levels. A cabin below deck where a
+   later scene is staged is a second location, joined to the first by an
+   exit.
+2. Write `description.summary` in one sentence, then `architecture`: scale,
+   materials, and the fixed structures. Name the structures the action will
+   use (the ladder, the crates, the bulwark), because `location-mapping`
+   turns those names into landmarks.
+3. Write `dressing`: the objects that belong to the place and where they
+   sit by default. Anything a character picks up, uses, or moves is a prop
+   and goes to the prop bible.
+4. Write `light` as physical causes. Name each source, where it is, and
+   what it reaches: "one shielded lamp on the wheelhouse; otherwise
+   moonlight". In an ink style the light plan is also the shadow plan, so
+   say which surfaces go black.
+5. Set `time_of_day_states` from the scenes that use the place. For each
+   state, note what changes: which sources are on, where the shadows fall,
+   what is visible beyond the location.
+6. Describe the depth. State what a reader sees in front, what sits in the
+   middle, and what lies behind the action: the far bank, a skyline, a
+   wall. Undefined backgrounds are the first thing a model reinvents.
+7. Write `prompt_summary`: one sentence, fixed wording, containing the two
+   or three structures that make the place recognizable. The compiler
+   reuses it verbatim.
+8. Hand the geometry to `location-mapping` and set `map_file`. The names
+   used in `architecture` and the landmark IDs in `map.yaml` must match.
+9. Plan the establishing plate: the location drawn in the comic's style,
+   empty of characters, seen from the viewpoint of the map's side
+   convention, with every landmark visible. It is generated through
+   `/visual-development`, saved as `LOC_<NAME>_PLATE_MASTER_V##` under
+   `production/locations/<LOC_ID>/refs/`, and registered with `kind: plate`
+   and `default_role: spatial_continuity`. List it in `references`.
+10. Version changes. An approved location is immutable. When the story
+    damages or alters the place, the altered state gets a new plate with
+    the next `_V##`.
+
+## Outputs
+
+- `production/locations/<LOC_ID>/location.yaml` (`location` schema).
+- A plate plan for `/visual-development` and, once approved, the plate's
+  asset ID in `references`.
+- The list of named structures that `location-mapping` places as landmarks.
+
+## Quality Bar
+
+- Every scene's `location` resolves to a location file, and its
+  `time_of_day` appears in that file's `time_of_day_states`.
+- Every structure the scenes use is named in `architecture`, and each name
+  matches a landmark in `map.yaml`.
+- `light` names sources and positions; it contains no mood word standing in
+  for a cause.
+- `dressing` lists nothing that a character handles.
+- `prompt_summary` is one sentence and is identical wherever it is used.
+- The approved plate shows the landmarks on the sides the map gives them.
+
+## Common Failure Modes
+
+- One location split into per-scene variants that drift apart.
+- Mood where a cause is needed. "Gloomy" tells the model nothing; "one
+  shielded lamp, everything beyond three metres in black" does.
+- A plate with characters in it. Every page that attaches it gets extra
+  figures.
+- No description of what lies beyond the location, so the river has a lit
+  city behind it on page 3 and empty dark on page 4.
+- Dressing added panel by panel that no file records, such as a second
+  lamp or a new stack of crates.
+- A plate drawn from an angle that contradicts the map's side convention,
+  which turns the spatial reference into a source of flipped pages.
+- Light sources that multiply between pages because none were listed.
+
+## Related Agents
+
+- environment-designer
+- art-director
+
+## Related Commands
+
+- location-bible
+- visual-development
+
+## Notes
+
+Design says what the place is. `location-mapping` says where things are in
+it, in terms a panel row can cite. Keep the two files in step whenever a
+structure is added, renamed, or removed. The rule is
+`rules/visual/location-consistency.md`.

@@ -1,0 +1,148 @@
+---
+name: reference-ingestion
+description: Analyze user-supplied reference material and turn it into bible entries and registered reference assets.
+origin: everything-ai-comics
+category: visual
+---
+
+# Reference Ingestion
+
+## Purpose
+
+Let the user bring their own material (photographs of a person, pages or
+panels whose drawing style they like, costume pictures, location photos,
+notes) and turn what it shows into the scaffold's canon: bible entries,
+style vocabulary, and registered reference assets with provenance. Each
+file is sorted by what it is allowed to control. A photograph can fix a
+face without dictating the drawing style, and a style sample can fix the
+line without lending anyone its characters.
+
+## Use When
+
+- The user drops files into `production/references/inbox/`, or points at
+  files and says "she looks like this", "this is the style", "this is the
+  coat".
+- `/ingest-references` is invoked.
+- `/visual-development` finds inbox material that should be analyzed before
+  masters are generated from text alone.
+
+## Inputs
+
+- The files themselves, opened and looked at. The analysis reads the image,
+  never the filename.
+- The user's intent per file or batch: which entity it belongs to and how
+  binding it is (canon or inspiration).
+- Existing bibles, the style bible, and `production/references/manifest.yaml`,
+  to detect conflicts.
+- Origin and license status per file (`rules/common/asset-provenance.md`).
+
+## Process
+
+1. Inventory the inbox. Sort every file into one of three classes: identity
+   photographs (who someone is), style inspiration (how the comic is drawn),
+   and costume, prop, or location references (what something looks like). A
+   file that seems to be two of these is recorded as one and cropped or
+   duplicated for the other. Ask once about anything unclassifiable; never
+   guess whether a file is canon or mood.
+2. Record which reference controls which decision. For each file, write one
+   line: "controls Mara's face and hair; does not control clothing or
+   rendering". That line goes into the registry entry's `notes` and decides
+   its `default_role`.
+3. Analyze each file for what it shows, in terms that can be drawn:
+   - Identity: face shape, hair, build, apparent age, marks. Separate the
+     person from the photograph. The photo's lighting, angle, and expression
+     are not traits.
+   - Style: line quality, black placement, tone method, texture, degree of
+     simplification, panel borders and balloons if visible.
+   - Costume: layers, cut, length, fastenings, wear and damage, what the
+     hands and head carry.
+   - Location or prop: structure, materials, scale, fixed features.
+4. Write the extraction into canon as drafts. Identity analysis fills the
+   character's `description` and proposes `distinguishing_features`.
+   Costume analysis fills an outfit in `wardrobe.yaml`. Style analysis
+   feeds the style bible through `visual-style-development`. Location and
+   prop analysis fills the matching `description` fields. Everything
+   derived keeps `status: draft` until reviewed.
+5. Register each file in `production/references/manifest.yaml`: an `id`
+   under the naming scheme, `entity`, `kind`, `path`, `status: draft`,
+   `default_role`, `sha256`, and `notes` with origin, license status, and
+   the controlling line from step 2. Move the file out of `inbox/` to its
+   home: the entity's `refs/` directory, `references/style/` for style
+   material, `references/docs/` for text documents.
+6. Set the role by class. Identity photograph: `default_role: identity`.
+   Costume reference: `wardrobe`. Style sample: `style`. Location photo:
+   `spatial_continuity`. Prop photo: `prop_consistency`. One asset has one
+   role.
+7. Decide how each asset will be used. An identity photograph normally
+   conditions sheet generation and is not attached to page requests, since
+   a photograph on a page request drags the rendering toward photography.
+   The stylized sheet made from it becomes the page-level identity
+   reference. A style sample conditions the look master in the same way.
+8. Report conflicts and do not merge them. A file that contradicts an
+   approved fact or an approved sheet (a beard where the bible says
+   clean-shaven) is a decision for the user: change the canon as a
+   `user_change`, or demote the file to inspiration.
+9. Flag likeness and rights. A photograph of a real person used as a
+   character's identity needs the user's statement that they may use it.
+   Unknown or uncleared license status is written in `notes` and raised
+   immediately.
+10. Hand off: list which assets can go straight to review as masters (a
+    finished character drawing the user made is already in style) and which
+    should condition `/visual-development`.
+
+## Outputs
+
+- Draft bible entries and style notes derived from the analyses.
+- Registry entries in `production/references/manifest.yaml` with class,
+  role, origin, and license notes; files moved to their homes.
+- A conflict report where the material disagrees with existing canon.
+- A use plan: direct-to-review candidates and conditioning-only assets.
+
+## Quality Bar
+
+- Every extracted claim is visible in the file. Nothing is inferred about
+  backstory or about parts the image does not show.
+- Every registered asset has an ID, entity, kind, path, status, one
+  `default_role`, and origin and license notes.
+- Every asset's `notes` states what it controls and what it does not.
+- Nothing is left in `inbox/`.
+- No file is registered with two roles.
+- Conflicts with approved canon are reported and left for the user.
+
+## Common Failure Modes
+
+- One photograph treated as identity, costume, and style at once. The
+  character then arrives on the page in the photo's T-shirt, lit like the
+  photo.
+- Describing the photograph in place of the person: the squint from the
+  sun becomes "narrow eyes" in the bible.
+- A style sample that lends its characters. Attached without a stated
+  role, its protagonist's face turns up on the project's cast.
+- A grayscale photograph accepted as if it were already a drawing in a
+  black-and-white style.
+- Mood-board inspiration recorded as canon. How binding a file is comes
+  from the user and never from how good the image looks.
+- Building a look from one file's accidents (compression artifacts, one
+  odd scan) while ignoring what the batch has in common.
+- Skipping license notes because the user "probably owns it".
+- Files analyzed and then left unregistered in the inbox, so the next
+  session cannot find them.
+
+## Related Agents
+
+- art-director
+- character-designer
+- environment-designer
+
+## Related Commands
+
+- ingest-references
+
+## Notes
+
+Ingestion comes before `/visual-development`: analyze first, then generate
+masters conditioned on the user's material. Where the harness can open
+images directly, the analysis reads the files; where it cannot, the user
+pastes them into the conversation and the procedure is the same. Text
+documents are read and analyzed like images. The one-role policy is
+`rules/image/reference-roles.md`.
