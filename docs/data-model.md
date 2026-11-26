@@ -439,7 +439,7 @@ One role per entry, and an asset appears once. A `style` entry is never also
 ## issues/<ISS_ID>/pages/<PG_ID>/prompts/<provider>.yaml (`prompt-package`)
 
 ```yaml
-id: PP_PG_001_001_HARNESS-NATIVE       # required. PP_<page or asset id>_<PROVIDER>[-P## | -<TAG>]
+id: PP_PG_001_001_HARNESS-NATIVE       # required. PP_<page or entity id>_<PROVIDER>[-P## | -<TAG>]
 page: PG_001_001                       # required. page ID, or null for an asset-scoped package
 asset: null                            # entity ID for asset-scoped packages
 provider: harness-native               # required
@@ -489,7 +489,7 @@ Two variants use the same schema:
 ## generations/<scope>/GEN_*.yaml (`generation-record`)
 
 ```yaml
-id: GEN_PG_001_001_01                  # required. GEN_<page or asset id>_<attempt##>
+id: GEN_PG_001_001_01                  # required. GEN_<page or entity id>_<attempt##>
 page: PG_001_001                       # required. page ID or null
 asset: null                            # entity ID for asset-scoped records
 provider: harness-native               # required

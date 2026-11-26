@@ -296,10 +296,13 @@ rows above. `validate.js` cross-checks every listed name against the manifests.
 - Assets: `CHAR_*`, `LOC_*`, `PROP_*`, `LOOK_*`, versioned `_V##`
   (e.g. `CHAR_MARA_TURN_MASTER_V02`). Approved masters carry `_MASTER`.
 - Wardrobe states: `WARD_<CHARACTER>_<NAME>` (e.g. `WARD_MARA_OILSKIN`).
-- Prompt packages: `PP_<page-or-asset-id>_<PROVIDER>`, with a `-P##` suffix for
+- Prompt packages: `PP_<page-or-entity-id>_<PROVIDER>`, with a `-P##` suffix for
   a single panel and a `-<TAG>` suffix for a reference sheet (`TURN`, `EXPR`,
   `WARD`, `PLATE`, `PROP`, `LOOK`, `DETAIL`).
-- Generation records: `GEN_<page-id>_<attempt##>` or `GEN_<asset-id>_<attempt##>`.
+- Reference candidates: `<ENTITY_ID>_<TAG>_V##`. Promotion to a master is an
+  approval step: the file is copied to the `_MASTER` name and registered in
+  `references/manifest.yaml`; the candidate stays on disk.
+- Generation records: `GEN_<page-id>_<attempt##>` or `GEN_<entity-id>_<attempt##>`.
 - Canon facts: `FACT_###`, unique within the story bible.
 - Review findings: `F##`, unique within a review file.
 - Editions: `ED_<issue>_##` (e.g. `ED_001_03`).
@@ -319,10 +322,10 @@ production/
 ├── project.yaml               # project.schema.json
 ├── story/                     # source/ (source text), story-bible.yaml, series-plan.yaml
 ├── style/                     # style-bible.md, style-block.txt (frozen prompt block), color-script.md
-├── characters/                # <CHAR_ID>/character.yaml, wardrobe.yaml, refs/
-├── locations/                 # <LOC_ID>/location.yaml, map.yaml, refs/
-├── props/                     # <PROP_ID>/prop.yaml, refs/
-├── references/                # manifest.yaml (registry of ALL reference material), inbox/, style/, docs/
+├── characters/                # <CHAR_ID>/character.yaml, wardrobe.yaml, refs/ (sheets, candidates, refs/prompts/)
+├── locations/                 # <LOC_ID>/location.yaml, map.yaml, refs/ (plates, refs/prompts/)
+├── props/                     # <PROP_ID>/prop.yaml, refs/ (sheets, refs/prompts/)
+├── references/                # manifest.yaml (registry of ALL reference material), inbox/, style/ (look pages, style/prompts/), docs/
 ├── issues/
 │   └── <ISS_ID>/
 │       ├── issue.yaml         # issue.schema.json
@@ -336,7 +339,7 @@ production/
 │               ├── prompts/               # <provider>.yaml (prompt-package.schema.json)
 │               ├── renders/               # <PG_ID>_V##.png|jpg versioned candidates, never overwritten
 │               └── reviews/               # <RENDER_ID>.review.yaml (visual-review.schema.json)
-├── generations/               # <PG_ID or ASSET_ID>/GEN_*.yaml (generation-record.schema.json)
+├── generations/               # <PG_ID or ENTITY_ID>/GEN_*.yaml (generation-record.schema.json) + GEN_*.request.json
 ├── continuity/                # <ISS_ID>.final-state.yaml (continuity-state.schema.json)
 └── editions/
     └── <ED_ID>/               # edition.yaml (edition.schema.json), exports/
@@ -365,8 +368,8 @@ module.exports = {
 };
 ```
 
-`generate` MUST default to dry-run (writes the request spec and a pending
-generation record, calls no network) and MUST refuse to run live when a required
+`generate` MUST default to dry-run (writes the request spec and a generation
+record with status `dry_run`, calls no network) and MUST refuse to run live when a required
 env var is missing. Never log API keys. `manual` and `harness-native` produce a
 handoff package for a person or for the harness's own image tool; they never
 call the network.
