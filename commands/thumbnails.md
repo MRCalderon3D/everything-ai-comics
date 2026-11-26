@@ -1,0 +1,98 @@
+---
+description: Rough each page as thumbnails and check readability before final generation.
+---
+
+# /thumbnails
+
+## Purpose
+
+Test whether a page reads before paying to draw it. A thumbnail is the page
+at the size of a playing card: panel borders, where the figures stand, where
+the balloons go. If the reading order fails at that size, or a figure
+cannot be told from another by silhouette, the finished page will fail the
+same way. What the test finds goes back into `page.yaml`, where fixing it
+is free.
+
+## Use When
+
+- Pages are scripted and you want proof that the layout works before
+  `/generate-pages`.
+- A page has many panels or many characters and the staging is in doubt.
+- A repair cycle ended with "return to the plan" and the layout is the
+  suspect.
+
+## Inputs
+
+- `issue` (ID, required): the `ISS_###` to thumbnail.
+- `pages` (ID or range, optional): limit the run; default is every page
+  with `status: scripted` or later that has no thumbnail.
+- `render` (enum, optional, default `text`): `text` (a written rough, free)
+  | `sketch` (a rough image from the provider, cost-gated).
+- `provider` (string, optional, default from `project.yaml`): used only
+  with `render: sketch`.
+- `--live` (flag, optional, default off): call the provider for sketches.
+
+## Invokes Agents
+
+- layout-artist
+- penciller
+
+## Required Skills
+
+- thumbnailing
+- panel-composition
+
+## Process
+
+1. Read each `page.yaml`: `layout`, the panels in `reading_order`, their
+   `framing`, `cast` positions, and `lettering`.
+2. layout-artist roughs the page tier by tier following `layout.tiers`.
+   For each panel: its box, the figures as simple shapes placed by `side`
+   and `level`, the direction they face, and the area kept clear for each
+   lettering element. Save the rough in the page's `thumbnails/` directory
+   with a round number (`thumb-01.md`) and keep earlier rounds.
+3. With `render: sketch`, cost gate first: estimate pages x provider rate,
+   show it, and wait for confirmation. The sketch asks for composition
+   only and is saved as `thumbnails/thumb-##.png` with a generation
+   record.
+4. Run the reading test on the whole page. The eye moves through the panels
+   in `layout.reading_order` without help from arrows. Balloons are met in
+   their `order`. The largest panel is the one the page's `purpose` points
+   at.
+5. penciller runs the panel test. Each panel's actor can be picked out by
+   silhouette and position alone. Two characters who look alike are not at
+   the same scale with the same pose. The lettering areas cover no face, no
+   hand, and no part of the action. Screen sides match the location's
+   convention and the scene's travel direction from panel to panel.
+6. Paged projects: read the page beside its facing page and check the
+   turn. Webtoon projects: read the segment after the one above it and
+   check the spacing between panels.
+7. Push every failure back into the plan. Change `layout`, `size`,
+   `framing`, or the panel count in `page.yaml` and thumbnail the page
+   again. A thumbnail never disagrees with its page file.
+8. Run `node scripts/build-board.js --issue production/issues/<ISS_ID>` to
+   see the issue on one HTML page, then the self-evaluation gates on the
+   changed page files. Report pages that read, pages changed, and pages
+   that still fail.
+
+## Outputs
+
+- `production/issues/<ISS_ID>/pages/<PG_ID>/thumbnails/thumb-##.md`, the
+  written rough, one file per round (human document, no schema).
+- With `render: sketch`:
+  `production/issues/<ISS_ID>/pages/<PG_ID>/thumbnails/thumb-##.png` and a
+  record under `production/generations/<PG_ID>/`
+  (`schemas/generation-record.schema.json`).
+- `production/issues/<ISS_ID>/pages/<PG_ID>/page.yaml`, corrected where the
+  test failed (`schemas/page.schema.json`).
+
+## Notes
+
+- `text` mode is free and is usually enough. Render sketches when the
+  staging of a crowded page cannot be judged from a description.
+- A thumbnail is a test. It is never attached to a generation request as a
+  style or identity reference; approved masters do that job.
+- A page that passes here has a readable plan. Whether the rendered page
+  reads is decided by `/visual-review`, on the pixels.
+- Related: `/page-plan` and `/panel-script` (before), `/panel-ledger`
+  (next), `/generate-pages` (the first paid step for pages).

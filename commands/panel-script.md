@@ -1,0 +1,108 @@
+---
+description: "Write the full panel script for planned pages: framing, cast, action, acting, and exact lettering text."
+---
+
+# /panel-script
+
+## Purpose
+
+Fill each planned panel with everything an artist, or an image model, needs
+to draw it and nothing it has to guess. For every panel the script states
+the framing, who is visible and where, what each of them does, how they
+hold themselves, and the exact words on the page. The text written here is
+the text the page is reviewed against, down to the accents.
+
+## Use When
+
+- Pages have `status: planned` from `/page-plan` and the plan is approved.
+- Dialogue or a caption changes after a user change in the story bible.
+- A review found a panel whose actor was unclear and the script has to
+  say more before a repair.
+
+## Inputs
+
+- `issue` (ID, required): the `ISS_###` to script.
+- `pages` (ID or range, optional): limit the run, e.g.
+  `PG_001_003..PG_001_006`; default is every page with `status: planned`.
+- `--check` (flag, optional): audit existing scripts against the rules
+  below and change nothing.
+
+## Invokes Agents
+
+- comic-writer
+- penciller
+- letterer
+
+## Required Skills
+
+- comic-scripting
+- panel-composition
+- performance-direction
+
+## Process
+
+1. Read the planned `page.yaml` files, the scene's `geography`, the
+   location map, the character files (`voice`, `distinguishing_features`,
+   `visually_adjacent_to`), and the facts the scene adapts.
+2. comic-writer tests each `moment` again: one actor, one action, one
+   instant that can be drawn. Then write the `background` and one `cast`
+   row per visible character with `action`, the thing the reader sees them
+   do.
+3. Place every character on the map: `position.level`, `position.side`,
+   `position.landmark`, and `facing`. Positions agree with the scene's
+   travel and threat directions and with the location's side convention.
+   Set `wardrobe` to the outfit ID in force and `state` to the tags the
+   character carries into the panel.
+4. penciller completes `framing`: `shot_size`, `angle`, `view`, and
+   `composition`. The actor of the moment is unmistakable. When identity
+   matters in the panel, choose a size at which the character's
+   distinguishing features can be seen. Characters listed in each other's
+   `visually_adjacent_to` are not staged overlapping or at the same scale
+   with their backs turned.
+5. Write `acting` as behavior that can be drawn: shoulders, hands, eyes,
+   distance from the other person. "Grips the rail, looks past him" can be
+   drawn. "Angry" cannot.
+6. Check the sequence for what the reader has to see. If a later panel
+   depends on a handoff, a pickup, a drop, or a move between levels, there
+   is a panel that shows it, or an `ellipsis` on the next panel that a
+   reader can fill in without mistaking who or where. If neither is true,
+   go back to `/page-plan` and add the panel. No caption is written to
+   explain a drawing that would otherwise be impossible.
+7. letterer writes `lettering` for each panel: `id` (`L##`, unique in the
+   page), `type` (`caption` | `narration` | `balloon` | `thought` |
+   `whisper` | `shout` | `radio` | `sfx` | `sign`), `speaker` for spoken
+   types, the exact `text` in the project's `language`, and `order`, unique
+   within the page and following the reading order. A speaker is in the
+   panel's `cast`. Keep within `lettering.max_words_per_balloon` and
+   `max_words_per_panel` from `project.yaml`.
+8. Keep adaptation edits traceable. A line taken from the source keeps its
+   anchor in the panel's `notes`; a line that was changed or invented says
+   so.
+9. Fill `references.required` and `references.optional` with the asset IDs
+   the page needs: the look master, an identity sheet per visible
+   character, the plate, any prop reference. Set `status: scripted`.
+10. Run `node scripts/validate-workspace.js --root production --issue
+    <ISS_ID>`, then the self-evaluation gates on the page files. Report
+    pages scripted and any panel sent back to the plan.
+
+## Outputs
+
+- `production/issues/<ISS_ID>/pages/<PG_ID>/page.yaml`, with framing, cast
+  rows, and lettering text filled and `status: scripted`; validates against
+  `schemas/page.schema.json`.
+
+## Notes
+
+- This command costs nothing.
+- The cast rows written here are the visible half of the panel ledger.
+  `/panel-ledger` adds the characters who are off-panel, custody,
+  transfers, and state changes, and then audits the whole issue.
+- Lettering text follows `rules/writing/dialogue-economy.md` and
+  `rules/lettering/balloons-and-captions.md`. Once a page is rendered with
+  in-image lettering, changing a word means a repair.
+- Format differences: a webtoon panel is read alone on a phone screen, so
+  it carries fewer words; follow `rules/webtoon/scroll-grammar.md`.
+- Escalate to the user when a line of dialogue cannot fit the word limits
+  without losing information the story needs.
+- Related: `/page-plan` (before), `/thumbnails` and `/panel-ledger` (next),
+  `/lettering` (placement and checks), `/humanize` (prose pass on captions).

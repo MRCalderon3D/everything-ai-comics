@@ -1,0 +1,96 @@
+---
+description: "Compile the canon: facts by provenance, world rules, timeline, and character arcs."
+---
+
+# /story-bible
+
+## Purpose
+
+Turn the fact registry from `/source-analyze` into the canon every later
+artifact answers to. The story bible states the premise and tone, the rules
+of the world, the order of events, each character's arc, and every fact with
+its provenance. Open questions get one answer each. When the user has
+changed something, the change is carried into every artifact that depends on
+it, so no page is drawn from a fact that no longer holds.
+
+## Use When
+
+- `/source-analyze` has written the registry and its open questions.
+- The user changes canon in the middle of production. Come here first, then
+  propagate.
+- A review or a continuity pass finds two artifacts that disagree about a
+  fact.
+
+## Inputs
+
+- `bible` (path, optional, default `production/story/story-bible.yaml`):
+  the registry written by `/source-analyze`.
+- `changes` (list of strings, optional): user changes to apply in this run.
+- `--check` (flag, optional): audit provenance and list unresolved blocking
+  questions without editing anything.
+
+## Invokes Agents
+
+- editor-in-chief
+- comic-writer
+
+## Required Skills
+
+- narrative-structure
+- source-analysis
+
+## Process
+
+1. Read the source and the current `production/story/story-bible.yaml`.
+   Collect the facts, the open questions, and any change the user has
+   stated since the last run.
+2. editor-in-chief rules on each open question with one answer and writes it
+   to `resolution`. When the source cannot settle a blocking question, ask
+   the user, all such questions in one batch with a proposed answer for each
+   (`rules/common/ask-dont-assume.md`). A resolved question becomes a fact:
+   `user_change` when the user decided against the source, `addition` when
+   the answer is new.
+3. Audit provenance. Every fact has one tag. A `source` fact carries a
+   `source_ref`. A `user_change` carries `replaces` and a complete `affects`
+   list. An `addition` is kept only if a drawing or a line of dialogue needs
+   it.
+4. comic-writer writes `premise`, `tone`, and `world_rules` (what can
+   happen, what cannot, what it costs), and for each entry in `characters`
+   its `role` and `arc`.
+5. Order the `timeline`. Check it against the facts for travel, injuries,
+   and time of day that cannot both be true, and set `issue` on each event
+   once the series plan exists.
+6. Propagate every user change. Walk the `affects` list of the changed fact
+   and update each dependent in the same run, or hand it to its owning
+   command with the file named: `character.yaml` and `wardrobe.yaml`,
+   dialogue and cast rows in `page.yaml`, registered reference sheets,
+   reference plans, and compiled prompt packages (recompile, since their
+   `source_hashes` no longer match). If Oskar's cut moves from his left hand
+   to his right, the character file, the state tag in every ledger row, the
+   turnaround sheet, and the prompts change together.
+7. Gate: list every question with `blocking: true` and no `resolution`.
+   While the list is not empty, no prompt is compiled and no page is
+   generated.
+8. Run `node scripts/validate-workspace.js --root production`, then the
+   self-evaluation gates on the bible. Present the rulings and the provisional
+   additions that need the user's approval.
+
+## Outputs
+
+- `production/story/story-bible.yaml`, validates against
+  `schemas/story-bible.schema.json`.
+- A propagation report in the conversation: each user change, the artifacts
+  updated, and the artifacts handed to another command.
+
+## Notes
+
+- Approval gate: the visual bibles and the series plan should wait until the
+  user has approved the canon. Designs built on an unapproved fact get
+  redrawn, and at the generation stage that costs money.
+- A contradiction found later is fixed here first and then propagated. No
+  page is patched to disagree with the bible.
+- A superseded fact stays in the registry. The fact that replaces it points
+  back through `replaces`, which keeps every adaptation edit traceable to
+  the source.
+- Related: `/source-analyze` (before), `/series-plan`, `/character-bible`,
+  `/location-bible`, `/prop-bible`, `/style-bible` (all read the canon).

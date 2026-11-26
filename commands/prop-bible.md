@@ -1,0 +1,89 @@
+---
+description: Catalog plot-relevant props with appearance, state timeline, and custody tracking.
+---
+
+# /prop-bible
+
+## Purpose
+
+Give every object the story depends on a fixed appearance and a history.
+In the pilot a dropped revolver came back as a different pistol in another
+character's hand. A prop file states what the object looks like and how
+many hands it takes, and the custody timeline states who holds it at each
+event and how it passes from one holder to the next. The panel ledger later
+has to account for every one of those transfers.
+
+## Use When
+
+- The story bible is approved and its objects need tracking before pages
+  are planned.
+- A new object enters the story, or a user change alters who holds one.
+- A review reported an `object_identity` or `object_custody` finding.
+
+## Inputs
+
+- `prop` (ID, optional): a single `PROP_*` to build or rebuild; default is
+  every `PROP_*` named in the story bible's facts.
+- `scope` (enum, optional, default `plot`): `plot` (objects the story
+  depends on) | `all` (set dressing that recurs is catalogued as well, with
+  `plot_relevant: false`).
+
+## Invokes Agents
+
+- environment-designer
+- continuity-editor
+
+## Required Skills
+
+- visual-style-development
+- state-tracking
+
+## Process
+
+1. List the objects named in the story bible's facts and timeline. An
+   object is plot-relevant when it changes hands, changes state, or a later
+   action needs it to be somewhere.
+2. environment-designer writes `prop.yaml`: `name`, `description.summary`,
+   and `description.distinguishing_features`, the shape and details that
+   keep it the same object in every drawing (a wide stubby barrel, a lanyard
+   ring). Write `prompt_summary` as one sentence in the look's vocabulary.
+3. Set `hands_required` (1 or 2) and `plot_relevant`. The hands value feeds
+   the hands budget of the ledger: a character who carries someone has no
+   hand left for a two-handed object.
+4. continuity-editor writes the custody timeline from the story bible's
+   events: where the object starts, who holds it after each event, and how
+   each change happens, in the ledger's own terms (`handoff`, `pickup`,
+   `drop`, `set_down`, `draw`, `holster`, `throw`, `take`). Put it in the
+   file's `notes` as one line per event.
+5. Write the state timeline the same way: the state tags the object can
+   carry (`loaded`, `fired`, `broken`), the event that adds each one, and
+   whether anything resolves it.
+6. When a previous issue exists, read its
+   `production/continuity/<ISS_ID>.final-state.yaml` and start the timeline
+   from the recorded `custody`, `location`, and `state`.
+7. Plan a reference, `PROP_<NAME>_MASTER_V##`, for any object whose shape
+   has to survive across several pages. List it in `notes`; `references`
+   stays empty until `/visual-development` registers the asset.
+8. Set `status: review`, run `node scripts/validate-workspace.js --root
+   production`, then the self-evaluation gates on each prop file.
+
+## Outputs
+
+- `production/props/<PROP_ID>/prop.yaml`, validates against
+  `schemas/prop.schema.json`.
+- `production/props/<PROP_ID>/refs/`, empty until `/visual-development`
+  fills it.
+
+## Notes
+
+- No images are generated here, so the command is free.
+- The timelines in `notes` are the plan. The record is the panel ledger:
+  `holding`, `props`, and `transfers` in each `page.yaml`, audited by
+  `check-continuity.js`.
+- An object that is only dressing does not need a file. Describe it in the
+  location's `dressing`.
+- Escalate to the user when the source moves an object between two holders
+  with no moment at which the transfer could happen.
+- Related: `/story-bible` (before), `/visual-development` (draws the
+  reference), `/panel-ledger` (tracks custody panel by panel),
+  `/continuity-review` (writes the end-of-issue custody).

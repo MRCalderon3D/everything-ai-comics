@@ -1,0 +1,110 @@
+---
+description: "Plan every page of an issue: panel count, grid, panel sizes, reading order, and page turns."
+---
+
+# /page-plan
+
+## Purpose
+
+Decide what each page shows and how it is divided, before a word of script
+or a prompt exists. For every page the command writes a purpose, a grid,
+and a list of panels in reading order, and each panel holds one moment that
+can be drawn. It also decides what happens between panels: which actions
+the gutter may skip and which have to be seen. A page plan is cheap to
+change. A rendered page is not.
+
+## Use When
+
+- `/issue-breakdown` is approved and the issue's beats have page budgets.
+- A page needs another panel because a handoff or an arrival was left to a
+  caption.
+- You want to revise the layout of pages that `/smart-page` proposed.
+
+## Inputs
+
+- `issue` (ID, required): the `ISS_###` to plan.
+- `pages` (ID or range, optional): limit the run, e.g. `PG_001_003` or
+  `PG_001_003..PG_001_006`; default is every page in the issue.
+- `max_panels` (int, optional, default from the format layer): ceiling on
+  panels per page.
+
+## Invokes Agents
+
+- layout-artist
+- comic-writer
+
+## Required Skills
+
+- page-layout
+- sequential-storytelling
+
+## Process
+
+1. Read `issue.yaml`, the scene files with their beats and `geography`, the
+   location maps, and `comic_format` and `reading_direction` from
+   `project.yaml`. Load `rules/paged/` or `rules/webtoon/`, whichever the
+   format selects.
+2. Give each page a `purpose` in one sentence: what the reader knows at the
+   bottom of the page that they did not know at the top.
+3. comic-writer lists the moments of each beat. Write one drawable main
+   moment per panel in `moment`: one actor, one action, one instant. Two
+   actions are two panels. A second action may sit in the background only
+   if it stays legible there.
+4. Confirm the geography before going further. The scene has its travel and
+   threat directions, and every place a moment happens exists on the map as
+   a level and a side with its landmarks. Set each panel's `location`. If a
+   position cannot be named, fix the map or the scene first.
+5. layout-artist designs the grid: `layout.grid`, `layout.tiers` (panels per
+   tier, summing to the panel count), and `layout.reading_order`. Give each
+   panel its `id` (`PN_<issue>_<page>_##`), `order`, `tier`, and `size`
+   (`splash` | `wide` | `large` | `medium` | `small` | `inset`). Size
+   follows weight. Set a first `framing.shot_size` per panel; `/panel-script`
+   completes the framing.
+6. Decide every gutter. Set `transition_in` on each panel after the first
+   of a scene. Where the gutter skips something on purpose, write what it
+   skips in `ellipsis`. Skip only what a reader infers without mistaking
+   who someone is, where they are, or what caused what. A critical handoff,
+   pickup, drop, or change of level gets its own panel. It is shown, never
+   explained by a caption.
+7. Paged projects: set `side` (`left` | `right` | `single`), `spread_with`
+   for a double-page spread, and `page_turn` (`none` | `continuation` |
+   `reveal` | `cliffhanger`), following `rules/paged/page-turn-grammar.md`
+   for where a reveal lands. Webtoon projects leave `side` out and pace
+   reveals by scroll distance (`rules/webtoon/scroll-grammar.md`).
+8. Chain the pages: `continuity.enters_from` and `continuity.exits_to` form
+   one unbroken line through the issue. Set
+   `continuity.attach_previous_render` to true where the page continues in
+   the same place as the one before.
+9. Write each `pages/<PG_ID>/page.yaml` with `status: planned`. Update
+   `page_count` and `panel_count` in `issue.yaml`, set the issue's `status`
+   to `scripting`, and correct `pages` and `beats[].pages` in the scene
+   files if the plan moved a beat.
+10. comic-writer reads the plan against the breakdown: every beat is
+    covered and nothing from the source span disappeared without a note.
+11. Run `node scripts/validate-workspace.js --root production --issue
+    <ISS_ID>`, then the self-evaluation gates on the page files. Present
+    the plan for approval.
+
+## Outputs
+
+- `production/issues/<ISS_ID>/pages/<PG_ID>/page.yaml`, one per page, with
+  layout and panel moments; validates against `schemas/page.schema.json`.
+- `production/issues/<ISS_ID>/issue.yaml`, `page_count`, `panel_count`, and
+  `status` updated (`schemas/issue.schema.json`).
+- `production/issues/<ISS_ID>/scenes/<SC_ID>.yaml`, page lists corrected
+  (`schemas/scene.schema.json`).
+
+## Notes
+
+- This command costs nothing.
+- The page file is one file on purpose. Layout, panel script, ledger, and
+  lettering text live together so they cannot drift apart; this command
+  writes the first layer.
+- Fewer panels that each do one job read better than a crowded page. If a
+  panel's `moment` needs the word "while", it is probably two panels.
+- An approved plan fixes intent. It approves no image.
+- `/smart-page` writes this plan together with the script, ledger,
+  references, and prompts for one scene. Prefer it for a first pass and
+  this command for revisions.
+- Related: `/issue-breakdown` (before), `/panel-script` and `/thumbnails`
+  (next), `/panel-ledger` (audits what the gutters skip).
