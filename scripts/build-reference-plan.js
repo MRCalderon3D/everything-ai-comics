@@ -121,6 +121,35 @@ function entityAssets(assets, entityId) {
 }
 
 /**
+ * The project's look master: the first approved asset of style.look_refs,
+ * or, when the project lists none, the best approved look in the registry.
+ * @returns {{look: object|null, pool: object[], unregistered: string[]}}
+ */
+function findLookMaster(project, assets) {
+  const listed = project && project.style && Array.isArray(project.style.look_refs) ? project.style.look_refs : [];
+  const pool = listed.length
+    ? listed.map((id) => assets.get(id)).filter(Boolean)
+    : [...assets.values()].filter((a) => a.kind === 'look' || a.default_role === 'style' || /^LOOK_/.test(String(a.entity || '')));
+  return {
+    look: bestApproved(pool, listed),
+    pool,
+    unregistered: listed.filter((id) => !assets.has(id)),
+  };
+}
+
+/**
+ * A character's identity master: the best approved turnaround or
+ * expression sheet, preferring the ones character.yaml lists.
+ * @returns {{identity: object|null, pool: object[]}}
+ */
+function findIdentityMaster(assets, charId, character) {
+  const listed = character && Array.isArray(character.references) ? character.references : [];
+  const pool = entityAssets(assets, charId).filter((a) =>
+    a.default_role === 'identity' || (!a.default_role && IDENTITY_KIND_RANK[a.kind] !== undefined));
+  return { identity: bestApproved(pool, listed, IDENTITY_KIND_RANK), pool };
+}
+
+/**
  * What the page draws, in reading order.
  * @returns {{characters: string[], panelsOfCharacter: Map, outfits: Map, locations: string[], panelsOfLocation: Map, props: string[], panelsOfProp: Map, panelIds: string[]}}
  */
@@ -234,12 +263,7 @@ function buildReferencePlan(root, page, options = {}) {
   };
 
   // 1. Look master.
-  const lookRefs = project.style && Array.isArray(project.style.look_refs) ? project.style.look_refs : [];
-  const unregisteredLook = lookRefs.filter((id) => !assets.has(id));
-  const lookPool = lookRefs.length
-    ? lookRefs.map((id) => assets.get(id)).filter(Boolean)
-    : [...assets.values()].filter((a) => a.kind === 'look' || a.default_role === 'style' || /^LOOK_/.test(String(a.entity || '')));
-  const look = bestApproved(lookPool, lookRefs);
+  const { look, pool: lookPool, unregistered: unregisteredLook } = findLookMaster(project, assets);
   if (!look) {
     if (lookPool.length) {
       throw pipelineError('look_unapproved',
@@ -265,10 +289,7 @@ function buildReferencePlan(root, page, options = {}) {
   // 2. Identity master per on-panel character.
   for (const charId of demand.characters) {
     const character = ws.loadCharacter(root, charId) || {};
-    const listed = Array.isArray(character.references) ? character.references : [];
-    const pool = entityAssets(assets, charId).filter((a) =>
-      a.default_role === 'identity' || (!a.default_role && IDENTITY_KIND_RANK[a.kind] !== undefined));
-    const identity = bestApproved(pool, listed, IDENTITY_KIND_RANK);
+    const { identity, pool } = findIdentityMaster(assets, charId, character);
     if (!identity) {
       if (pool.length) {
         throw pipelineError('identity_unapproved',
@@ -296,9 +317,7 @@ function buildReferencePlan(root, page, options = {}) {
   // image: an attached sheet is a reason for the model to draw them.
   for (const charId of demand.offPanelOnly) {
     const character = ws.loadCharacter(root, charId) || {};
-    const pool = entityAssets(assets, charId).filter((a) =>
-      a.default_role === 'identity' || (!a.default_role && IDENTITY_KIND_RANK[a.kind] !== undefined));
-    const identity = bestApproved(pool, Array.isArray(character.references) ? character.references : [], IDENTITY_KIND_RANK);
+    const { identity } = findIdentityMaster(assets, charId, character);
     if (identity) leaveOut(identity.id, `${character.name || charId} is off panel on this whole page`);
   }
 
@@ -552,6 +571,16 @@ function main() {
   if (doc.notes) console.log(`  notes: ${doc.notes}`);
 }
 
-module.exports = { buildReferencePlan, pageDemand, roleOfAsset, bestApproved, versionOf };
+module.exports = {
+  buildReferencePlan,
+  pageDemand,
+  roleOfAsset,
+  bestApproved,
+  versionOf,
+  entityAssets,
+  findLookMaster,
+  findIdentityMaster,
+  roomierProviders,
+};
 
 if (require.main === module) main();

@@ -15,7 +15,7 @@ const ws = require('../scripts/lib/workspace');
 const yaml = require('../scripts/lib/yaml');
 const { validateDoc, hashPage } = require('../scripts/lib/page-pipeline');
 const { buildReferencePlan } = require('../scripts/build-reference-plan');
-const { compilePage, selectFindings } = require('../scripts/compile-prompts');
+const { compilePage, compileAsset, selectFindings } = require('../scripts/compile-prompts');
 const layout = require('../scripts/lib/layout-language');
 const lang = require('../scripts/lib/panel-language');
 
@@ -554,6 +554,383 @@ function testCli() {
   });
 }
 
+const LOOK = { asset_id: 'LOOK_NOIR_INK_MASTER_V01', role: 'style', image_path: 'references/style/LOOK_NOIR_INK_MASTER_V01.png' };
+const MARA_ID = { asset_id: 'CHAR_MARA_TURN_MASTER_V01', role: 'identity', image_path: 'characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V01.png' };
+const MARA_IS_NOT_OSKAR = 'Mara is not Oskar. Mara: broken nose, grey cropped hair, oilskin coat with a torn left cuff. ' +
+  'Oskar: round face, hooded jacket, cut on his left hand. Do not swap or blend their features.';
+
+/** Checks every asset package shares: scope, shape, style block, no IDs. */
+function assertSheetPackage(root, result, expected) {
+  const { pkg, spec, fileRel } = result;
+  assertSchemaValid(pkg);
+  assert.strictEqual(pkg.id, expected.id);
+  assert.strictEqual(fileRel, expected.file);
+  assert.strictEqual(pkg.page, null, 'asset scope: page is null');
+  assert.strictEqual(pkg.asset, expected.asset);
+  assert.strictEqual(pkg.mode, 'generate');
+  assert.strictEqual(pkg.edit_target, null);
+  assert.strictEqual(pkg.status, 'compiled');
+  assert.deepStrictEqual(pkg.lettering_text, []);
+  assert.strictEqual(pkg.model, spec.model);
+  assert.deepStrictEqual(pkg.references, expected.references);
+  assert.strictEqual(pkg.parameters.aspect_ratio, expected.ratio);
+  assert.strictEqual(pkg.parameters.seed, null);
+  assert.deepStrictEqual(Object.keys(pkg), ['id', 'page', 'asset', 'provider', 'model', 'mode', 'prompt',
+    'negative_prompt', 'parameters', 'references', 'edit_target', 'lettering_text', 'status', 'source_hashes']);
+  assert.deepStrictEqual(Object.keys(pkg.source_hashes), ['style_block']);
+  assert.ok(/^[a-f0-9]{16}$/.test(pkg.source_hashes.style_block));
+  assert.ok(pkg.prompt.startsWith(`${ws.loadStyleBlock(root)}\n\nSHEET\n`), 'the style block opens the prompt verbatim');
+  assert.ok(pkg.prompt.trimEnd().split('\n\n').pop().startsWith('HARD CONSTRAINTS\n'), 'constraints close the prompt');
+  assert.ok(!/\b(CHAR|PROP|LOC|LOOK|WARD)_[A-Z0-9_]+/.test(pkg.prompt), 'IDs stay out of the model-facing text');
+  const legend = section(pkg.prompt, 'REFERENCE IMAGES').split('\n').filter((l) => /^Image \d+:/.test(l));
+  assert.strictEqual(legend.length, pkg.references.length, 'one legend line per attached image');
+  return pkg;
+}
+
+function testSheets() {
+  return fx.withWorkspace((root) => {
+    // --- character: turnaround -------------------------------------------
+    const turn = assertSheetPackage(root, compileAsset(root, 'CHAR_MARA', { sheet: 'turnaround' }), {
+      id: 'PP_CHAR_MARA_HARNESS-NATIVE-TURN',
+      file: 'characters/CHAR_MARA/refs/prompts/harness-native.turnaround.yaml',
+      asset: 'CHAR_MARA',
+      references: [LOOK],
+      ratio: '1:1',
+    });
+    const turnBrief = section(turn.prompt, 'SHEET');
+    assert.ok(turnBrief.includes('Character turnaround sheet of one character: Mara.'));
+    assert.ok(turnBrief.includes('Four full-figure views of the same person in one row, left to right: front, three-quarter, profile, back.'));
+    assert.ok(turnBrief.includes('All four figures at the same scale, heads level, feet on one baseline.'));
+    assert.ok(turnBrief.includes('The face is fully readable in the front, three-quarter, and profile views.'));
+    assert.ok(turnBrief.includes('Plain light background with nothing in it. Flat, even light: no cast shadow across the face or the subject, no dramatic or scene lighting.'));
+    assert.ok(turnBrief.includes('One image, square format, aspect ratio 1:1.'));
+    assert.ok(section(turn.prompt, 'REFERENCE IMAGES').includes('Image 1: drawing style only'));
+    const turnSubject = section(turn.prompt, 'SUBJECT');
+    assert.deepStrictEqual(turnSubject.split('\n'), [
+      'SUBJECT',
+      'Name: Mara.',
+      'In one line: Wiry woman in her fifties with cropped grey hair, a broken nose and an oilskin coat torn at the left cuff.',
+      'Summary: Ferry pilot in her fifties, weathered, economical in movement.',
+      'Age: fifties.',
+      'Build: wiry, slightly stooped.',
+      'Hair: grey, cropped.',
+      'Face: long face, deep-set eyes, broken nose.',
+      'Distinguishing features, all visible: broken nose; grey cropped hair; oilskin coat with a torn left cuff.',
+      'Outfit: Black oilskin coat torn at the left cuff, wool cap, rubber boots.',
+      'Layers: oilskin coat; wool jumper; wool cap; rubber boots.',
+      'Hands: bare.',
+      MARA_IS_NOT_OSKAR,
+    ], 'the canonical description comes from the bible, with the difference line');
+    const turnHard = section(turn.prompt, 'HARD CONSTRAINTS');
+    assert.ok(turnHard.includes('- One character only, Mara, shown exactly four times: front, three-quarter, profile, back. No other figure.'));
+    assert.ok(turnHard.includes('- No text, labels, arrows, numbers, or color swatches.'));
+    assert.ok(!turn.prompt.includes('identity of'), 'a turnaround does not inherit from an older sheet');
+    assert.ok(/labels/.test(turn.negative_prompt));
+
+    // The difference line also runs the other way: Oskar lists nobody.
+    const oskar = compileAsset(root, 'CHAR_OSKAR', { sheet: 'turnaround' }).pkg;
+    assert.ok(section(oskar.prompt, 'SUBJECT').includes('Oskar is not Mara. Oskar: round face, hooded jacket, cut on his left hand.'));
+
+    // --- character: expressions, with the identity master ------------------
+    const exprResult = compileAsset(root, 'CHAR_MARA', { sheet: 'expressions' });
+    const expr = assertSheetPackage(root, exprResult, {
+      id: 'PP_CHAR_MARA_HARNESS-NATIVE-EXPR',
+      file: 'characters/CHAR_MARA/refs/prompts/harness-native.expressions.yaml',
+      asset: 'CHAR_MARA',
+      references: [LOOK, MARA_ID],
+      ratio: '1:1',
+    });
+    assert.deepStrictEqual(exprResult.notes, []);
+    const exprLegend = section(expr.prompt, 'REFERENCE IMAGES');
+    assert.ok(exprLegend.includes('Image 1: drawing style only'));
+    assert.ok(exprLegend.includes('Image 2: identity of Mara. Match the face, hair, build, and proportions exactly.'));
+    assert.deepStrictEqual(exprResult.spec.body.images.map((i) => [i.position, i.role]), [[1, 'style'], [2, 'identity']]);
+    const exprBrief = section(expr.prompt, 'SHEET');
+    assert.ok(exprBrief.includes('6 head-and-shoulders drawings of the same head in a grid of 3 columns and 2 rows, read left to right, top to bottom: ' +
+      '1. neutral; 2. wary; 3. angry; 4. afraid; 5. in pain; 6. relieved.'));
+    assert.ok(exprBrief.includes('Only the expression changes.'));
+    assert.ok(section(expr.prompt, 'HARD CONSTRAINTS').includes('- One character only: the head of Mara, exactly 6 times. No other figure.'));
+    // A chosen set of expressions.
+    const four = compileAsset(root, 'CHAR_MARA', { sheet: 'expressions', expressions: 'Neutral, listening , angry,neutral, spent' }).pkg;
+    assert.ok(four.prompt.includes('4 head-and-shoulders drawings of the same head in a grid of 2 columns and 2 rows, read left to right, top to bottom: ' +
+      '1. neutral; 2. listening; 3. angry; 4. spent.'));
+    assert.ok(four.prompt.includes('exactly 4 times'));
+    // No approved identity master yet: compiled from the description, with a note.
+    const oskarExpr = fx.withWorkspace((other) => {
+      fx.editYaml(other, 'references/manifest.yaml', (doc) => {
+        doc.assets.find((a) => a.id === 'CHAR_OSKAR_TURN_MASTER_V01').status = 'review';
+      });
+      return compileAsset(other, 'CHAR_OSKAR', { sheet: 'expressions' });
+    });
+
+    // --- character: wardrobe ------------------------------------------------
+    const ward = assertSheetPackage(root, compileAsset(root, 'CHAR_MARA', { sheet: 'wardrobe' }), {
+      id: 'PP_CHAR_MARA_HARNESS-NATIVE-WARD',
+      file: 'characters/CHAR_MARA/refs/prompts/harness-native.wardrobe.yaml',
+      asset: 'CHAR_MARA',
+      references: [LOOK, MARA_ID],
+      ratio: '1:1',
+    });
+    assert.ok(section(ward.prompt, 'SHEET').includes('Two full-figure views of the same person side by side: front on the left, back on the right.'));
+    assert.deepStrictEqual(section(ward.prompt, 'OUTFIT').split('\n'), [
+      'OUTFIT',
+      'The outfit on this sheet: Black oilskin coat torn at the left cuff, wool cap, rubber boots.',
+      'Layers: oilskin coat; wool jumper; wool cap; rubber boots.',
+      'Hands: bare.',
+    ], 'the outfit comes from wardrobe.yaml (default_wardrobe when --outfit is not given)');
+    assert.ok(section(ward.prompt, 'SUBJECT').includes(MARA_IS_NOT_OSKAR));
+    assert.ok(!section(ward.prompt, 'SUBJECT').includes('Outfit:'), 'the outfit is stated once, in its own section');
+    // --outfit picks another outfit of the character.
+    fx.editYaml(root, 'characters/CHAR_MARA/wardrobe.yaml', (doc) => {
+      doc.outfits.push({ id: 'WARD_MARA_SUNDAY', description: 'Dark wool suit, white shirt buttoned to the neck', accessories: ['brooch'], hands: 'gloved' });
+    });
+    const sunday = compileAsset(root, 'CHAR_MARA', { sheet: 'wardrobe', outfit: 'WARD_MARA_SUNDAY' }).pkg;
+    assert.deepStrictEqual(section(sunday.prompt, 'OUTFIT').split('\n'), [
+      'OUTFIT',
+      'The outfit on this sheet: Dark wool suit, white shirt buttoned to the neck.',
+      'Accessories: brooch.',
+      'Hands: gloved.',
+    ]);
+    assert.strictEqual(sunday.id, 'PP_CHAR_MARA_HARNESS-NATIVE-WARD');
+    expectError(() => compileAsset(root, 'CHAR_MARA', { sheet: 'wardrobe', outfit: 'WARD_MARA_NONE' }), 'outfit_missing',
+      /outfits on file: WARD_MARA_OILSKIN, WARD_MARA_SUNDAY/);
+
+    // --- any entity: detail -------------------------------------------------
+    const detail = assertSheetPackage(root,
+      compileAsset(root, 'CHAR_OSKAR', { sheet: 'detail', subject: 'the cut on his left hand.' }), {
+        id: 'PP_CHAR_OSKAR_HARNESS-NATIVE-DETAIL',
+        file: 'characters/CHAR_OSKAR/refs/prompts/harness-native.detail.yaml',
+        asset: 'CHAR_OSKAR',
+        references: [LOOK],
+        ratio: '1:1',
+      });
+    assert.ok(detail.prompt.includes('Detail sheet: a close study of one detail of Oskar: the cut on his left hand.\n'));
+    expectError(() => compileAsset(root, 'CHAR_OSKAR', { sheet: 'detail' }), 'bad_arguments', /--subject/);
+    assert.strictEqual(compileAsset(root, 'PROP_FLARE_GUN', { sheet: 'detail', subject: 'the lanyard ring' }).fileRel,
+      'props/PROP_FLARE_GUN/refs/prompts/harness-native.detail.yaml');
+
+    // --- location: plate ----------------------------------------------------
+    const plate = assertSheetPackage(root, compileAsset(root, 'LOC_FERRY_DECK', { sheet: 'plate' }), {
+      id: 'PP_LOC_FERRY_DECK_HARNESS-NATIVE-PLATE',
+      file: 'locations/LOC_FERRY_DECK/refs/prompts/harness-native.plate.yaml',
+      asset: 'LOC_FERRY_DECK',
+      references: [LOOK],
+      ratio: '3:2',
+    });
+    const plateBrief = section(plate.prompt, 'SHEET');
+    assert.ok(plateBrief.includes('Establishing plate of one location: Ferry deck.'));
+    assert.ok(plateBrief.includes('One wide view of the whole place, empty: no characters, no figures, no silhouettes.'));
+    assert.ok(plateBrief.includes("Lit by the location's own light sources as described below, at night."));
+    assert.ok(plateBrief.includes('One image, landscape format, aspect ratio 3:2.'));
+    assert.ok(!plateBrief.includes('Flat, even light'), 'a plate keeps the light of the place');
+    assert.deepStrictEqual(section(plate.prompt, 'SUBJECT').split('\n'), [
+      'SUBJECT',
+      'Name: Ferry deck.',
+      'In one line: Open steel deck of a small river ferry at night with a raised wheelhouse aft and two lashed crates.',
+      'Summary: Open steel car deck of a small river ferry, wheelhouse raised aft.',
+      'Architecture: Flat deck, low bulwarks, a steel ladder up to the wheelhouse.',
+      'Dressing: Coiled mooring lines, two lashed crates, a fire bucket.',
+      'Light: One shielded lamp on the wheelhouse; otherwise moonlight.',
+    ]);
+    assert.deepStrictEqual(section(plate.prompt, 'GEOGRAPHY').split('\n'), [
+      'GEOGRAPHY',
+      'Side convention: Bow is screen left, stern is screen right when facing port.',
+      'Screen left is the bow. Screen right is the stern.',
+      'Levels, bottom to top:',
+      '1. Deck: Car deck, at water level.',
+      '2. Wheelhouse: Raised cabin, reached by the ladder.',
+      'Landmarks:',
+      '- Crates: on the deck level, screen left. Two lashed crates near the bow.',
+      '- Ladder: on the deck level, screen right. Steel ladder to the wheelhouse.',
+      'The deck level connects to the wheelhouse level by the ladder.',
+    ], 'levels, landmarks, and the side convention come from map.yaml');
+    assert.ok(section(plate.prompt, 'HARD CONSTRAINTS').includes('- No characters, figures, or silhouettes anywhere in the image.'));
+    assert.ok(/people, figures/.test(plate.negative_prompt));
+    // The plate ratio follows what the provider offers.
+    const landscapeless = { referenceImages: 4, aspectRatios: ['2:3', '1:1'], imageEditing: true, textRendering: 'unreliable' };
+    const stub = Object.assign({}, require('../providers/image/manual'), { capabilities: landscapeless });
+    assert.strictEqual(compileAsset(root, 'LOC_FERRY_DECK', { sheet: 'plate', provider: stub, providerId: 'manual' }).pkg.parameters.aspect_ratio,
+      '2:3', 'no landscape ratio on offer: the page ratio');
+    // A plate without a map compiles, with a warning.
+    fs.unlinkSync(fx.abs(root, 'locations/LOC_FERRY_DECK/map.yaml'));
+    const mapless = compileAsset(root, 'LOC_FERRY_DECK', { sheet: 'plate' });
+    assert.ok(!mapless.pkg.prompt.includes('GEOGRAPHY'));
+    assert.ok(mapless.warnings.some((w) => /map\.yaml is missing/.test(w)));
+
+    // --- prop ---------------------------------------------------------------
+    const prop = assertSheetPackage(root, compileAsset(root, 'PROP_FLARE_GUN', { sheet: 'prop' }), {
+      id: 'PP_PROP_FLARE_GUN_HARNESS-NATIVE-PROP',
+      file: 'props/PROP_FLARE_GUN/refs/prompts/harness-native.prop.yaml',
+      asset: 'PROP_FLARE_GUN',
+      references: [LOOK],
+      ratio: '1:1',
+    });
+    assert.ok(section(prop.prompt, 'SHEET').includes('Add a second, smaller side view when it shows a feature the first view hides.'));
+    assert.deepStrictEqual(section(prop.prompt, 'SUBJECT').split('\n'), [
+      'SUBJECT',
+      'Name: Flare gun.',
+      'In one line: Orange single-shot flare pistol with a wide stubby barrel.',
+      'Summary: Orange single-shot flare pistol with a wide barrel.',
+      'Distinguishing features, all visible: wide stubby barrel; lanyard ring.',
+      'Size: held in one hand.',
+    ]);
+    assert.ok(section(prop.prompt, 'HARD CONSTRAINTS').includes('- One object only, Flare gun, shown once or twice. No hands, no figures, no setting.'));
+
+    // --- look: a new version of an approved look attaches its master -------
+    const look = assertSheetPackage(root, compileAsset(root, 'LOOK_NOIR_INK', { sheet: 'look' }), {
+      id: 'PP_LOOK_NOIR_INK_HARNESS-NATIVE-LOOK',
+      file: 'references/style/prompts/harness-native.LOOK_NOIR_INK.yaml',
+      asset: 'LOOK_NOIR_INK',
+      references: [LOOK],
+      ratio: '2:3',
+    });
+    assert.strictEqual(look.parameters.resolution, '2000x3000', 'a look page is page-shaped');
+    const lookBrief = section(look.prompt, 'SHEET');
+    assert.ok(lookBrief.includes('Look page: one sample comic page that demonstrates the drawing style above and nothing else.'));
+    assert.ok(lookBrief.includes('one anonymous adult figure who belongs to no story, in a plain everyday setting that suits a noir story.'));
+    assert.ok(lookBrief.includes('Include one speech balloon and one caption box in the lettering style'));
+    assert.ok(!look.prompt.includes('SUBJECT'), 'a look is built from the style only: no story content');
+    assert.ok(!/Mara|Oskar|Ferry/.test(look.prompt));
+
+    // --- first look: no approved master, no references, a note --------------
+    const firstResult = compileAsset(root, 'LOOK_DAWN_WASH', { sheet: 'look' });
+    const first = assertSheetPackage(root, firstResult, {
+      id: 'PP_LOOK_DAWN_WASH_HARNESS-NATIVE-LOOK',
+      file: 'references/style/prompts/harness-native.LOOK_DAWN_WASH.yaml',
+      asset: 'LOOK_DAWN_WASH',
+      references: [],
+      ratio: '2:3',
+    });
+    assert.deepStrictEqual(firstResult.notes,
+      ['LOOK_DAWN_WASH has no approved master yet: this is its first look, compiled with no reference image.']);
+    assert.ok(section(first.prompt, 'REFERENCE IMAGES').includes('No reference images are attached.'));
+    assert.deepStrictEqual(firstResult.spec.body.images, []);
+    // The project's only look losing its approval makes it a first look again...
+    fx.editYaml(root, 'references/manifest.yaml', (doc) => {
+      doc.assets.find((a) => a.id === 'LOOK_NOIR_INK_MASTER_V01').status = 'review';
+    });
+    assert.deepStrictEqual(compileAsset(root, 'LOOK_NOIR_INK', { sheet: 'look' }).pkg.references, []);
+    // ...and every other sheet waits for the look.
+    const noLook = expectError(() => compileAsset(root, 'CHAR_MARA', { sheet: 'turnaround' }), 'look_unapproved',
+      /LOOK_NOIR_INK_MASTER_V01 is review/);
+    assert.ok(/finish the look first/.test(noLook.message));
+    fx.editYaml(root, 'references/manifest.yaml', (doc) => {
+      doc.assets = doc.assets.filter((a) => a.entity !== 'LOOK_NOIR_INK');
+    });
+    expectError(() => compileAsset(root, 'PROP_FLARE_GUN', { sheet: 'prop' }), 'look_missing');
+    // Overlay lettering: the look page carries no text at all.
+    fx.editYaml(root, 'project.yaml', (project) => { project.lettering.mode = 'overlay'; });
+    const overlayLook = compileAsset(root, 'LOOK_NOIR_INK', { sheet: 'look' }).pkg;
+    assert.ok(overlayLook.prompt.includes('No balloons, captions, or text of any kind'));
+    assert.ok(section(overlayLook.prompt, 'HARD CONSTRAINTS').includes('- No text anywhere in the image.'));
+
+    return oskarExpr;
+  }).then((oskarExpr) => {
+    assert.deepStrictEqual(oskarExpr.pkg.references, [LOOK], 'no approved identity master: the style reference only');
+    assert.deepStrictEqual(oskarExpr.notes,
+      ['CHAR_OSKAR has no approved identity master yet: the expressions sheet is drawn from the written description only.']);
+  });
+}
+
+function testSheetRefusalsAndDeterminism() {
+  return fx.withWorkspace((rootA) => fx.withWorkspace((rootB) => {
+    // Deterministic: same inputs, same package, wherever the workspace lives.
+    const cases = [
+      ['CHAR_MARA', { sheet: 'turnaround' }],
+      ['CHAR_MARA', { sheet: 'expressions' }],
+      ['CHAR_MARA', { sheet: 'wardrobe' }],
+      ['CHAR_OSKAR', { sheet: 'detail', subject: 'the cut on his left hand' }],
+      ['LOC_FERRY_DECK', { sheet: 'plate' }],
+      ['PROP_FLARE_GUN', { sheet: 'prop' }],
+      ['LOOK_NOIR_INK', { sheet: 'look' }],
+      ['LOOK_DAWN_WASH', { sheet: 'look' }],
+    ];
+    for (const [id, options] of cases) {
+      const first = compileAsset(rootA, id, options).pkg;
+      assert.deepStrictEqual(compileAsset(rootA, id, options).pkg, first, `${id} ${options.sheet}: compiling twice`);
+      assert.deepStrictEqual(compileAsset(rootB, id, options).pkg, first, `${id} ${options.sheet}: another workspace copy`);
+      assert.deepStrictEqual(yaml.parse(yaml.stringify(first)), first, `${id} ${options.sheet}: YAML round trip`);
+      assert.ok(!/\d{4}-\d{2}-\d{2}/.test(first.prompt), 'no dates in the prompt');
+    }
+
+    // Kinds are checked against the entity type.
+    const root = rootA;
+    expectError(() => compileAsset(root, 'CHAR_MARA', { sheet: 'plate' }), 'bad_arguments',
+      /a CHAR entity takes turnaround \| expressions \| wardrobe \| detail/);
+    expectError(() => compileAsset(root, 'LOC_FERRY_DECK', { sheet: 'turnaround' }), 'bad_arguments', /a LOC entity takes plate \| detail/);
+    expectError(() => compileAsset(root, 'PROP_FLARE_GUN', { sheet: 'look' }), 'bad_arguments', /a PROP entity takes prop \| detail/);
+    expectError(() => compileAsset(root, 'LOOK_NOIR_INK', { sheet: 'prop' }), 'bad_arguments', /a LOOK entity takes look \| detail/);
+    expectError(() => compileAsset(root, 'CHAR_MARA', {}), 'bad_arguments', /--sheet \(missing\)/);
+    expectError(() => compileAsset(root, 'PG_001_001', { sheet: 'look' }), 'bad_arguments', /entity ID/);
+    // The bible entry must exist.
+    expectError(() => compileAsset(root, 'CHAR_NOBODY', { sheet: 'turnaround' }), 'entity_missing',
+      /characters\/CHAR_NOBODY\/character\.yaml not found/);
+    expectError(() => compileAsset(root, 'LOC_NOWHERE', { sheet: 'plate' }), 'entity_missing');
+    expectError(() => compileAsset(root, 'PROP_NOTHING', { sheet: 'prop' }), 'entity_missing');
+
+    // Provider budget and capabilities apply as for pages.
+    assert.strictEqual(compileAsset(root, 'CHAR_MARA', { sheet: 'turnaround', providerId: 'replicate' }).pkg.references.length, 1);
+    const over = expectError(() => compileAsset(root, 'CHAR_MARA', { sheet: 'expressions', providerId: 'replicate' }),
+      'budget_exceeded', /needs 2 reference image\(s\) .* but replicate takes 1/);
+    assert.ok(/Use a provider with a larger budget: comfyui \(8\)/.test(over.message));
+    const gemini = compileAsset(root, 'CHAR_MARA', { sheet: 'expressions', providerId: 'gemini' });
+    assert.strictEqual(gemini.pkg.id, 'PP_CHAR_MARA_GEMINI-EXPR');
+    assert.strictEqual(gemini.pkg.model, 'gemini-2.5-flash-image');
+    assert.strictEqual(gemini.fileRel, 'characters/CHAR_MARA/refs/prompts/gemini.expressions.yaml');
+    assert.strictEqual(compileAsset(root, 'CHAR_MARA', { sheet: 'turnaround', providerId: 'gemini', model: 'custom/model' }).pkg.model, 'custom/model');
+    // A provider that draws no text still takes sheets: they carry no lettering.
+    assert.strictEqual(compileAsset(root, 'LOOK_NOIR_INK', { sheet: 'look', providerId: 'comfyui' }).pkg.model, 'sd_xl_base_1.0.safetensors');
+    assert.ok(compileAsset(root, 'CHAR_MARA', { sheet: 'turnaround', providerId: 'fal' }).warnings
+      .some((w) => /ignores the 1 input image/.test(w)));
+
+    // The style block is mandatory here too.
+    fs.unlinkSync(fx.abs(root, 'style/style-block.txt'));
+    expectError(() => compileAsset(root, 'CHAR_MARA', { sheet: 'turnaround' }), 'style_block_missing');
+  }));
+}
+
+function testSheetCli() {
+  return fx.withWorkspace((root) => {
+    const out = fx.abs(root, 'characters/CHAR_MARA/refs/prompts/harness-native.expressions.yaml');
+    const expected = compileAsset(root, 'CHAR_MARA', { sheet: 'expressions' }).pkg;
+    const ok = spawnSync(process.execPath, [SCRIPT, '--asset', 'CHAR_MARA', '--sheet', 'expressions', '--root', root], { encoding: 'utf8' });
+    assert.strictEqual(ok.status, 0, ok.stderr);
+    assert.deepStrictEqual(yaml.parse(fs.readFileSync(out, 'utf8')), expected, 'the file on disk is the compiled package');
+    assert.ok(/PP_CHAR_MARA_HARNESS-NATIVE-EXPR \(asset CHAR_MARA, harness-native, model harness-native\)/.test(ok.stdout), ok.stdout);
+    assert.ok(/2 reference image\(s\), aspect 1:1/.test(ok.stdout));
+
+    // Without --root the workspace is found from the current directory.
+    const cwd = spawnSync(process.execPath, [SCRIPT, '--asset', 'LOC_FERRY_DECK', '--sheet', 'plate', '--provider', 'gemini'],
+      { encoding: 'utf8', cwd: fx.abs(root, 'issues/ISS_001') });
+    assert.strictEqual(cwd.status, 0, cwd.stderr);
+    assert.strictEqual(yaml.parse(fs.readFileSync(fx.abs(root, 'locations/LOC_FERRY_DECK/refs/prompts/gemini.plate.yaml'), 'utf8')).id,
+      'PP_LOC_FERRY_DECK_GEMINI-PLATE');
+
+    // The first look says on the console that it has no reference.
+    const first = spawnSync(process.execPath, [SCRIPT, '--asset', 'LOOK_DAWN_WASH', '--sheet', 'look', '--root', root], { encoding: 'utf8' });
+    assert.strictEqual(first.status, 0, first.stderr);
+    assert.ok(/note: LOOK_DAWN_WASH has no approved master yet: this is its first look, compiled with no reference image\./.test(first.stdout), first.stdout);
+    assert.ok(fs.existsSync(fx.abs(root, 'references/style/prompts/harness-native.LOOK_DAWN_WASH.yaml')));
+
+    // Flags with a value in quotes, and the refusals.
+    const detail = spawnSync(process.execPath,
+      [SCRIPT, '--asset', 'PROP_FLARE_GUN', '--sheet', 'detail', '--subject', 'the lanyard ring', '--root', root], { encoding: 'utf8' });
+    assert.strictEqual(detail.status, 0, detail.stderr);
+    assert.ok(fs.readFileSync(fx.abs(root, 'props/PROP_FLARE_GUN/refs/prompts/harness-native.detail.yaml'), 'utf8').includes('the lanyard ring'));
+    const bad = spawnSync(process.execPath, [SCRIPT, '--asset', 'CHAR_MARA', '--sheet', 'plate', '--root', root], { encoding: 'utf8' });
+    assert.strictEqual(bad.status, 1);
+    assert.ok(/a CHAR entity takes/.test(bad.stderr), bad.stderr);
+    const both = spawnSync(process.execPath,
+      [SCRIPT, '--asset', 'CHAR_MARA', '--sheet', 'turnaround', '--page', fx.pageFile(root, fx.PAGE_1), '--root', root], { encoding: 'utf8' });
+    assert.strictEqual(both.status, 1);
+    assert.ok(/--asset and --page cannot be combined/.test(both.stderr));
+    const outside = spawnSync(process.execPath, [SCRIPT, '--asset', 'CHAR_MARA', '--sheet', 'turnaround'],
+      { encoding: 'utf8', cwd: path.parse(root).root });
+    assert.strictEqual(outside.status, 1);
+    assert.ok(/--root <workspace>/.test(outside.stderr), outside.stderr);
+  });
+}
+
 async function main() {
   testLanguageHelpers();
   await testGeneratePackage();
@@ -564,6 +941,9 @@ async function main() {
   await testRepairCycleLimit();
   await testPerPanel();
   await testCli();
+  await testSheets();
+  await testSheetRefusalsAndDeterminism();
+  await testSheetCli();
   console.log('compile-prompts: OK');
 }
 

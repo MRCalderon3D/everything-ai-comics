@@ -15,7 +15,8 @@ const ws = require('../scripts/lib/workspace');
 const yaml = require('../scripts/lib/yaml');
 const { validateDoc } = require('../scripts/lib/page-pipeline');
 const { buildReferencePlan } = require('../scripts/build-reference-plan');
-const { compilePage } = require('../scripts/compile-prompts');
+const { compilePage, compileAsset } = require('../scripts/compile-prompts');
+const assetPaths = require('../scripts/lib/asset-paths');
 const gen = require('../scripts/generate-assets');
 
 const SCRIPT = path.join(__dirname, '..', 'scripts', 'generate-assets.js');
@@ -67,8 +68,12 @@ function testEstimates() {
   assert.strictEqual(gen.estimateCost({ provider: 'manual', model: 'manual' }), null);
   assert.deepStrictEqual(gen.scopeOf({ id: 'PP_PG_001_002_FAL', page: 'PG_001_002', provider: 'fal' }),
     { scope: 'PG_001_002', page: 'PG_001_002', asset: null });
-  assert.deepStrictEqual(gen.scopeOf({ id: 'PP_CHAR_OSKAR_TURN_V02_HARNESS-NATIVE', page: null, asset: 'CHAR_OSKAR', provider: 'harness-native' }),
-    { scope: 'CHAR_OSKAR_TURN_V02', page: null, asset: 'CHAR_OSKAR' });
+  // Asset scope is the entity: records live under generations/<ENTITY_ID>/.
+  assert.deepStrictEqual(gen.scopeOf({ id: 'PP_CHAR_OSKAR_HARNESS-NATIVE-TURN', page: null, asset: 'CHAR_OSKAR', provider: 'harness-native' }),
+    { scope: 'CHAR_OSKAR', page: null, asset: 'CHAR_OSKAR' });
+  // Without an asset field the ID inside the package ID is the fallback.
+  assert.deepStrictEqual(gen.scopeOf({ id: 'PP_CHAR_OSKAR_TURN_V02_HARNESS-NATIVE', page: null, asset: null, provider: 'harness-native' }),
+    { scope: 'CHAR_OSKAR_TURN_V02', page: null, asset: 'CHAR_OSKAR_TURN_V02' });
   assert.strictEqual(gen.scopeOf({ id: 'PP_X', page: null, asset: null, provider: 'fal' }), null);
 }
 
@@ -350,12 +355,13 @@ function testIssueAndAssetScope() {
       await expectReject(gen.generateAssets({ page: fx.pageFile(root, fx.PAGE_1), issue: issueDir, log: quiet }), 'bad_arguments');
       await expectReject(gen.generateAssets({ issue: fx.abs(root, 'issues'), log: quiet }), 'issue_missing');
 
-      // Asset-scoped package (a new character sheet): records live under the
-      // asset ID, there is no render, and the target sits next to the record.
+      // A hand-written asset package with no sheet tag in its ID: the record
+      // still lives under the entity, there is no render, and the target
+      // sits next to the record because no sheet kind names a candidate.
       const assetPackage = fx.abs(root, 'characters/CHAR_OSKAR/prompts/harness-native.yaml');
       fs.mkdirSync(path.dirname(assetPackage), { recursive: true });
       fs.writeFileSync(assetPackage, yaml.stringify({
-        id: 'PP_CHAR_OSKAR_TURN_V02_HARNESS-NATIVE',
+        id: 'PP_CHAR_OSKAR_HARNESS-NATIVE',
         page: null,
         asset: 'CHAR_OSKAR',
         provider: 'harness-native',
@@ -374,14 +380,14 @@ function testIssueAndAssetScope() {
       const record = asset.results[0].record;
       assertRecordValid(record);
       assert.strictEqual(asset.results[0].recordFile,
-        fx.abs(root, 'generations/CHAR_OSKAR_TURN_V02/GEN_CHAR_OSKAR_TURN_V02_01.yaml'));
-      assert.strictEqual(record.id, 'GEN_CHAR_OSKAR_TURN_V02_01');
+        fx.abs(root, 'generations/CHAR_OSKAR/GEN_CHAR_OSKAR_01.yaml'));
+      assert.strictEqual(record.id, 'GEN_CHAR_OSKAR_01');
       assert.strictEqual(record.page, null);
       assert.strictEqual(record.asset, 'CHAR_OSKAR');
       assert.strictEqual(record.output_render, null);
       const request = JSON.parse(fs.readFileSync(asset.results[0].requestFile, 'utf8'));
       assert.deepStrictEqual(request.body.output,
-        { render: null, path: 'generations/CHAR_OSKAR_TURN_V02/GEN_CHAR_OSKAR_TURN_V02_01.png' });
+        { render: null, path: 'generations/CHAR_OSKAR/GEN_CHAR_OSKAR_01.png' });
       assert.ok(asset.results[0].warnings.some((w) => /style block changed/.test(w)), 'a stale style block hash is flagged');
 
       // A per-panel package yields a panel image, not a page render.
@@ -422,7 +428,180 @@ function testCli() {
 
     const none = spawnSync(process.execPath, [SCRIPT], { encoding: 'utf8', env });
     assert.strictEqual(none.status, 1);
-    assert.ok(/exactly one of --package, --page, --issue/.test(none.stderr));
+    assert.ok(/exactly one of --package, --page, --issue, --asset/.test(none.stderr));
+  });
+}
+
+/** Compile a sheet and write its package where the CLI would. */
+function prepareSheet(root, entityId, options) {
+  const { pkg, fileRel } = compileAsset(root, entityId, options);
+  const file = fx.abs(root, fileRel);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, yaml.stringify(pkg));
+  return { pkg, file, fileRel };
+}
+
+function testSheets() {
+  return fx.withWorkspace(async (root) => {
+    const network = fx.blockNetwork();
+    try {
+      // Candidate naming: next free version, masters counted, never _MASTER.
+      assert.deepStrictEqual(assetPaths.nextCandidate(root, 'CHAR_MARA', 'TURN'),
+        { id: 'CHAR_MARA_TURN_V02', version: 2, rel: 'characters/CHAR_MARA/refs/CHAR_MARA_TURN_V02.png' },
+        'CHAR_MARA_TURN_MASTER_V01 exists, so the next candidate is V02');
+      assert.strictEqual(assetPaths.nextCandidate(root, 'CHAR_MARA', 'EXPR').id, 'CHAR_MARA_EXPR_V01');
+      assert.strictEqual(assetPaths.nextCandidate(root, 'CHAR_MARA', 'WARD').rel,
+        'characters/CHAR_MARA/refs/CHAR_MARA_WARD_V01.png');
+      assert.strictEqual(assetPaths.nextCandidate(root, 'LOC_FERRY_DECK', 'PLATE').rel,
+        'locations/LOC_FERRY_DECK/refs/LOC_FERRY_DECK_PLATE_V02.png');
+      assert.strictEqual(assetPaths.nextCandidate(root, 'PROP_FLARE_GUN', 'PROP').rel,
+        'props/PROP_FLARE_GUN/refs/PROP_FLARE_GUN_PROP_V01.png');
+      assert.strictEqual(assetPaths.nextCandidate(root, 'PROP_FLARE_GUN', 'DETAIL', '.jpg').rel,
+        'props/PROP_FLARE_GUN/refs/PROP_FLARE_GUN_DETAIL_V01.jpg');
+      assert.strictEqual(assetPaths.nextCandidate(root, 'LOOK_NOIR_INK', 'LOOK').rel,
+        'references/style/LOOK_NOIR_INK_V02.png', 'a look has no tag; the master V01 is counted');
+      assert.strictEqual(assetPaths.nextCandidate(root, 'LOOK_DAWN_WASH', 'LOOK').rel,
+        'references/style/LOOK_DAWN_WASH_V01.png');
+      // A registry entry reserves its version even when its file is gone.
+      assert.strictEqual(assetPaths.nextCandidate(root, 'CHAR_OSKAR', 'TURN').id, 'CHAR_OSKAR_TURN_V03',
+        'CHAR_OSKAR_TURN_V02 is registered (in review)');
+      fs.unlinkSync(fx.abs(root, 'characters/CHAR_OSKAR/refs/CHAR_OSKAR_TURN_V02.png'));
+      assert.strictEqual(assetPaths.nextCandidate(root, 'CHAR_OSKAR', 'TURN').id, 'CHAR_OSKAR_TURN_V03');
+
+      // Dry run of a turnaround: entity scope, candidate target, no render.
+      const turn = prepareSheet(root, 'CHAR_MARA', { sheet: 'turnaround' });
+      const refsBefore = listFiles(fx.abs(root, 'characters/CHAR_MARA/refs')).filter((n) => /\.png$/.test(n));
+      const first = await gen.generateAssets({ package: turn.file, log: quiet });
+      const record = first.results[0].record;
+      assertRecordValid(record);
+      assert.strictEqual(first.results[0].recordFile, fx.abs(root, 'generations/CHAR_MARA/GEN_CHAR_MARA_01.yaml'));
+      assert.strictEqual(record.id, 'GEN_CHAR_MARA_01');
+      assert.strictEqual(record.page, null);
+      assert.strictEqual(record.asset, 'CHAR_MARA');
+      assert.strictEqual(record.output_render, null, 'a sheet is not a page render');
+      assert.strictEqual(record.prompt_package, 'PP_CHAR_MARA_HARNESS-NATIVE-TURN');
+      assert.strictEqual(record.status, 'dry_run');
+      assert.strictEqual(record.model, 'unreported');
+      assert.deepStrictEqual(record.metadata_unavailable, ['model', 'cost', 'seed']);
+      const target = 'characters/CHAR_MARA/refs/CHAR_MARA_TURN_V02.png';
+      assert.ok(record.notes.includes(target), 'the handoff names the candidate file');
+      const request = JSON.parse(fs.readFileSync(first.results[0].requestFile, 'utf8'));
+      assert.deepStrictEqual(request.body.output, { render: null, path: target });
+      assert.strictEqual(request.body.prompt, turn.pkg.prompt);
+      assert.ok(!/_MASTER/.test(request.body.output.path), 'generation never targets a master name');
+      assert.deepStrictEqual(listFiles(fx.abs(root, 'characters/CHAR_MARA/refs')).filter((n) => /\.png$/.test(n)),
+        refsBefore, 'a dry run adds no image');
+
+      // Every sheet of the entity shares one record sequence.
+      const expr = prepareSheet(root, 'CHAR_MARA', { sheet: 'expressions' });
+      const second = await gen.generateAssets({ package: expr.file, log: quiet });
+      assert.strictEqual(second.results[0].record.id, 'GEN_CHAR_MARA_02');
+      assert.strictEqual(JSON.parse(fs.readFileSync(second.results[0].requestFile, 'utf8')).body.output.path,
+        'characters/CHAR_MARA/refs/CHAR_MARA_EXPR_V01.png');
+
+      // --asset runs every package under the entity's refs/prompts/.
+      prepareSheet(root, 'CHAR_MARA', { sheet: 'wardrobe' });
+      prepareSheet(root, 'CHAR_MARA', { sheet: 'expressions', providerId: 'gemini' });
+      const all = await gen.generateAssets({ asset: 'CHAR_MARA', root, log: quiet });
+      assert.deepStrictEqual(all.results.map((r) => r.record.prompt_package), [
+        'PP_CHAR_MARA_GEMINI-EXPR',
+        'PP_CHAR_MARA_HARNESS-NATIVE-EXPR',
+        'PP_CHAR_MARA_HARNESS-NATIVE-TURN',
+        'PP_CHAR_MARA_HARNESS-NATIVE-WARD',
+      ]);
+      assert.deepStrictEqual(all.results.map((r) => r.record.id),
+        ['GEN_CHAR_MARA_03', 'GEN_CHAR_MARA_04', 'GEN_CHAR_MARA_05', 'GEN_CHAR_MARA_06']);
+      assert.ok(all.results.every((r) => r.record.asset === 'CHAR_MARA' && r.record.page === null));
+      for (const r of all.results) assertRecordValid(r.record);
+      // --provider narrows it.
+      const onlyGemini = await gen.generateAssets({ asset: 'CHAR_MARA', root, provider: 'gemini', log: quiet });
+      assert.deepStrictEqual(onlyGemini.results.map((r) => r.record.provider), ['gemini']);
+      assert.strictEqual(onlyGemini.skipped.length, 3);
+      await expectReject(gen.generateAssets({ asset: 'CHAR_OSKAR', root, log: quiet }), 'package_missing',
+        /compile-prompts\.js --asset CHAR_OSKAR --sheet/);
+      await expectReject(gen.generateAssets({ asset: 'PG_001_001', root, log: quiet }), 'bad_arguments');
+      await expectReject(gen.generateAssets({ asset: 'CHAR_MARA', package: turn.file, log: quiet }), 'bad_arguments');
+
+      // Looks share references/style/prompts/; --asset picks only its own.
+      const firstLook = prepareSheet(root, 'LOOK_DAWN_WASH', { sheet: 'look' });
+      prepareSheet(root, 'LOOK_NOIR_INK', { sheet: 'look' });
+      const look = await gen.generateAssets({ asset: 'LOOK_DAWN_WASH', root, log: quiet });
+      assert.strictEqual(look.results.length, 1);
+      assert.strictEqual(look.results[0].file, firstLook.file);
+      assert.strictEqual(look.results[0].record.id, 'GEN_LOOK_DAWN_WASH_01');
+      assert.strictEqual(look.results[0].record.asset, 'LOOK_DAWN_WASH');
+      assert.strictEqual(JSON.parse(fs.readFileSync(look.results[0].requestFile, 'utf8')).body.output.path,
+        'references/style/LOOK_DAWN_WASH_V01.png');
+      assert.deepStrictEqual(JSON.parse(fs.readFileSync(look.results[0].requestFile, 'utf8')).body.images, [],
+        'a first look attaches no image');
+
+      // Plate and prop targets.
+      const plate = await gen.generateAssets({ package: prepareSheet(root, 'LOC_FERRY_DECK', { sheet: 'plate' }).file, log: quiet });
+      assert.strictEqual(plate.results[0].record.id, 'GEN_LOC_FERRY_DECK_01');
+      assert.ok(plate.results[0].record.notes.includes('locations/LOC_FERRY_DECK/refs/LOC_FERRY_DECK_PLATE_V02.png'));
+      const prop = await gen.generateAssets({ package: prepareSheet(root, 'PROP_FLARE_GUN', { sheet: 'prop' }).file, log: quiet });
+      assert.ok(prop.results[0].record.notes.includes('props/PROP_FLARE_GUN/refs/PROP_FLARE_GUN_PROP_V01.png'));
+
+      // A live result is saved as the next candidate; each attempt is a new
+      // version, and the approved master is never touched.
+      const real = require('../providers/image/gemini');
+      const common = require('../providers/lib/common');
+      const bytes = Buffer.from('new sheet bytes');
+      const fake = Object.assign({}, real, {
+        async generate(spec) {
+          const rec = common.makeRecord(spec, { status: 'pending' });
+          rec._media = [{ data_base64: bytes.toString('base64'), format: 'png' }];
+          return common.markSucceeded(rec, 'Stand-in returned 1 image.', ['inline image 1 (png)']);
+        },
+      });
+      const master = fx.abs(root, 'characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V01.png');
+      const masterBefore = fs.readFileSync(master);
+      const geminiTurn = prepareSheet(root, 'CHAR_MARA', { sheet: 'turnaround', providerId: 'gemini' });
+      const item = { file: geminiTurn.file, pkg: geminiTurn.pkg, root };
+      const live1 = await gen.runPackage(item, { live: true, providerModule: fake });
+      assert.strictEqual(live1.record.status, 'succeeded');
+      assert.deepStrictEqual(live1.record.media_files, ['characters/CHAR_MARA/refs/CHAR_MARA_TURN_V02.png']);
+      assert.strictEqual(live1.record.output_render, null);
+      assert.ok(fs.readFileSync(fx.abs(root, live1.record.media_files[0])).equals(bytes));
+      assertRecordValid(yaml.parse(fs.readFileSync(live1.recordFile, 'utf8')));
+      const live2 = await gen.runPackage(item, { live: true, providerModule: fake });
+      assert.deepStrictEqual(live2.record.media_files, ['characters/CHAR_MARA/refs/CHAR_MARA_TURN_V03.png'],
+        'version increment: the second attempt is a sibling');
+      assert.ok(fs.readFileSync(master).equals(masterBefore), 'the approved master is untouched');
+      assert.ok(!listFiles(fx.abs(root, 'characters/CHAR_MARA/refs')).some((n) => /_MASTER_V0[2-9]/.test(n)),
+        'generation never creates a master');
+      // The next dry run plans the version after the saved ones.
+      const after = await gen.generateAssets({ package: turn.file, log: quiet });
+      assert.ok(after.results[0].record.notes.includes('characters/CHAR_MARA/refs/CHAR_MARA_TURN_V04.png'));
+
+      // A look result lands in references/style/ under the LOOK ID.
+      const lookItem = { file: firstLook.file, pkg: Object.assign({}, firstLook.pkg, { provider: 'gemini', id: 'PP_LOOK_DAWN_WASH_GEMINI-LOOK' }), root };
+      const liveLook = await gen.runPackage(lookItem, { live: true, providerModule: fake });
+      assert.deepStrictEqual(liveLook.record.media_files, ['references/style/LOOK_DAWN_WASH_V01.png']);
+
+      assert.strictEqual(network.calls, 0);
+    } finally {
+      network.restore();
+    }
+  });
+}
+
+function testSheetCli() {
+  return fx.withWorkspace((root) => {
+    const turn = prepareSheet(root, 'CHAR_MARA', { sheet: 'turnaround' });
+    // --root points at the workspace.
+    const byRoot = spawnSync(process.execPath, [SCRIPT, '--asset', 'CHAR_MARA', '--root', root], { encoding: 'utf8' });
+    assert.strictEqual(byRoot.status, 0, byRoot.stderr);
+    assert.ok(/DRY_RUN GEN_CHAR_MARA_01 \[harness-native, model unreported\]/.test(byRoot.stdout), byRoot.stdout);
+    assert.ok(/target:\s+characters\/CHAR_MARA\/refs\/CHAR_MARA_TURN_V02\.png/.test(byRoot.stdout), byRoot.stdout);
+    // Without --root the workspace is found from the current directory.
+    const byCwd = spawnSync(process.execPath, [SCRIPT, '--asset', 'CHAR_MARA'],
+      { encoding: 'utf8', cwd: path.dirname(turn.file) });
+    assert.strictEqual(byCwd.status, 0, byCwd.stderr);
+    assert.ok(/GEN_CHAR_MARA_02/.test(byCwd.stdout));
+    const outside = spawnSync(process.execPath, [SCRIPT, '--asset', 'CHAR_MARA'], { encoding: 'utf8', cwd: path.parse(root).root });
+    assert.strictEqual(outside.status, 1);
+    assert.ok(/--root <workspace>/.test(outside.stderr), outside.stderr);
   });
 }
 
@@ -433,6 +612,8 @@ async function main() {
   await testLiveGate();
   await testLiveResultIsSavedAsNewVersion();
   await testIssueAndAssetScope();
+  await testSheets();
+  await testSheetCli();
   await testCli();
   console.log('generate-assets: OK');
 }

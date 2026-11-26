@@ -470,6 +470,22 @@ source_hashes:                         # required
   style_block: 9a8b7c6d5e4f3a20
 ```
 
+Two variants use the same schema:
+
+- Per-panel packages (`generation.mode: per_panel`, compiled with `--panel`)
+  are written to `prompts/<provider>.<PN_ID>.yaml` with the id
+  `PP_<PAGE_ID>_<PROVIDER>-P##`.
+- Asset-scoped packages (`page: null`, `asset: <ENTITY_ID>`, compiled with
+  `--asset <ENTITY_ID> --sheet <kind>`) are written to
+  `<entity dir>/refs/prompts/<provider>.<kind>.yaml`, and for LOOK entities to
+  `references/style/prompts/<provider>.<LOOK_ID>.yaml`. Their id is
+  `PP_<ENTITY_ID>_<PROVIDER>-<TAG>` with TAG one of `TURN`, `EXPR`, `WARD`,
+  `PLATE`, `PROP`, `LOOK`, `DETAIL`. Generation writes the next free candidate
+  `<ENTITY_ID>_<TAG>_V##` in the entity's `refs/` directory (look pages in
+  `references/style/`). A candidate never carries `_MASTER`: promoting it to
+  a master is an approval step that registers the file in
+  `references/manifest.yaml`.
+
 ## generations/<scope>/GEN_*.yaml (`generation-record`)
 
 ```yaml

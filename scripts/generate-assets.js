@@ -20,6 +20,13 @@
  * next free render version (<PAGE_ID>_V##) as its output_render, and a live
  * result is saved under the page's renders/ directory. An existing render
  * file is never overwritten. Records never contain API keys.
+ *
+ * An asset-scoped package (a reference sheet compiled with
+ * compile-prompts.js --asset) is recorded under generations/<ENTITY_ID>/
+ * and targets the next free candidate in the entity's refs directory:
+ * <ENTITY_ID>_<TAG>_V##.png, or references/style/<LOOK_ID>_V##.png for a
+ * look. A candidate never takes the _MASTER name: promotion to master is an
+ * approval step, not something generation does.
  */
 
 const fs = require('fs');
@@ -30,6 +37,7 @@ const { parseArgs, helpIfRequested } = require('./lib/cli');
 const {
   pipelineError, loadPageContext, hashPage, hashText, validateDoc,
 } = require('./lib/page-pipeline');
+const assetPaths = require('./lib/asset-paths');
 const ws = require('./lib/workspace');
 const yaml = require('./lib/yaml');
 const { providerTag, isRemote, resolveLocal } = require('../providers/lib/common');
@@ -38,7 +46,8 @@ const HELP = `
 generate-assets.js: generate images from compiled prompt packages.
 
 Usage:
-  node scripts/generate-assets.js (--package <prompt-package.yaml> | --page <page.yaml> | --issue <issue dir>)
+  node scripts/generate-assets.js (--package <prompt-package.yaml> | --page <page.yaml> |
+                                   --issue <issue dir> | --asset <ENTITY_ID> [--root <workspace>])
                                   [--provider <id>] [--live --yes]
 
 Options:
@@ -46,13 +55,26 @@ Options:
   --page <page.yaml> The page's package for its provider (prompts/<provider>.yaml).
   --issue <dir>      Every page of the issue, in reading order. Pages that are
                      already reviewed or approved are skipped.
+  --asset <ID>       Every sheet package compiled for a CHAR_*, LOC_*, PROP_*
+                     or LOOK_* entity (its refs/prompts/ directory).
+  --root <dir>       Workspace root for --asset. Default: the workspace found
+                     from the current directory.
   --provider <id>    Use the packages compiled for this provider instead of
-                     the page's own provider.
+                     the page's own provider. With --asset: only that provider.
   --live             Call the provider API (default: DRY RUN).
   --yes              Confirm the printed cost estimate. Required with --live.
   --help             Show this help.
 
 Dry run writes the request spec and a dry_run record and calls no network.
+
+Written under <workspace>/generations/<PAGE_ID or ENTITY_ID>/:
+  GEN_<scope>_<attempt##>.yaml and GEN_<scope>_<attempt##>.request.json
+Image targets, always the next free version, never an overwrite:
+  page    <page dir>/renders/<PAGE_ID>_V##.png
+  sheet   characters|locations|props/<ID>/refs/<ID>_<TAG>_V##.png
+          (TAG: TURN, EXPR, WARD, PLATE, PROP, DETAIL)
+  look    references/style/<LOOK_ID>_V##.png
+A sheet candidate never takes the _MASTER name; approval promotes it.
 `;
 
 /**
@@ -112,9 +134,16 @@ function nextRenderId(root, pageId) {
   return `${pageId}_V${String(max + 1).padStart(2, '0')}`;
 }
 
-/** Scope of a package: its page, else the asset or entity ID it is for. */
+/**
+ * Scope of a package: its page, else the entity it is for. Records of an
+ * asset-scoped package live under generations/<ENTITY_ID>/. A package with
+ * no asset field falls back to the ID inside its package ID.
+ */
 function scopeOf(pkg) {
   if (pkg.page) return { scope: String(pkg.page), page: String(pkg.page), asset: null };
+  if (pkg.asset && ws.ID.entity.test(String(pkg.asset))) {
+    return { scope: String(pkg.asset), page: null, asset: String(pkg.asset) };
+  }
   const tag = `_${providerTag(pkg.provider)}`;
   const id = String(pkg.id || '');
   let fromId = id.startsWith('PP_') ? id.slice(3) : '';
@@ -157,9 +186,9 @@ function pagePackageFiles(pageDir, page, providerId) {
 function collectPackages(options) {
   const items = [];
   const skipped = [];
-  const selected = ['package', 'page', 'issue'].filter((k) => options[k] && options[k] !== true);
+  const selected = ['package', 'page', 'issue', 'asset'].filter((k) => options[k] && options[k] !== true);
   if (selected.length !== 1) {
-    throw pipelineError('bad_arguments', 'exactly one of --package, --page, --issue is required (see --help)');
+    throw pipelineError('bad_arguments', 'exactly one of --package, --page, --issue, --asset is required (see --help)');
   }
   const wanted = options.provider && options.provider !== true ? String(options.provider) : null;
 
@@ -188,6 +217,30 @@ function collectPackages(options) {
     }
     for (const file of files) items.push({ file, pkg: loadPackage(file), root });
   };
+
+  if (options.asset) {
+    const entityId = String(options.asset);
+    if (!assetPaths.entityType(entityId)) {
+      throw pipelineError('bad_arguments', `--asset needs an entity ID (CHAR_*, LOC_*, PROP_* or LOOK_*), got "${entityId}"`);
+    }
+    const start = options.root && options.root !== true ? path.resolve(String(options.root)) : process.cwd();
+    const root = ws.findWorkspaceRoot(start);
+    if (!root) {
+      throw pipelineError('workspace_missing', `no project.yaml at or above ${start}: pass --root <workspace> or run from inside the workspace`);
+    }
+    const files = assetPaths.listPackageFiles(root, entityId);
+    if (!files.length) {
+      throw pipelineError('package_missing',
+        `${entityId}: no sheet package under ${assetPaths.promptsDir(entityId)}/ (run compile-prompts.js --asset ${entityId} --sheet <kind>)`);
+    }
+    for (const file of files) {
+      const pkg = loadPackage(file);
+      if (pkg.asset !== entityId) skipped.push(`${toPosix(file)}: compiled for ${pkg.asset || pkg.page}, not ${entityId}`);
+      else if (wanted && pkg.provider !== wanted) skipped.push(`${toPosix(file)}: compiled for ${pkg.provider}, not ${wanted}`);
+      else items.push({ file, pkg, root });
+    }
+    return { items, skipped };
+  }
 
   if (options.page) {
     const ctx = loadPageContext(options.page);
@@ -238,8 +291,11 @@ function writeNew(file, buffer) {
  * renders/ directory under the next free version; anything else goes next
  * to the record. Nothing is ever overwritten: a taken name moves on to the
  * next free version.
+ * A sheet (ctx.sheet) goes to the entity's refs directory as the next free
+ * candidate version, never under a _MASTER name.
  * @param {object} record generation record (mutated)
- * @param {{root: string, page: string|null, fullPage: boolean, dir: string, fetchImpl?: Function}} ctx
+ * @param {{root: string, page: string|null, fullPage: boolean, dir: string,
+ *          sheet?: {entity: string, tag: string}, fetchImpl?: Function}} ctx
  */
 async function persistMedia(record, ctx) {
   const inline = Array.isArray(record._media) ? record._media : null;
@@ -280,6 +336,18 @@ async function persistMedia(record, ctx) {
           writeNew(candidate, buffer);
           file = candidate;
           if (!firstRender) firstRender = renderId;
+        } catch (err) {
+          if (err.code !== 'EEXIST') throw err;
+        }
+      }
+    } else if (ctx.sheet) {
+      // nextCandidate counts every extension, so a taken version moves on.
+      for (let tries = 0; tries < 5 && !file; tries++) {
+        const next = assetPaths.nextCandidate(ctx.root, ctx.sheet.entity, ctx.sheet.tag, ext);
+        const candidate = ws.abs(ctx.root, next.rel);
+        try {
+          writeNew(candidate, buffer);
+          file = candidate;
         } catch (err) {
           if (err.code !== 'EEXIST') throw err;
         }
@@ -359,9 +427,13 @@ async function runPackage(item, options = {}) {
   const dir = path.join(root, 'generations', target.scope);
   const recordId = `GEN_${target.scope}_${String(nextAttempt(dir, target.scope)).padStart(2, '0')}`;
   const renderId = fullPage ? nextRenderId(root, target.page) : null;
-  const outputFile = fullPage
-    ? path.join(ws.pageDir(root, target.page), 'renders', `${renderId}.png`)
-    : path.join(dir, `${recordId}.png`);
+  // A compiled sheet package targets the next candidate in the entity's refs
+  // directory; anything else without a page stays next to its record.
+  const sheet = !target.page ? assetPaths.sheetOfPackage(pkg) : null;
+  const sheetTarget = sheet ? { entity: target.asset, tag: sheet.tag } : null;
+  let outputFile = path.join(dir, `${recordId}.png`);
+  if (fullPage) outputFile = path.join(ws.pageDir(root, target.page), 'renders', `${renderId}.png`);
+  else if (sheetTarget) outputFile = ws.abs(root, assetPaths.nextCandidate(root, sheetTarget.entity, sheetTarget.tag).rel);
   const outputPath = ws.rel(root, outputFile);
   const cost = estimateCost(Object.assign({}, pkg, { model: spec.model }), pkg.provider);
 
@@ -389,7 +461,9 @@ async function runPackage(item, options = {}) {
     root,
   });
   if (record.status === 'succeeded') {
-    await persistMedia(record, { root, page: target.page, fullPage, dir, fetchImpl: options.fetchImpl });
+    await persistMedia(record, {
+      root, page: target.page, fullPage, dir, sheet: sheetTarget, fetchImpl: options.fetchImpl,
+    });
   } else {
     delete record._media;
   }
@@ -414,8 +488,9 @@ async function runPackage(item, options = {}) {
 
 /**
  * Programmatic entry point (what the CLI runs).
- * @param {{package?: string, page?: string, issue?: string, provider?: string,
- *          live?: boolean, yes?: boolean, log?: Function, fetchImpl?: Function}} options
+ * @param {{package?: string, page?: string, issue?: string, asset?: string, root?: string,
+ *          provider?: string, live?: boolean, yes?: boolean, log?: Function,
+ *          fetchImpl?: Function}} options
  * @returns {Promise<{live: boolean, results: object[], failures: string[], skipped: string[], totalCost: number, unestimated: number}>}
  */
 async function generateAssets(options = {}) {
@@ -466,6 +541,8 @@ async function main() {
     package: flags.package,
     page: flags.page,
     issue: flags.issue,
+    asset: flags.asset,
+    root: flags.root,
     provider: flags.provider,
     live: flags.live === true,
     yes: flags.yes === true,

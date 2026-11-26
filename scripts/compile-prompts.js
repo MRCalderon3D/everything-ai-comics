@@ -28,44 +28,84 @@
  * locked. It refuses once the review's repair_cycle has reached the
  * project's repair_policy.max_cycles.
  *
+ * --asset <ENTITY_ID> --sheet <kind> compiles a reference sheet instead of a
+ * page: a character turnaround, expression or wardrobe sheet, a location
+ * plate, a prop sheet, a look page, or a detail study. The prompt is the
+ * style block, a sheet brief for the kind, the reference legend, the
+ * entity's canonical description from its bible, and hard constraints. The
+ * approved look master is attached with role style (a LOOK entity with no
+ * approved master yet compiles its first look with no image), and wardrobe
+ * and expression sheets also attach the character's approved identity
+ * master. The package is asset-scoped (page: null) and is written into the
+ * entity's refs/prompts/ directory.
+ *
  * provider.compile() runs last to enforce the provider's capabilities and
  * pin the model.
  */
 
 const path = require('path');
 const { writeFileEnsuring, toPosix } = require('./lib/fsx');
-const { loadImageProvider, resolveProviderId } = require('./lib/providers');
+const { loadImageProvider, listProviders, resolveProviderId } = require('./lib/providers');
 const { parseArgs, helpIfRequested } = require('./lib/cli');
 const {
   pipelineError, loadPageContext, hashPage, hashPlan, hashText, assertValid,
 } = require('./lib/page-pipeline');
 const layout = require('./lib/layout-language');
 const lang = require('./lib/panel-language');
+const sheets = require('./lib/sheet-language');
+const assetPaths = require('./lib/asset-paths');
 const ws = require('./lib/workspace');
 const yaml = require('./lib/yaml');
+const {
+  bestApproved, entityAssets, findLookMaster, findIdentityMaster, roomierProviders,
+} = require('./build-reference-plan');
 const { attachments, providerTag } = require('../providers/lib/common');
 
 const HELP = `
-compile-prompts.js: compile a page into a prompt package for an image provider.
+compile-prompts.js: compile a page or a reference sheet into a prompt package
+for an image provider.
 
 Usage:
   node scripts/compile-prompts.js --page <page.yaml> [--provider <id>] [--repair <review.yaml>]
+  node scripts/compile-prompts.js --asset <ENTITY_ID> --sheet <kind> [--root <workspace>] [--provider <id>]
 
-Options:
-  --page <file>      page.yaml (or its directory). Required.
-  --provider <id>    Image provider. Default: the page's generation.provider,
-                     then the project's default_providers.image.
+Page options:
+  --page <file>      page.yaml (or its directory).
   --repair <file>    A visual review of one of this page's renders. Compiles
                      a repair package: edit target, exact changes, locked
                      elements. Refused once the repair limit is reached.
-  --model <id>       Pin a model instead of the provider's default.
   --panel <PN_ID>    Per-panel mode: compile one panel as its own image
                      (written to prompts/<provider>.<PN_ID>.yaml).
+
+Asset options:
+  --asset <ID>       A CHAR_*, LOC_*, PROP_* or LOOK_* entity.
+  --sheet <kind>     CHAR: turnaround | expressions | wardrobe
+                     LOC:  plate        PROP: prop        LOOK: look
+                     any entity: detail (needs --subject)
+  --outfit <WARD_ID> wardrobe only. Default: the character's default_wardrobe.
+  --expressions <a,b,c>
+                     expressions only. Default: neutral, wary, angry, afraid,
+                     in pain, relieved.
+  --subject "<text>" detail only: what the study shows.
+  --root <dir>       Workspace root. Default: the workspace found from the
+                     current directory.
+
+Both:
+  --provider <id>    Image provider. Default: the page's generation.provider,
+                     then the project's default_providers.image.
+  --model <id>       Pin a model instead of the provider's default.
   --help             Show this help.
 
-Needs style/style-block.txt and a reference-plan.yaml next to page.yaml
-(run build-reference-plan.js first).
-Output: prompts/<provider>.yaml next to page.yaml, status "compiled".
+A page needs style/style-block.txt and a reference-plan.yaml next to
+page.yaml (run build-reference-plan.js first). A sheet needs the style block,
+the entity's bible file, and an approved look master (except the first look).
+
+Output, status "compiled":
+  page    <page dir>/prompts/<provider>.yaml
+  sheet   characters/<ID>/refs/prompts/<provider>.<kind>.yaml
+          locations/<ID>/refs/prompts/<provider>.<kind>.yaml
+          props/<ID>/refs/prompts/<provider>.<kind>.yaml
+          references/style/prompts/<provider>.<LOOK_ID>.yaml
 `;
 
 const DEFAULT_MAX_REPAIR_CYCLES = 2;
@@ -818,11 +858,267 @@ function compilePage(root, page, options = {}) {
   };
 }
 
+/**
+ * Characters `charId` could be confused with, across the whole cast:
+ * the ones its file lists, then every character whose file lists it.
+ */
+function adjacentInCast(root, charId, bibles) {
+  const own = bibles.character(charId);
+  const out = own && Array.isArray(own.visually_adjacent_to) ? own.visually_adjacent_to.slice() : [];
+  for (const other of ws.listEntityIds(root, 'characters')) {
+    if (other === charId || out.includes(other)) continue;
+    const doc = bibles.character(other);
+    if (doc && Array.isArray(doc.visually_adjacent_to) && doc.visually_adjacent_to.includes(charId)) out.push(other);
+  }
+  return out.filter((id) => id !== charId);
+}
+
+/**
+ * Compile the prompt package of a reference sheet (asset scope).
+ * @param {string} root workspace root
+ * @param {string} entityId CHAR_*, LOC_*, PROP_* or LOOK_* entity ID
+ * @param {{sheet: string, outfit?: string, subject?: string, expressions?: string|string[],
+ *          providerId?: string, provider?: object, project?: object,
+ *          styleBlock?: string, model?: string}} options
+ * @returns {{pkg: object, spec: object, warnings: string[], notes: string[], fileRel: string}}
+ *   fileRel is the workspace-relative path the package belongs at
+ * @throws an Error with `code` on any refusal
+ */
+function compileAsset(root, entityId, options = {}) {
+  const type = assetPaths.entityType(entityId);
+  if (!type) {
+    throw pipelineError('bad_arguments', `--asset needs an entity ID (CHAR_*, LOC_*, PROP_* or LOOK_*), got "${entityId}"`);
+  }
+  const kind = options.sheet && options.sheet !== true ? String(options.sheet) : null;
+  const allowed = assetPaths.SHEET_KINDS[type];
+  if (!kind || !allowed.includes(kind)) {
+    throw pipelineError('bad_arguments',
+      `--sheet ${kind || '(missing)'} does not apply to ${entityId}: a ${type} entity takes ${allowed.join(' | ')}`);
+  }
+  const subject = options.subject && options.subject !== true ? String(options.subject).trim() : '';
+  if (kind === 'detail' && !subject) {
+    throw pipelineError('bad_arguments', '--sheet detail needs --subject "<what the study shows>"');
+  }
+
+  const project = options.project || ws.loadProject(root) || {};
+  const providerId = resolveProviderId(options.providerId, null, project);
+  const provider = options.provider || loadImageProvider(providerId);
+  const capabilities = provider.capabilities || {};
+  const capacity = typeof capabilities.referenceImages === 'number' ? capabilities.referenceImages : Infinity;
+  const letteringMode = project.lettering && project.lettering.mode === 'overlay' ? 'overlay' : 'in_image';
+  const warnings = [];
+  const notes = [];
+
+  const styleBlock = options.styleBlock !== undefined ? options.styleBlock : ws.loadStyleBlock(root, project);
+  if (!styleBlock || !String(styleBlock).trim()) {
+    throw pipelineError('style_block_missing',
+      `${entityId}: the frozen style block is missing or empty (${(project.style && project.style.style_block) || 'style/style-block.txt'}). ` +
+      'Every prompt starts with it verbatim; write it with /style-bible first.');
+  }
+
+  const bibles = createBibles(root);
+  const assets = ws.loadReferenceAssets(root);
+  const name = bibles.entityName(entityId);
+  const missingBible = (file) => pipelineError('entity_missing',
+    `${entityId}: ${file} not found in the workspace. Write the bible entry before compiling its sheet.`);
+
+  // The entity's canonical description, from its bible file.
+  const subjectLines = [];
+  const extraSections = [];
+  const briefCtx = {
+    name,
+    subject,
+    format: project.comic_format,
+    genre: project.genre ? String(project.genre).trim() : '',
+    letteringMode,
+  };
+  if (type === 'CHAR') {
+    const character = bibles.character(entityId);
+    if (!character) throw missingBible(`characters/${entityId}/character.yaml`);
+    const wardrobe = bibles.wardrobe(entityId);
+    const outfits = wardrobe && Array.isArray(wardrobe.outfits) ? wardrobe.outfits.filter((o) => o && o.id) : [];
+    const outfitId = kind === 'wardrobe' && options.outfit && options.outfit !== true
+      ? String(options.outfit) : character.default_wardrobe;
+    const outfit = outfits.find((o) => o.id === outfitId) || null;
+    if (kind === 'wardrobe' && !outfit) {
+      throw pipelineError('outfit_missing',
+        `${entityId}: ${outfitId ? `outfit ${outfitId} is not in characters/${entityId}/wardrobe.yaml` : 'no --outfit given and the character has no default_wardrobe'}` +
+        ` (outfits on file: ${outfits.map((o) => o.id).join(', ') || 'none'})`);
+    }
+    if (kind === 'expressions') briefCtx.expressions = sheets.expressionList(options.expressions);
+    subjectLines.push(...sheets.characterSubject(character, name));
+    if (kind === 'wardrobe') {
+      extraSections.push(['OUTFIT', ...sheets.outfitLines(outfit, 'The outfit on this sheet')].join('\n'));
+    } else {
+      subjectLines.push(...sheets.outfitLines(outfit, 'Outfit'));
+    }
+    for (const otherId of adjacentInCast(root, entityId, bibles)) {
+      subjectLines.push(differenceLine(entityId, otherId, bibles));
+    }
+  } else if (type === 'LOC') {
+    const location = bibles.location(entityId);
+    if (!location) throw missingBible(`locations/${entityId}/location.yaml`);
+    const map = ws.loadLocationMap(root, entityId);
+    const states = Array.isArray(location.time_of_day_states) ? location.time_of_day_states : [];
+    if (states.length) briefCtx.time = lang.humanize(states[0]);
+    subjectLines.push(...sheets.locationSubject(location, name));
+    const geography = sheets.geographyLines(map);
+    if (geography.length) extraSections.push(['GEOGRAPHY', ...geography].join('\n'));
+    else if (kind === 'plate') {
+      warnings.push(`locations/${entityId}/map.yaml is missing or empty: the plate states no sides, levels, or landmarks, and later pages may contradict it`);
+    }
+  } else if (type === 'PROP') {
+    const prop = bibles.prop(entityId);
+    if (!prop) throw missingBible(`props/${entityId}/prop.yaml`);
+    subjectLines.push(...sheets.propSubject(prop, name));
+  }
+
+  // References: one role per image.
+  const picked = [];
+  if (type === 'LOOK') {
+    const own = bestApproved(entityAssets(assets, entityId)
+      .filter((a) => !a.kind || a.kind === 'look' || a.default_role === 'style'));
+    if (own) picked.push({ asset: own, role: 'style' });
+    else notes.push(`${entityId} has no approved master yet: this is its first look, compiled with no reference image.`);
+  } else {
+    const { look, pool, unregistered } = findLookMaster(project, assets);
+    if (!look) {
+      const why = pool.length
+        ? `the look master is not approved (${pool.map((a) => `${a.id} is ${a.status}`).join(', ')})`
+        : `no look master is registered${unregistered.length ? ` (project.style.look_refs lists ${unregistered.join(', ')}, which references/manifest.yaml does not register)` : ''}`;
+      throw pipelineError(pool.length ? 'look_unapproved' : 'look_missing',
+        `${entityId}: ${why}. A sheet is drawn in the approved look, so finish the look first: ` +
+        'compile and generate a look page (--asset <LOOK_ID> --sheet look), approve it, and list it under style.look_refs.');
+    }
+    picked.push({ asset: look, role: 'style' });
+    if (type === 'CHAR' && (kind === 'wardrobe' || kind === 'expressions')) {
+      const { identity } = findIdentityMaster(assets, entityId, bibles.character(entityId));
+      if (identity) picked.push({ asset: identity, role: 'identity' });
+      else notes.push(`${entityId} has no approved identity master yet: the ${kind} sheet is drawn from the written description only.`);
+    }
+  }
+  for (const p of picked) {
+    if (!p.asset.path) {
+      throw pipelineError('reference_unusable', `${p.asset.id} has no path in references/manifest.yaml`);
+    }
+  }
+  if (picked.length > capacity) {
+    const roomier = roomierProviders(picked.length, providerId, listProviders('image'));
+    throw pipelineError('budget_exceeded',
+      `${entityId}: the ${kind} sheet needs ${picked.length} reference image(s) (${picked.map((p) => p.asset.id).join(', ')}) ` +
+      `but ${providerId} takes ${capacity}. ` +
+      (roomier.length ? `Use a provider with a larger budget: ${roomier.join(', ')}.` : 'No listed provider takes that many images.'));
+  }
+
+  // Parameters: sheets are square, plates landscape, look pages page-shaped.
+  const pageRatio = (project.page && project.page.aspect_ratio) || '2:3';
+  const ratio = sheets.pickRatio(kind, capabilities.aspectRatios, pageRatio);
+  const parameters = { aspect_ratio: ratio };
+  if (kind === 'look' && ratio === pageRatio && project.page && project.page.width_px && project.page.height_px) {
+    parameters.resolution = `${project.page.width_px}x${project.page.height_px}`;
+  }
+  parameters.seed = null;
+
+  const pkg = {
+    id: assetPaths.packageId(entityId, providerId, kind),
+    page: null,
+    asset: entityId,
+    provider: providerId,
+    model: 'pending',
+    mode: 'generate',
+    prompt: '',
+    negative_prompt: sheets.negativePrompt(kind, letteringMode),
+    parameters,
+    references: picked.map((p) => ({
+      asset_id: p.asset.id,
+      role: p.role,
+      image_path: String(p.asset.path).replace(/\\/g, '/'),
+    })),
+    edit_target: null,
+  };
+
+  const entityByAsset = new Map(picked.map((p) => [p.asset.id, p.asset.entity || null]));
+  const sections = [
+    String(styleBlock).trim(),
+    ['SHEET', ...sheets.sheetBrief(kind, briefCtx),
+      `One image, ${orientationOf(ratio)}, aspect ratio ${ratio}.`,
+      ...colorLines(project)].join('\n'),
+    legendSection(attachments(pkg), entityByAsset, bibles),
+  ];
+  if (subjectLines.length) sections.push(['SUBJECT', ...subjectLines].join('\n'));
+  sections.push(...extraSections);
+  sections.push(['HARD CONSTRAINTS', ...sheets.sheetConstraints(kind, briefCtx)].join('\n'));
+  pkg.prompt = sections.join('\n\n');
+
+  // A sheet carries no story lettering: nothing for a review to compare.
+  pkg.lettering_text = [];
+  pkg.status = 'compiled';
+  // The schema defines page, reference_plan, and style_block hashes and
+  // requires none. An asset package has neither a page nor a reference
+  // plan, so only the style block is hashed.
+  pkg.source_hashes = { style_block: hashText(String(styleBlock)) };
+
+  let spec;
+  try {
+    spec = provider.compile(pkg, options.model ? { model: String(options.model) } : {});
+  } catch (err) {
+    throw pipelineError('provider_rejected', `${providerId} cannot run this package: ${err.message}`);
+  }
+  pkg.model = spec.model;
+  for (const w of (spec.meta && spec.meta.warnings) || []) warnings.push(w);
+
+  return { pkg, spec, warnings, notes, fileRel: assetPaths.packageFile(entityId, providerId, kind) };
+}
+
+/** --asset branch of the CLI. */
+function mainAsset(flags) {
+  let root;
+  let result;
+  try {
+    if (flags.asset === true) throw pipelineError('bad_arguments', '--asset needs an entity ID');
+    for (const other of ['page', 'repair', 'panel']) {
+      if (flags[other] !== undefined) throw pipelineError('bad_arguments', `--asset and --${other} cannot be combined`);
+    }
+    const start = flags.root && flags.root !== true ? path.resolve(String(flags.root)) : process.cwd();
+    root = ws.findWorkspaceRoot(start);
+    if (!root) {
+      throw pipelineError('workspace_missing',
+        `no project.yaml at or above ${start}: pass --root <workspace> or run from inside the workspace`);
+    }
+    result = compileAsset(root, String(flags.asset), {
+      sheet: flags.sheet,
+      outfit: flags.outfit,
+      subject: flags.subject,
+      expressions: flags.expressions && flags.expressions !== true ? String(flags.expressions) : undefined,
+      providerId: flags.provider,
+      model: flags.model && flags.model !== true ? flags.model : undefined,
+    });
+    const check = assertValid('prompt-package', result.pkg, `prompt package ${result.pkg.id}`);
+    if (check.skipped) console.warn('warning: schemas/prompt-package.schema.json not found, schema validation skipped');
+  } catch (err) {
+    console.error(`error: ${err.message}`);
+    process.exit(1);
+  }
+  const { pkg, spec, warnings, notes } = result;
+  const outFile = ws.abs(root, result.fileRel);
+  writeFileEnsuring(outFile, yaml.stringify(pkg));
+  console.log(`prompt package: ${pkg.id} (asset ${pkg.asset}, ${pkg.provider}, model ${pkg.model}) -> ${toPosix(outFile)}`);
+  console.log(`  prompt: ${pkg.prompt.length} characters, ${pkg.references.length} reference image(s), aspect ${pkg.parameters.aspect_ratio}`);
+  console.log(`  request endpoint: ${spec.endpoint || '(none: handoff to a person or the harness tool)'}`);
+  for (const n of notes) console.log(`  note: ${n}`);
+  for (const w of warnings) console.log(`  warning: ${w}`);
+  console.log(`  next: node scripts/generate-assets.js --package ${toPosix(outFile)}`);
+}
+
 function main() {
   helpIfRequested(process.argv.slice(2), HELP);
   const { flags } = parseArgs();
+  if (flags.asset !== undefined) {
+    mainAsset(flags);
+    return;
+  }
   if (!flags.page || flags.page === true) {
-    console.error('error: --page <page.yaml> is required (see --help)');
+    console.error('error: --page <page.yaml> or --asset <ENTITY_ID> --sheet <kind> is required (see --help)');
     process.exit(1);
   }
   let ctx;
@@ -862,6 +1158,7 @@ function main() {
 
 module.exports = {
   compilePage,
+  compileAsset,
   composePagePrompt,
   composeRepairPrompt,
   composePanelPrompt,

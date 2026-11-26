@@ -125,6 +125,14 @@ the aspect ratio, instructions, and the target output. `generate()` returns a
 the result. `generate-assets.js` writes the package next to the record as
 `GEN_<scope>_<attempt>.request.json` and fills in the target render and path.
 
+The target depends on the package's scope. A page package targets the next
+free render, `<page dir>/renders/<PAGE_ID>_V##.png`. A sheet package compiled
+with `compile-prompts.js --asset <ENTITY_ID> --sheet <kind>` targets the next
+free candidate in the entity's `refs/` directory,
+`<ENTITY_ID>_<TAG>_V##.png` (`references/style/<LOOK_ID>_V##.png` for a look),
+and its record goes under `generations/<ENTITY_ID>/`. A candidate never takes
+the `_MASTER` name; approval promotes it.
+
 Use `harness-native` when the coding assistant has its own image tool (Codex
 with gpt-image, or an MCP image tool). Use `manual` when a person generates in
 a web UI. In both cases the record is completed afterwards with the saved file
