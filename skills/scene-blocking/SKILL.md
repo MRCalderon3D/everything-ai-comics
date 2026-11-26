@@ -1,0 +1,137 @@
+---
+name: scene-blocking
+description: "Stage each scene on the location map: positions, movement paths, eyelines, travel and threat directions."
+origin: everything-ai-comics
+category: production
+---
+
+# Scene Blocking
+
+## Purpose
+
+Put the scene in concrete space before anyone draws it: who stands on which
+level, on which side, beside which landmark, who moves where, and who looks at
+whom. Blocking also fixes the direction the cast travels and the direction the
+threat comes from, so every panel of the scene agrees about where things are.
+
+## Use When
+
+- `/issue-breakdown` has scenes and beats and the geography is still prose.
+- `/panel-ledger` or `/smart-page` needs positions to fill the cast rows.
+- A planned page has a character acting from a place they never reached.
+- A script revision changes who is present or how the action flows.
+
+## Inputs
+
+- `production/issues/<ISS_ID>/scenes/<SC_ID>.yaml`: `cast`, `beats`, and the
+  `geography` block.
+- `production/locations/<LOC_ID>/map.yaml`: `levels`, `sides`, `landmarks`,
+  `exits`, and `connections`.
+- `production/characters/<CHAR_ID>/character.yaml` and
+  `production/props/<PROP_ID>/prop.yaml` (`hands_required`) for what each body
+  and object can do.
+- The state the scene inherits: the last page of the previous scene, or the
+  file named in `opens_from` in `issue.yaml` for the first scene of an issue.
+
+## Process
+
+1. Read the map before the script. List the levels from bottom to top, the
+   landmarks on each, the exits, and the `connections` between levels. If the
+   scene needs a place the map does not name, stop and add it through
+   `location-mapping`. A position invented inside one scene is lost in the
+   next.
+2. Adopt the map's `sides.convention` for the whole scene. On LOC_FERRY_DECK
+   the bow is screen left and the stern is screen right, and no panel of the
+   scene may swap them.
+3. Fix `geography.travel_direction` and `geography.threat_direction` with the
+   enum values (`left_to_right`, `right_to_left`, `toward_reader`,
+   `away_from_reader`, `none`). Write in `geography.notes` which side or exit
+   the threat uses, for example "The patrol launch always approaches from the
+   stern (screen right)".
+4. Place every cast member at the start of the scene: `level`, `side`,
+   `landmark`, and `facing`. Take the starting state from what the previous
+   scene or issue left true. A character who ended the last scene in the
+   wheelhouse opens this one there.
+5. Block movement beat by beat. For each move, state who moves, from where to
+   where, through which connection, and what triggers it. A change of level
+   uses a `connections` entry of the map (Mara reaches the deck by the
+   ladder). Cut any move that has no reason in the beat.
+6. Decide which moves the reader sees. A shown move gets its own panel moment.
+   A skipped move becomes a labelled `ellipsis` on the next panel and a
+   `moved` note on the character's row. Keep on the page any move that
+   changes who can reach whom.
+7. Set eyelines as `facing` values that agree with the positions. If Mara
+   stands at the ladder on the right and Oskar crouches at the crates on the
+   left, she faces left and he faces right, in every panel until one of them
+   moves.
+8. Establish custody changes before the action that needs them. Walk each
+   plot-relevant prop through the scene and give every handoff, drop, pickup,
+   or draw a beat where it visibly happens. If Mara fires PROP_FLARE_GUN in
+   the last beat, an earlier beat shows her taking it.
+9. Check that each beat is physically possible. Carrying a person takes both
+   hands. A prop with `hands_required: 2` leaves no hand for anything else. A
+   character on one level cannot touch someone on another.
+10. Decide what the establishing panel must show so the close panels after it
+    stay legible: the levels, the landmarks the scene uses, and where each
+    character starts.
+11. Write the result: the `geography` block in the scene file, and for each
+    panel the `position`, `facing`, and `moved` fields of the cast rows and
+    the `position` of the prop rows in `page.yaml`. When the pages do not
+    exist yet, record the per-beat positions in `geography.notes` so
+    `/panel-ledger` can copy them into rows.
+
+## Outputs
+
+- `production/issues/<ISS_ID>/scenes/<SC_ID>.yaml` with `geography` filled
+  (`scene.schema.json`).
+- Position, facing, and movement values for the cast and prop rows of every
+  `page.yaml` in the scene.
+- A list of the custody changes and level changes the pages must show.
+
+## Quality Bar
+
+- Every position names a level and a landmark or side that exist in
+  `map.yaml`.
+- `travel_direction` and `threat_direction` are set and no panel contradicts
+  them.
+- Every level change uses a connection of the map and is either shown or
+  labelled as an ellipsis.
+- Every action that needs an object comes after a beat where the character
+  gets that object.
+- Two characters who look at each other have opposite `facing` values.
+
+## Common Failure Modes
+
+- Positions written as prose ("near the stairs") instead of level, side, and
+  landmark, so two panels read the same sentence differently.
+- A character fires from a platform nobody showed them climbing.
+- The threat enters from the left on one page and from the right on the next.
+- A prop appears in a hand in the panel where it is used, with no pickup
+  before it.
+- Blocking invented panel by panel during scripting, so the fourth panel
+  contradicts the first.
+- A rescuer carries the wounded character and opens a door in the same panel.
+
+## Related Agents
+
+- layout-artist
+- continuity-editor
+- comic-writer
+- penciller
+
+## Related Commands
+
+- issue-breakdown
+- panel-ledger
+- smart-page
+
+## Notes
+
+Blocking is the spatial contract that `panel-composition`, `state-tracking`,
+and `continuity-checking` audit against. Change the blocking first and derive
+the panels again from it. Editing a panel to fit a drawing that got the
+geography wrong moves the error into the plan.
+
+`scripts/check-continuity.js` catches a level change without `moved` or
+`ellipsis` and a position that names a level or landmark missing from the map.
+It cannot tell whether a move makes sense. That judgment stays here.

@@ -1,0 +1,142 @@
+---
+name: panel-composition
+description: Choose framing, angle, and staging inside the panel so the moment and the actor are unmistakable.
+origin: everything-ai-comics
+category: production
+---
+
+# Panel Composition
+
+## Purpose
+
+Decide what the reader sees inside each panel border: how close, from what
+angle, from which side of the figure, and how the bodies are arranged. A panel
+works when a reader who has not seen the script can say who is doing what. The
+caption does not rescue a drawing where two people could each be the actor.
+
+## Use When
+
+- `/panel-script` fills the `framing` block of planned panels.
+- `/thumbnails` tests whether a framing reads at small size.
+- `/smart-page` composes the panels of a new page.
+- A review reports that the wrong person seems to act, or that bodies merge.
+
+## Inputs
+
+- The panel in `production/issues/<ISS_ID>/pages/<PG_ID>/page.yaml`: `moment`,
+  `size`, `cast` rows with `position` and `facing`, `props`, and `lettering`.
+- `production/locations/<LOC_ID>/map.yaml` for the side convention and the
+  landmarks a wide view must show.
+- The scene's `geography` (travel and threat directions).
+- `character.yaml` for `distinguishing_features` and `visually_adjacent_to`.
+- `production/style/style-bible.md` for how the look handles blacks and
+  detail.
+
+## Process
+
+1. Read the panel's `moment` and name the actor: the one character whose
+   action the sentence describes. If the moment holds two actions that
+   compete, send it back to `comic-scripting` to be split. One panel carries
+   one drawable moment.
+2. Choose `shot_size` by what the reader must be able to read:
+   `extreme_wide` and `wide` for geography and levels; `full` for a whole-body
+   action and for who stands where; `medium_wide` and `medium` for an
+   exchange and for hands; `medium_close_up` and `close_up` for a reaction or
+   a decision; `extreme_close_up` for a detail of a face; `insert` for an
+   object that carries plot, such as a prop changing hands;
+   `over_the_shoulder` for two people with the listener's back in frame.
+3. Match the size of the framing to the size of the panel. A `small` panel
+   holds a close view of one subject. Four figures and a stretch of river need a
+   `wide` or `large` panel.
+4. Choose `angle`. Use `eye_level` unless another angle does a job:
+   `high_angle` shows the layout of a space or makes a figure small,
+   `low_angle` makes one loom, `overhead` works as a map when positions
+   matter more than faces, `worms_eye` is for rare extremes, and `dutch`
+   belongs to moments when the world itself tips.
+5. Choose `view`. `front` and `three_quarter` show the face and so carry
+   identity. `profile` shows direction of travel and suits a confrontation.
+   `three_quarter_back` and `back` hide the face, so use them only when the
+   wardrobe or the previous panel already tells the reader who this is. Never
+   introduce a character from behind, and never turn away a character listed
+   in someone's `visually_adjacent_to` in the panel where the two share
+   space.
+6. Make the actor unmistakable. Give the actor the clearest shape in the
+   panel, keep at least one distinguishing feature visible, and show the hand
+   or body part that performs the action. Everyone else is smaller, further
+   back, or cropped.
+7. Separate the silhouettes. Each figure reads as its own shape with a gap
+   between bodies unless contact is the moment. When two characters touch,
+   show whose hand is whose. In a handoff, draw both hands and the object
+   between them. Put characters of similar build at different heights or
+   facing different ways.
+8. Stage from the ledger. Screen left and right follow the map's side
+   convention, each `facing` value is drawn as written, and movement runs
+   along the scene's `travel_direction`. A panel that flips the sides for a
+   prettier angle breaks the next ten.
+9. Reserve room for lettering. Count the words in the panel's `lettering`
+   list and leave quiet space for them (sky, a wall, dark water) where the
+   reading path enters the panel: top left in `ltr`, top right in `rtl`.
+   Place the first speaker on the side the reader meets first so balloon
+   tails do not cross. Say where the space is in `framing.composition`.
+10. Check variety across the page. Read the `shot_size` and `angle` of every
+    panel in order. Open a new location with a wide view, avoid three panels
+    in a row with the same size and angle unless a fixed view is the device,
+    and keep the closest framing for the moment the page turns on.
+11. Write `framing.composition` as one sentence a penciller could draw from,
+    and `background` as what is visible behind the figures. Describe
+    placement and shapes. Leave mood words out.
+
+## Outputs
+
+- The `framing` block of each panel in `page.yaml`: `shot_size`, `angle`,
+  `view`, and `composition`.
+- `background` per panel.
+- Notes sent back to `page-layout` when a moment does not fit its panel size.
+
+## Quality Bar
+
+- Every `shot_size`, `angle`, and `view` uses a value from the `page.yaml`
+  enums.
+- From `composition` alone, a reader can name the actor and the action.
+- No panel hides the face of a character who is new to the reader or who
+  could be confused with another character present.
+- Every panel with lettering says where the text goes.
+- No more than two consecutive panels share both `shot_size` and `angle`,
+  unless `layout.notes` records the repetition as deliberate.
+- Left and right in every panel agree with `sides.convention` in `map.yaml`.
+
+## Common Failure Modes
+
+- Every panel a medium view at eye level, so the page has no rhythm and no
+  emphasis.
+- The actor drawn from behind while a bystander faces the reader, so the
+  bystander seems to act.
+- Two bodies overlapping at the moment of an attack, with no way to tell who
+  is being hit.
+- A handoff framed so tightly that only one hand shows.
+- A crowded wide view squeezed into a `small` panel.
+- Balloons planned after the drawing, covering the hand that holds the gun.
+- A side flip between panels because the reverse angle looked better alone.
+
+## Related Agents
+
+- penciller
+- layout-artist
+- comic-writer
+
+## Related Commands
+
+- panel-script
+- thumbnails
+- smart-page
+
+## Notes
+
+Composition decides what each panel shows. `sequential-storytelling` decides
+how panels follow each other, and `performance-direction` decides what the
+figures do with their bodies and faces. Write the framing before the acting:
+the acting has to live where the framing puts the reader's eye.
+
+Full-page generation draws small panels with less fidelity than large ones.
+When identity matters in a panel, give it size or a closer framing. Do not
+count on a prompt to hold a face that is twenty pixels wide.
