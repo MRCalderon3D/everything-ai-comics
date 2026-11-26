@@ -1,0 +1,150 @@
+# Balloons and captions
+
+## Purpose
+
+Get the right words, attributed to the right character, onto the page where
+they can be read without hiding the drawing.
+
+## Scope
+
+Lettering layer. Applies to the `lettering` list of every panel in
+`page.yaml`, to `lettering.yaml` in overlay mode, to the `lettering_text` of
+prompt packages, and to the `lettering` check of every visual review. Used by
+`/panel-script`, `/lettering`, `/smart-page`, and `/visual-review`. Sound
+effects have their own rule (`sound-effects.md`), and the order of elements
+is covered by `reading-order.md`.
+
+## Core Principles
+
+- The text in `page.yaml` is the text. Every other place the words appear is
+  a copy and matches it character for character.
+- A reader always knows who is speaking. Attribution comes from the tail and
+  from staging, never from guessing.
+- Lettering covers the least important part of the panel. Faces, hands, and
+  the main action stay visible.
+- Fewer words, read once. A balloon the reader has to reread is too long or
+  badly placed.
+
+## Lettering types
+
+Every element declares a `type`. The type decides the container, and the
+style bible fixes how each container is drawn.
+
+| Type | What it is | `speaker` |
+|---|---|---|
+| `caption` | Boxed text outside the scene: time, place, a neutral narrator | `null` |
+| `narration` | Boxed text in a narrating voice that runs across panels | `null` |
+| `balloon` | Ordinary speech | Character ID |
+| `thought` | Unspoken thought, in a cloud or the project's thought style | Character ID |
+| `whisper` | Quiet speech: dashed outline or smaller, lighter text | Character ID |
+| `shout` | Loud speech: burst outline, larger or heavier text | Character ID |
+| `radio` | A voice through a device: jagged outline and a bolt tail | Character ID |
+| `sign` | Text that exists inside the world: signage, labels, screens | `null` |
+| `sfx` | A sound effect (see `sound-effects.md`) | `null` |
+
+- The speaker of a spoken element MUST have a row in the panel's `cast`. A
+  voice from outside the frame, including a radio voice, keeps a row with
+  `off_panel: true`.
+- When a project has more than one narrating voice, the style bible gives
+  each one a distinct box style, and the script keeps to it.
+- Use `whisper` and `shout` for volume. Do not signal volume with
+  punctuation alone, and do not use `shout` for emphasis on a single word.
+- `sign` text is part of the set. It follows the location's design and still
+  has to be exact.
+
+## Exact text
+
+- The rendered page MUST carry the `text` of each element exactly: every
+  word, accent, apostrophe, and punctuation mark. A paraphrase is a defect
+  even when it reads well.
+- Text is in the project's `language`, in the case set by
+  `project.lettering.case`. Accented capitals keep their accents.
+- A change to a line is made in `page.yaml` first and goes through the same
+  review as the rest of the script. The overlay and the prompt package are
+  rebuilt afterwards.
+- No element exists only in the picture. Text that appears in a render and
+  is absent from `page.yaml` is a finding.
+
+## Tails and attribution
+
+- A tail points at the speaker's mouth and stops short of the face. It does
+  not cross another balloon, another character's face, or a hand.
+- For an off-panel speaker the tail runs to the panel edge on the side where
+  that character stands in the ledger.
+- Two characters never share a balloon. A second balloon from the same
+  speaker in the same panel is joined to the first by a connector, or
+  carries its own tail.
+- `thought` uses the project's thought convention (bubbles or a tailless
+  cloud). `caption`, `narration`, and `sign` have no tail.
+- Staging does part of the work. When two visually adjacent characters share
+  a panel, place each balloon nearer to its own speaker than to the other.
+
+## Placement
+
+- Lettering MUST stay clear of faces, hands, held props the story tracks,
+  and the panel's main moment.
+- Default position: the upper part of the panel, in the open area the
+  layout reserved (see `layout/page-composition.md`).
+- Balloons stay inside their panel. A balloon may break a border to link two
+  panels only when that helps the reading path and the layout notes say so.
+- Keep text away from the page edge. Paged projects use the safe margin in
+  `paged/print-specs.md`, and webtoon projects follow
+  `webtoon/episode-deliverables.md`.
+- Leave air inside the balloon. Text that touches the outline reads as a
+  rendering error.
+
+## Word budgets
+
+- `project.lettering.max_words_per_balloon` caps a single balloon or
+  caption, and `project.lettering.max_words_per_panel` caps the panel.
+  Defaults when the project sets neither: 25 words per balloon and 50 per
+  panel.
+- Over budget means the line is cut or split across balloons or panels.
+  NEVER shrink the type to fit.
+- Default ceiling of four balloons and captions in one panel, with at most
+  one reply and one answer (A, B, A). A longer exchange needs more panels.
+- One idea per balloon. A balloon that changes subject halfway becomes two
+  linked balloons.
+- Budgets for the writing itself are in `writing/dialogue-economy.md`.
+
+## In-image and overlay modes
+
+`project.lettering.mode` selects how text reaches the page.
+
+- `in_image`: the image provider draws the lettering. The prompt package
+  lists every string in `lettering_text`, and the review compares each
+  rendered string with `page.yaml`. Choose this mode only with a provider
+  whose `textRendering` capability supports it (see
+  `image/image-generation.md`).
+- `overlay`: the render carries no text and leaves the reserved areas open.
+  `lettering.yaml` holds the geometry (box, shape, tail, style) for each
+  element, and `scripts/letter-pages.js` writes
+  `renders/<RENDER_ID>.lettered.svg` from it.
+- In overlay mode every element in `lettering.yaml` matches an element of
+  `page.yaml` by `id`, and its `type` and `text` MUST equal the page file's.
+  The overlay adds geometry and nothing else.
+- An overlay belongs to one render. `lettering.yaml` names it in `render`.
+  When the page gets a new render version, the boxes are checked against the
+  new image before the overlay is reused, because a repaired panel may have
+  moved a face under a balloon.
+- A wrong or missing word, an extra balloon, or a tail to the wrong speaker
+  is recorded as a finding under the `lettering` check. A line attributed to
+  the wrong character changes who said what and is treated as blocking.
+
+## Validation
+
+- `schemas/page.schema.json` and `schemas/lettering.schema.json` restrict
+  `type` to the roster above and require `id`, `text`, and `order`.
+- `scripts/check-continuity.js` fails a spoken element whose `speaker` is
+  missing from the panel's `cast`, and duplicate lettering `order` values on
+  a page.
+- `scripts/validate-workspace.js` fails a `lettering.yaml` element whose
+  `id` is unknown to `page.yaml` or whose `text` differs from it, and warns
+  about a planned element with no geometry. `scripts/letter-pages.js` stops
+  on the same mismatches before it writes anything.
+- `hooks/validate-after-write.js` re-validates both files on write.
+- Word budgets are counted from `page.yaml` by the letterer in the
+  self-review of `/panel-script` and `/lettering`.
+- Exact words in the picture, tail direction, and placement clear of faces
+  and hands can only be judged on pixels. They are the `lettering` check of
+  the visual review, with evidence quoted per string.

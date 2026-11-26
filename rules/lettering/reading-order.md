@@ -1,0 +1,106 @@
+# Reading order
+
+## Purpose
+
+Give every page one path for the eye, from the first panel to the last and
+from the first balloon to the last, in the direction the project reads.
+
+## Scope
+
+Lettering layer. Applies to `reading_direction` in `project.yaml`, to
+`layout.reading_order` and panel `order` in `page.yaml`, to the `order` of
+every lettering element, and to balloon placement in `lettering.yaml` and in
+rendered pages. Used by `/page-plan`, `/panel-script`, `/lettering`, and
+`/visual-review`.
+
+## Core Principles
+
+- The order is decided in the plan and expressed twice: as numbers in
+  `page.yaml` and as positions on the page. The two MUST agree.
+- The eye moves forward. A reader never has to travel back against the
+  reading direction or back up the page to find the next element.
+- Panels and lettering share one path. The balloons lead the reader through
+  the panel and hand them to the next one.
+- Direction is a property of the project. An `rtl` page is designed `rtl`
+  from the thumbnail on.
+
+## Order values
+
+- Every panel has an `order`, starting at 1. `layout.reading_order` is a
+  permutation of those values in the order the reader meets the panels.
+- Every lettering element has an `order` that is unique within the page.
+  The numbering runs across the whole page: all elements of the first panel
+  come before any element of the second.
+- Lettering `id` values (`L01`, `L02`) identify elements and do not have to
+  follow the order. When a line is inserted, renumber `order` and keep the
+  existing IDs.
+- A silent panel has no lettering and still holds its place in the panel
+  order.
+
+## Direction
+
+- `ltr`: tiers are read top to bottom and panels left to right inside a
+  tier. The path runs from the top left of the page to the bottom right.
+- `rtl`: tiers are still read top to bottom, and panels run right to left
+  inside a tier. The path runs from the top right to the bottom left.
+- Inside a panel the same direction applies to balloons: the first balloon
+  is the highest one on the entry side (left for `ltr`, right for `rtl`),
+  and later balloons sit lower and further along.
+- NEVER produce an `rtl` page by mirroring an `ltr` image. Mirroring swaps
+  left and right hands, moves wounds and torn cuffs to the wrong side, and
+  reverses any text in the art. Plan and generate the page in its own
+  direction.
+- Webtoon projects read in a single column from top to bottom (see
+  `webtoon/scroll-grammar.md`). `reading_direction` then governs only the
+  order of balloons that share a height.
+
+## Balloon chains inside a panel
+
+- Arrange the balloons of a panel as a chain: each one is lower than, or
+  further along than, the one before it. Height wins over horizontal
+  position, so the first balloon is always the highest.
+- Stage the first speaker on the entry side of the panel (see
+  `layout/page-composition.md`). When the composition puts the first
+  speaker on the far side, raise their balloon above the reply and let the
+  tail travel to them. Tails never cross.
+- A reply and an answer between two characters (A, B, A) uses joined or
+  overlapping balloons so the order is visible as a shape.
+- Captions that open a panel sit at its top entry corner. Captions that
+  close a panel sit at its bottom exit corner.
+- The last element of a panel SHOULD sit near the side where the eye leaves
+  for the next panel.
+
+## Never forcing the eye backwards
+
+- From any element to the next, the eye moves along the reading direction,
+  or down, or both. The only return sweep is the move from the end of one
+  tier to the start of the next.
+- No balloon sits above an earlier balloon in the same panel. No panel
+  later in the order sits above and before an earlier one.
+- Motion inside the art SHOULD run with the reading direction when it
+  carries the reader to the next panel. Use a figure moving against the
+  direction for resistance or threat, in agreement with the scene's
+  `geography`.
+- A layout that needs arrows or numbers to be read is rejected at the
+  thumbnail stage and redesigned.
+- When a panel breaks the tier pattern, apply the cues required by
+  `layout/page-composition.md` and test the path on a thumbnail with
+  someone who has not read the script.
+
+## Validation
+
+- `scripts/check-continuity.js` fails a page whose `layout.reading_order`
+  is not a permutation of the panels' `order` values, and a page with
+  duplicate lettering `order` values.
+- `schemas/page.schema.json` requires `order` on every panel and on every
+  lettering element, and `schemas/project.schema.json` restricts
+  `reading_direction` to `ltr` or `rtl`.
+- That lettering `order` rises with panel order, and that the numbers match
+  positions on the page, is checked by the letterer in the self-review of
+  `/panel-script` and `/lettering`. In overlay mode the `box` coordinates in
+  `lettering.yaml` give the positions to compare.
+- On the rendered page the reading path is judged on pixels: panel sequence
+  under the `page_structure` check, balloon sequence and tails under the
+  `lettering` check of the visual review.
+- A page mirrored after generation shows up as flipped state and wardrobe
+  details under the `physical_state` and `wardrobe` checks.

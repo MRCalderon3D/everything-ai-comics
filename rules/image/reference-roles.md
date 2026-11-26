@@ -1,0 +1,147 @@
+# Reference roles
+
+## Purpose
+
+Make every attached image do one stated job. A request that mixes up what
+each image is for produces the failure this scaffold was built around: a
+character drawn with someone else's face.
+
+## Scope
+
+Image layer. Applies to every `reference-plan.yaml`, to the `references` list
+of every prompt package, and to any image attached to a request by hand in
+the `harness-native` or `manual` path. Used by `/reference-plan`,
+`/smart-page`, `/generate-pages`, `/visual-development`, and `/repair-page`.
+
+## Core Principles
+
+- One image, one role. Each attached image answers a single question for
+  the model, and the prompt says which.
+- Style and identity are separate inputs. A style reference never stands in
+  for a character's face.
+- The look master goes on every request. A style word in the prompt is no
+  substitute for the image.
+- Only inspected images become references. A master is approved, and a
+  previous page has been opened and reviewed.
+- The budget is finite, and what gets left out is a recorded decision.
+
+## Role vocabulary
+
+Every entry of a reference plan carries one `role`:
+
+| Role | The image fixes | Typical asset |
+|---|---|---|
+| `style` | Line, tone, texture, rendering | The approved look master (`LOOK_*_MASTER_V##`) |
+| `identity` | A character's face, hair, and build | Turnaround or expression sheet |
+| `wardrobe` | A specific outfit | Wardrobe sheet for the `WARD_*` state on the page |
+| `spatial_continuity` | Where things are in a place | Location plate, or the previous reviewed page |
+| `prop_consistency` | The design of an object | Prop sheet |
+| `composition` | The arrangement of the page or panel | A thumbnail of the page |
+| `edit_target` | The image to be changed | The render under repair |
+
+- An asset appears once in a plan, with one role. If a turnaround shows both
+  the face and the default outfit, it is attached as `identity`, and the
+  outfit is stated in words or covered by a separate wardrobe sheet.
+- The prompt names each image by position and role ("Image 2: Mara's face
+  and build only"). It also says what not to take from an image when the
+  risk is real ("take no faces from image 1").
+- Each entry states its `reason` and SHOULD state its `omission_risk`: what
+  goes wrong on the page if the image is left out.
+- `edit_target` appears only in repair plans, and only one image has it.
+
+## Style never replaces identity
+
+- Every named character drawn on a page has an `identity` entry pointing at
+  their approved sheet. A look master that happens to show a face is still
+  only `style`.
+- Characters listed in each other's `visually_adjacent_to` are both attached
+  when they share a page, and the prompt states the difference in words
+  using their `distinguishing_features` ("Oskar: round face, hooded jacket.
+  Mara: long face, broken nose, grey cropped hair").
+- A name in the prompt does not carry identity. Without an image and a
+  stated difference, the model draws the face it drew last.
+- A grayscale photograph or a painting used as inspiration is `style`
+  material for the art-director. It goes through `/ingest-references` and
+  never onto a page request as an identity input.
+
+## The look master on every request
+
+- The approved look master is attached with role `style` and priority
+  `critical` on every request: pages, repairs, and reference art.
+- This includes new character designs and location plates. A character
+  sheet generated without the look master defines the character in the
+  wrong drawing style, and every page built on it inherits the mismatch.
+- The frozen style block accompanies the image in the prompt text. Both are
+  required. Neither replaces the other.
+- The only request without a look master is the one that creates the look
+  master. Its plan says so in `notes`.
+
+## The previous page as a reference
+
+- A page with `continuity.attach_previous_render: true` attaches the render
+  of the preceding page with role `spatial_continuity`. The plan entry uses
+  the render ID as `asset_id` and sets `entity` to `null`.
+- The previous render is attached only after its file was opened and
+  reviewed: a review file exists for that exact render, and its verdict is
+  `pass` or `fixed`. A `flagged` or unreviewed render is NEVER attached,
+  because the next page would inherit its defects.
+- Reviewed is different from approved. A reviewed render may serve as a
+  spatial reference while its `human_approval` is still `pending`. Reports
+  keep the two words apart, and the render gains no approval by being used.
+- The previous page carries the environment and the staging. Character
+  sheets are still attached for identity, since a page render is a poor
+  source for a face.
+- When the scene or the location changes between pages, drop the previous
+  render and attach the new location's plate.
+
+## Approved assets only
+
+- Apart from the previous render and an edit target, every `asset_id` in a
+  plan is registered in `references/manifest.yaml` with status `approved`.
+  Drafts and superseded versions are not attached.
+- An asset's `default_role` in the manifest is the role it plays unless the
+  plan states a reason for another.
+- Assets are attached at the exact version the plan lists. When a master is
+  superseded, plans that cite the old version are rebuilt.
+
+## Budget overflow
+
+- The plan's `budget` is the provider's `referenceImages` limit at planning
+  time. `required` entries MUST fit inside it.
+- Default priority when the budget is short: the edit target of a repair,
+  the look master, identity sheets for characters whose faces are visible,
+  spatial continuity, wardrobe, prop consistency, composition.
+- The look master and the identity sheet of any character with a visible
+  face are never dropped. If the `critical` entries alone exceed the budget,
+  the page is not generated as planned. Change the plan in one of these
+  ways:
+  - switch the page to `generation.mode: per_panel`, so each request needs
+    only the characters of one panel;
+  - build and approve a combined sheet (a cast lineup) as a new registered
+    asset, and attach it with role `identity`;
+  - reduce the cast on the page, or move a character to an `off_panel` row;
+  - use a provider with a larger limit.
+- Lower-priority images that do not fit move to `optional` or to `exclude`,
+  with the reason in `notes`. What an excluded image would have protected
+  is described in words in the prompt.
+- The reviewer reads `exclude` before looking at the render and inspects
+  those risks first.
+
+## Validation
+
+- `schemas/reference-plan.schema.json` restricts `role` to the seven values
+  and `priority` to its four, and requires a `reason` on every entry.
+- `scripts/build-reference-plan.js` writes the plan with the provider's
+  limit as `budget`, and each provider's `compile()` rejects a package with
+  more references than the provider accepts.
+- `scripts/validate-workspace.js` resolves every `asset_id` against
+  `references/manifest.yaml` and the renders on disk.
+- `hooks/protect-approved-assets.js` blocks writes over approved reference
+  assets and existing renders, so an attached image is the file that was
+  approved or reviewed.
+- No script can tell whether the model took a face from the style image.
+  That is the `identity` check of the visual review, judged against the
+  character sheet, with `style_fidelity` judged separately against the look
+  master.
+- Whether the previous render was actually opened before being attached is
+  shown by its review file: a verdict with pixel evidence for each check.
