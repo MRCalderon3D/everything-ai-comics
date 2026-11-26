@@ -163,7 +163,8 @@ async function main() {
     '--json', '--output-schema', '/tmp/s.json', '-o', '/tmp/o.txt', 'thread-9', '-',
   ]);
   assert.ok(!args.includes('-C') && !args.includes('-s') && !args.includes('--add-dir'), 'resume takes none of -s, -C, --add-dir');
-  assert.strictEqual(codex.tomlPath("C:\\it's\\here"), JSON.stringify("C:/it's/here"));
+  assert.strictEqual(codex.tomlPath("C:\\it's\\here", 'win32'), JSON.stringify("C:/it's/here"));
+  assert.strictEqual(codex.tomlPath('/home/me/comic', 'linux'), "'/home/me/comic'");
 
   // --- Codex: stream parsing from recorded sample lines -------------------------------------
   const codexLines = [

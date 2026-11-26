@@ -36,9 +36,14 @@ function cliSpawn() {
   return require(path.join(SCAFFOLD_ROOT, 'providers', 'lib', 'cli-spawn.js'));
 }
 
-/** A TOML string for a path: a literal string, forward slashes, nothing to escape. */
-function tomlPath(file) {
-  const text = String(file).split(path.sep).join('/');
+/**
+ * A TOML string for a path: a literal string, forward slashes, nothing to
+ * escape. Backslashes become slashes on Windows only; on POSIX a backslash
+ * is an ordinary character of a file name.
+ */
+function tomlPath(file, platform = process.platform) {
+  const sep = platform === 'win32' ? /[\\/]/ : /\//;
+  const text = String(file).split(sep).join('/');
   return text.includes("'") ? JSON.stringify(text) : `'${text}'`;
 }
 
@@ -55,7 +60,7 @@ function buildArgs(options) {
   if (options.sessionId) {
     args.push('resume', '--skip-git-repo-check', '-c', `sandbox_mode=${mode}`);
     if (options.allowWrite && addDirs.length) {
-      args.push('-c', `sandbox_workspace_write.writable_roots=[${addDirs.map(tomlPath).join(', ')}]`);
+      args.push('-c', `sandbox_workspace_write.writable_roots=[${addDirs.map((dir) => tomlPath(dir)).join(', ')}]`);
     }
   } else {
     args.push('--skip-git-repo-check', '-s', mode, '-C', String(options.cwd));
