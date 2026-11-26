@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": 1,
+  "skills": [
+    {
+      "name": "source-analysis",
+      "file": "skills/source-analysis/SKILL.md",
+      "description": "Decompose source prose or a script into events, entities, and a complete fact registry.",
+      "category": "story"
+    },
+    {
+      "name": "adaptation",
+      "file": "skills/adaptation/SKILL.md",
+      "description": "Turn prose into comic story: separate source facts, user changes, and additions, then compress for the page.",
+      "category": "story"
+    },
+    {
+      "name": "narrative-structure",
+      "file": "skills/narrative-structure/SKILL.md",
+      "description": "Map acts, turning points, setups and payoffs, and pacing across issues and pages.",
+      "category": "story"
+    },
+    {
+      "name": "comic-scripting",
+      "file": "skills/comic-scripting/SKILL.md",
+      "description": "Write panel-by-panel script: one drawable moment per panel, exact dialogue, captions, and sound effects.",
+      "category": "story"
+    },
+    {
+      "name": "text-humanization",
+      "file": "skills/text-humanization/SKILL.md",
+      "description": "Write and rewrite prose so it reads like a person wrote it, removing the catalogued AI-writing tells.",
+      "category": "story"
+    },
+    {
+      "name": "character-consistency",
+      "file": "skills/character-consistency/SKILL.md",
+      "description": "Lock canonical character identity so every drawn appearance matches every other.",
+      "category": "visual"
+    },
+    {
+      "name": "character-sheet-generation",
+      "file": "skills/character-sheet-generation/SKILL.md",
+      "description": "Produce reference sheets (turnarounds, expressions, wardrobe) that become approved identity masters.",
+      "category": "visual"
+    },
+    {
+      "name": "location-design",
+      "file": "skills/location-design/SKILL.md",
+      "description": "Define each location's architecture, dressing, light, and time-of-day states.",
+      "category": "visual"
+    },
+    {
+      "name": "location-mapping",
+      "file": "skills/location-mapping/SKILL.md",
+      "description": "Map levels, sides, landmarks, and exits so panels can state positions precisely.",
+      "category": "visual"
+    },
+    {
+      "name": "visual-style-development",
+      "file": "skills/visual-style-development/SKILL.md",
+      "description": "Define the comic's visual language (line, tone, texture, rendering) as an enforceable style bible.",
+      "category": "visual"
+    },
+    {
+      "name": "color-scripting",
+      "file": "skills/color-scripting/SKILL.md",
+      "description": "Plan palette, spot color, and tonal progression per scene and page.",
+      "category": "visual"
+    },
+    {
+      "name": "reference-ingestion",
+      "file": "skills/reference-ingestion/SKILL.md",
+      "description": "Analyze user-supplied reference material and turn it into bible entries and registered reference assets.",
+      "category": "visual"
+    },
+    {
+      "name": "scene-blocking",
+      "file": "skills/scene-blocking/SKILL.md",
+      "description": "Stage each scene on the location map: positions, movement paths, eyelines, travel and threat directions.",
+      "category": "production"
+    },
+    {
+      "name": "page-layout",
+      "file": "skills/page-layout/SKILL.md",
+      "description": "Design the page: panel count, grid, relative panel size, reading order, and page turns.",
+      "category": "production"
+    },
+    {
+      "name": "panel-composition",
+      "file": "skills/panel-composition/SKILL.md",
+      "description": "Choose framing, angle, and staging inside the panel so the moment and the actor are unmistakable.",
+      "category": "production"
+    },
+    {
+      "name": "sequential-storytelling",
+      "file": "skills/sequential-storytelling/SKILL.md",
+      "description": "Order panels into readable sequences: transitions, gutter ellipses, and flow from panel to panel.",
+      "category": "production"
+    },
+    {
+      "name": "thumbnailing",
+      "file": "skills/thumbnailing/SKILL.md",
+      "description": "Rough each page as thumbnails to test readability before any final generation.",
+      "category": "production"
+    },
+    {
+      "name": "performance-direction",
+      "file": "skills/performance-direction/SKILL.md",
+      "description": "Direct character acting as visible, drawable behavior instead of emotion labels.",
+      "category": "production"
+    },
+    {
+      "name": "balloon-lettering",
+      "file": "skills/balloon-lettering/SKILL.md",
+      "description": "Place balloons, captions, and sound effects in reading order with the exact approved text.",
+      "category": "production"
+    },
+    {
+      "name": "state-tracking",
+      "file": "skills/state-tracking/SKILL.md",
+      "description": "Keep the panel ledger: position, custody, wardrobe, and physical state for every character and object.",
+      "category": "production"
+    },
+    {
+      "name": "reference-selection",
+      "file": "skills/reference-selection/SKILL.md",
+      "description": "Choose which approved reference images each page needs, and give each one a single role.",
+      "category": "production"
+    },
+    {
+      "name": "production-orchestration",
+      "file": "skills/production-orchestration/SKILL.md",
+      "description": "Run the pipeline: phase gates, approval workflow, dependency order, and batch cost confirmation.",
+      "category": "production"
+    },
+    {
+      "name": "self-evaluation",
+      "file": "skills/self-evaluation/SKILL.md",
+      "description": "Evaluate a fresh artifact cold against schema, rules, and the producing skill's quality bar; apply clear fixes.",
+      "category": "production"
+    },
+    {
+      "name": "prompt-compilation",
+      "file": "skills/prompt-compilation/SKILL.md",
+      "description": "Compile provider-ready prompt packages from bibles, page files, and reference plans; never freehand.",
+      "category": "generation"
+    },
+    {
+      "name": "image-generation",
+      "file": "skills/image-generation/SKILL.md",
+      "description": "Generate pages and reference art through image providers with dry-run, provenance, and cost discipline.",
+      "category": "generation"
+    },
+    {
+      "name": "page-repair",
+      "file": "skills/page-repair/SKILL.md",
+      "description": "Repair a failed page with a targeted sibling version, locked elements, and a two-cycle limit.",
+      "category": "generation"
+    },
+    {
+      "name": "pixel-review",
+      "file": "skills/pixel-review/SKILL.md",
+      "description": "Inspect the rendered pixels against plan and references and record evidence-based findings.",
+      "category": "post"
+    },
+    {
+      "name": "continuity-checking",
+      "file": "skills/continuity-checking/SKILL.md",
+      "description": "Audit position, custody, state, wardrobe, and geography across panels, pages, and issues.",
+      "category": "post"
+    },
+    {
+      "name": "edition-assembly",
+      "file": "skills/edition-assembly/SKILL.md",
+      "description": "Select reviewed page versions, assemble an edition, and export it without overwriting earlier ones.",
+      "category": "post"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "name": "everything-ai-comics",
+  "version": "0.1.0",
+  "description": "Open-source workflow scaffold for AI-assisted comic creation: rules, agents, commands, skills, schemas, and image providers for Claude Code, Codex, Cursor, and OpenCode.",
+  "license": "MIT",
+  "author": "Marcos Calderon (MRCalderon3D)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MRCalderon3D/everything-ai-comics"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node tests/run-all.js",
+    "validate": "node scripts/validate.js",
+    "doctor": "node scripts/doctor.js",
+    "sync:harnesses": "node scripts/sync-harnesses.js",
+    "create:project": "node scripts/create-project.js",
+    "validate:workspace": "node scripts/validate-workspace.js",
+    "check:continuity": "node scripts/check-continuity.js",
+    "build:reference-plan": "node scripts/build-reference-plan.js",
+    "compile:prompts": "node scripts/compile-prompts.js",
+    "generate:assets": "node scripts/generate-assets.js",
+    "letter": "node scripts/letter-pages.js",
+    "build:edition": "node scripts/build-edition.js",
+    "board": "node scripts/build-board.js"
+  },
+  "keywords": [
+    "ai-comics",
+    "comics",
+    "webtoon",
+    "graphic-novel",
+    "claude-code",
+    "codex",
+    "cursor",
+    "opencode",
+    "panel-layout",
+    "lettering",
+    "continuity",
+    "image-generation",
+    "cbz",
+    "fal"
+  ]
+}

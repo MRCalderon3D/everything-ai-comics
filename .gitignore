@@ -1,0 +1,20 @@
+node_modules/
+*.log
+.env
+.env.*
+.DS_Store
+Thumbs.db
+.playwright-mcp/
+
+# Clone-and-go: comic workspaces created inside a scaffold clone stay out of
+# the scaffold's git history. Working in your own repo? Remove these lines or
+# use scripts/install.js to set up a standalone project.
+production/
+production-*/
+
+# The sample workspace and the test fixtures are part of the scaffold and stay
+# tracked, even if one of them contains a directory called production/.
+!/examples/**/production/
+!/examples/**/production-*/
+!/tests/**/production/
+!/tests/**/production-*/

@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": 1,
+  "agents": [
+    {
+      "name": "editor-in-chief",
+      "file": "agents/editor-in-chief.md",
+      "description": "Owns the whole production: story vision, phase sequencing, approvals, and arbitration between departments."
+    },
+    {
+      "name": "comic-writer",
+      "file": "agents/comic-writer.md",
+      "description": "Writes the comic script: page breakdowns, panel descriptions, dialogue, captions, and sound effects."
+    },
+    {
+      "name": "script-editor",
+      "file": "agents/script-editor.md",
+      "description": "Gives structural coverage on scripts and adaptations; guards source fidelity, causality, and dialogue economy."
+    },
+    {
+      "name": "art-director",
+      "file": "agents/art-director.md",
+      "description": "Owns the visual language (line, tone, color, texture) and reviews all imagery against the style bible."
+    },
+    {
+      "name": "character-designer",
+      "file": "agents/character-designer.md",
+      "description": "Builds and maintains character identity: face, silhouette, wardrobe states, and reference sheets."
+    },
+    {
+      "name": "environment-designer",
+      "file": "agents/environment-designer.md",
+      "description": "Designs locations and props, and maps every space so staging and continuity can reason about it."
+    },
+    {
+      "name": "layout-artist",
+      "file": "agents/layout-artist.md",
+      "description": "Breaks the story into pages and panels: grids, panel sizes, reading flow, page turns, and thumbnails."
+    },
+    {
+      "name": "penciller",
+      "file": "agents/penciller.md",
+      "description": "Composes each panel (framing, angle, staging, acting) so one drawable moment reads at a glance."
+    },
+    {
+      "name": "colorist",
+      "file": "agents/colorist.md",
+      "description": "Sets the color strategy: palette, color scripts, spot color, and tone continuity across pages."
+    },
+    {
+      "name": "letterer",
+      "file": "agents/letterer.md",
+      "description": "Places balloons, captions, and sound effects; owns reading order, exact text, and lettering checks."
+    },
+    {
+      "name": "continuity-editor",
+      "file": "agents/continuity-editor.md",
+      "description": "Tracks position, custody, wardrobe, and physical state panel by panel; owns ledgers and continuity state."
+    },
+    {
+      "name": "prompt-director",
+      "file": "agents/prompt-director.md",
+      "description": "Builds reference plans and compiles page data plus approved masters into provider-ready prompt packages; never freehands a prompt."
+    },
+    {
+      "name": "image-generation-specialist",
+      "file": "agents/image-generation-specialist.md",
+      "description": "Runs page and reference generation through image providers, saves versioned candidates, and records provenance."
+    },
+    {
+      "name": "visual-reviewer",
+      "file": "agents/visual-reviewer.md",
+      "description": "Inspects rendered pages against the plan and references; records evidence-based findings and verdicts."
+    },
+    {
+      "name": "prepress-specialist",
+      "file": "agents/prepress-specialist.md",
+      "description": "Assembles editions and exports PDF, CBZ, web, and social deliverables to spec."
+    },
+    {
+      "name": "production-qa",
+      "file": "agents/production-qa.md",
+      "description": "Runs the validation gates: schema compliance, roster integrity, provenance, approval, and cost policy."
+    }
+  ]
+}

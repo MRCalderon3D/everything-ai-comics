@@ -1,0 +1,360 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": 1,
+  "commands": [
+    {
+      "name": "project-init",
+      "file": "commands/project-init.md",
+      "description": "Scaffold a production/ workspace: project.yaml, directory layout, and phase plan.",
+      "agents": [
+        "editor-in-chief",
+        "production-qa"
+      ],
+      "skills": [
+        "production-orchestration"
+      ]
+    },
+    {
+      "name": "source-analyze",
+      "file": "commands/source-analyze.md",
+      "description": "Break source prose or a script into events, entities, and a fact registry with open questions.",
+      "agents": [
+        "comic-writer",
+        "script-editor"
+      ],
+      "skills": [
+        "source-analysis",
+        "adaptation"
+      ]
+    },
+    {
+      "name": "story-bible",
+      "file": "commands/story-bible.md",
+      "description": "Compile the canon: facts by provenance, world rules, timeline, and character arcs.",
+      "agents": [
+        "editor-in-chief",
+        "comic-writer"
+      ],
+      "skills": [
+        "narrative-structure",
+        "source-analysis"
+      ]
+    },
+    {
+      "name": "series-plan",
+      "file": "commands/series-plan.md",
+      "description": "Divide the story into issues with source spans, page budgets, and status.",
+      "agents": [
+        "editor-in-chief",
+        "script-editor"
+      ],
+      "skills": [
+        "narrative-structure",
+        "adaptation"
+      ]
+    },
+    {
+      "name": "character-bible",
+      "file": "commands/character-bible.md",
+      "description": "Define identity, distinguishing features, wardrobe states, and reference-sheet plans for every character.",
+      "agents": [
+        "character-designer",
+        "comic-writer"
+      ],
+      "skills": [
+        "character-consistency",
+        "character-sheet-generation"
+      ]
+    },
+    {
+      "name": "location-bible",
+      "file": "commands/location-bible.md",
+      "description": "Define locations with levels, landmarks, exits, and lighting logic.",
+      "agents": [
+        "environment-designer"
+      ],
+      "skills": [
+        "location-design",
+        "location-mapping"
+      ]
+    },
+    {
+      "name": "prop-bible",
+      "file": "commands/prop-bible.md",
+      "description": "Catalog plot-relevant props with appearance, state timeline, and custody tracking.",
+      "agents": [
+        "environment-designer",
+        "continuity-editor"
+      ],
+      "skills": [
+        "visual-style-development",
+        "state-tracking"
+      ]
+    },
+    {
+      "name": "style-bible",
+      "file": "commands/style-bible.md",
+      "description": "Lock the visual language: line, tone, color mode, lettering style, and the frozen style block.",
+      "agents": [
+        "art-director",
+        "colorist",
+        "letterer"
+      ],
+      "skills": [
+        "visual-style-development",
+        "color-scripting"
+      ]
+    },
+    {
+      "name": "visual-development",
+      "file": "commands/visual-development.md",
+      "description": "Generate and iterate the master references: character sheets, location plates, and look pages.",
+      "agents": [
+        "art-director",
+        "character-designer",
+        "environment-designer"
+      ],
+      "skills": [
+        "visual-style-development",
+        "character-sheet-generation",
+        "location-design"
+      ]
+    },
+    {
+      "name": "ingest-references",
+      "file": "commands/ingest-references.md",
+      "description": "Analyze user-supplied reference material and fold it into the bibles and the reference registry with provenance.",
+      "agents": [
+        "art-director",
+        "character-designer",
+        "environment-designer"
+      ],
+      "skills": [
+        "reference-ingestion",
+        "visual-style-development"
+      ]
+    },
+    {
+      "name": "issue-breakdown",
+      "file": "commands/issue-breakdown.md",
+      "description": "Break one issue into scenes and beats with cast, geography, and a page budget per beat.",
+      "agents": [
+        "editor-in-chief",
+        "comic-writer",
+        "layout-artist"
+      ],
+      "skills": [
+        "narrative-structure",
+        "scene-blocking"
+      ]
+    },
+    {
+      "name": "page-plan",
+      "file": "commands/page-plan.md",
+      "description": "Plan every page of an issue: panel count, grid, panel sizes, reading order, and page turns.",
+      "agents": [
+        "layout-artist",
+        "comic-writer"
+      ],
+      "skills": [
+        "page-layout",
+        "sequential-storytelling"
+      ]
+    },
+    {
+      "name": "panel-script",
+      "file": "commands/panel-script.md",
+      "description": "Write the full panel script for planned pages: framing, cast, action, acting, and exact lettering text.",
+      "agents": [
+        "comic-writer",
+        "penciller",
+        "letterer"
+      ],
+      "skills": [
+        "comic-scripting",
+        "panel-composition",
+        "performance-direction"
+      ]
+    },
+    {
+      "name": "thumbnails",
+      "file": "commands/thumbnails.md",
+      "description": "Rough each page as thumbnails and check readability before final generation.",
+      "agents": [
+        "layout-artist",
+        "penciller"
+      ],
+      "skills": [
+        "thumbnailing",
+        "panel-composition"
+      ]
+    },
+    {
+      "name": "panel-ledger",
+      "file": "commands/panel-ledger.md",
+      "description": "Fill and audit the per-panel ledger of position, custody, wardrobe, and physical state.",
+      "agents": [
+        "continuity-editor",
+        "layout-artist"
+      ],
+      "skills": [
+        "state-tracking",
+        "scene-blocking"
+      ]
+    },
+    {
+      "name": "smart-page",
+      "file": "commands/smart-page.md",
+      "description": "Turn one scene into finished page plans: layout, panel script, ledger, reference plan, and prompts.",
+      "agents": [
+        "art-director",
+        "layout-artist",
+        "comic-writer",
+        "penciller",
+        "letterer",
+        "continuity-editor",
+        "prompt-director"
+      ],
+      "skills": [
+        "scene-blocking",
+        "page-layout",
+        "sequential-storytelling",
+        "comic-scripting",
+        "panel-composition",
+        "performance-direction",
+        "state-tracking",
+        "reference-selection",
+        "prompt-compilation"
+      ]
+    },
+    {
+      "name": "reference-plan",
+      "file": "commands/reference-plan.md",
+      "description": "Decide which approved reference images each page conditions on, one role per image.",
+      "agents": [
+        "prompt-director",
+        "continuity-editor"
+      ],
+      "skills": [
+        "reference-selection"
+      ]
+    },
+    {
+      "name": "generate-pages",
+      "file": "commands/generate-pages.md",
+      "description": "Generate pages one at a time through image providers, with cost confirmation and provenance.",
+      "agents": [
+        "image-generation-specialist",
+        "prompt-director"
+      ],
+      "skills": [
+        "image-generation",
+        "prompt-compilation",
+        "reference-selection"
+      ]
+    },
+    {
+      "name": "visual-review",
+      "file": "commands/visual-review.md",
+      "description": "Review rendered pages against plan and references; record findings, gates, and a verdict.",
+      "agents": [
+        "visual-reviewer",
+        "continuity-editor",
+        "art-director"
+      ],
+      "skills": [
+        "pixel-review",
+        "continuity-checking"
+      ]
+    },
+    {
+      "name": "repair-page",
+      "file": "commands/repair-page.md",
+      "description": "Repair a flagged page as a sibling version, then recheck the whole page and its neighbors.",
+      "agents": [
+        "visual-reviewer",
+        "prompt-director",
+        "image-generation-specialist"
+      ],
+      "skills": [
+        "page-repair",
+        "prompt-compilation",
+        "pixel-review"
+      ]
+    },
+    {
+      "name": "lettering",
+      "file": "commands/lettering.md",
+      "description": "Plan, place, and check balloons, captions, and sound effects for in-image or overlay lettering.",
+      "agents": [
+        "letterer",
+        "visual-reviewer"
+      ],
+      "skills": [
+        "balloon-lettering"
+      ]
+    },
+    {
+      "name": "continuity-review",
+      "file": "commands/continuity-review.md",
+      "description": "Audit continuity across pages and issue boundaries and write the end-of-issue state.",
+      "agents": [
+        "continuity-editor",
+        "production-qa"
+      ],
+      "skills": [
+        "continuity-checking",
+        "state-tracking"
+      ]
+    },
+    {
+      "name": "build-edition",
+      "file": "commands/build-edition.md",
+      "description": "Assemble reviewed pages into an edition and export PDF, CBZ, and web reader.",
+      "agents": [
+        "prepress-specialist",
+        "editor-in-chief",
+        "production-qa"
+      ],
+      "skills": [
+        "edition-assembly"
+      ]
+    },
+    {
+      "name": "full-production",
+      "file": "commands/full-production.md",
+      "description": "Orchestrate the whole pipeline from source text to published edition, with approval gates and cost confirmation.",
+      "agents": [
+        "editor-in-chief",
+        "production-qa"
+      ],
+      "skills": [
+        "production-orchestration"
+      ]
+    },
+    {
+      "name": "humanize",
+      "file": "commands/humanize.md",
+      "description": "Rewrite generated or existing prose so it reads human, or audit it with --check.",
+      "agents": [
+        "script-editor",
+        "comic-writer"
+      ],
+      "skills": [
+        "text-humanization"
+      ]
+    },
+    {
+      "name": "self-review",
+      "file": "commands/self-review.md",
+      "description": "Run the self-evaluation pass on existing artifacts and report or fix what it finds.",
+      "agents": [
+        "production-qa",
+        "editor-in-chief"
+      ],
+      "skills": [
+        "self-evaluation"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "layers": [
+    {
+      "name": "common",
+      "kind": "common",
+      "rules": [
+        "source-of-truth",
+        "project-structure",
+        "naming-conventions",
+        "asset-provenance",
+        "cost-control",
+        "approval-policy",
+        "self-review",
+        "ask-dont-assume",
+        "visual-evidence",
+        "repair-limits"
+      ]
+    },
+    {
+      "name": "writing",
+      "kind": "domain",
+      "rules": [
+        "comic-script-format",
+        "narrative-continuity",
+        "prose-style",
+        "adaptation-fidelity",
+        "dialogue-economy"
+      ]
+    },
+    {
+      "name": "visual",
+      "kind": "domain",
+      "rules": [
+        "character-consistency",
+        "location-consistency",
+        "spatial-continuity",
+        "state-continuity",
+        "visual-language"
+      ]
+    },
+    {
+      "name": "layout",
+      "kind": "domain",
+      "rules": [
+        "page-composition",
+        "panel-transitions",
+        "pacing"
+      ]
+    },
+    {
+      "name": "lettering",
+      "kind": "domain",
+      "rules": [
+        "balloons-and-captions",
+        "sound-effects",
+        "reading-order"
+      ]
+    },
+    {
+      "name": "image",
+      "kind": "domain",
+      "rules": [
+        "image-generation",
+        "reference-roles",
+        "page-generation"
+      ]
+    },
+    {
+      "name": "publishing",
+      "kind": "domain",
+      "rules": [
+        "edition-assembly",
+        "export-formats"
+      ]
+    },
+    {
+      "name": "paged",
+      "kind": "format",
+      "rules": [
+        "page-turn-grammar",
+        "print-specs"
+      ]
+    },
+    {
+      "name": "webtoon",
+      "kind": "format",
+      "rules": [
+        "scroll-grammar",
+        "episode-deliverables"
+      ]
+    }
+  ]
+}
