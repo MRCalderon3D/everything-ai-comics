@@ -54,7 +54,11 @@ describe them again from text.
    `characters/<CHAR_ID>/refs/prompts/<provider>.<kind>.yaml`, an
    asset-scoped package (`page: null`, `asset: <CHAR_ID>`, id
    `PP_<CHAR_ID>_<PROVIDER>-<TAG>`, with TAG `TURN`, `EXPR`, `WARD`, or
-   `DETAIL`). The prompt opens with the style block verbatim and takes its
+   `DETAIL`). A wardrobe package carries its outfit in the file name and
+   the ID (`<provider>.wardrobe.WARD_MARA_OILSKIN.yaml`,
+   `...-WARD-OILSKIN`), and a detail package a slug of its subject
+   (`<provider>.detail.torn-left-cuff.yaml`, `...-DETAIL-TORN_LEFT_CUFF`).
+   The prompt opens with the style block verbatim and takes its
    subject from `prompt_summary`, the `description` fields,
    `distinguishing_features`, and the outfit entry, plus one line for each
    character in `visually_adjacent_to` that states the difference. The
@@ -62,9 +66,9 @@ describe them again from text.
    sheets also attach the character's approved identity master with role
    `identity`, so approve the turnaround before compiling them. Without an
    approved one the script still compiles and notes that the sheet is drawn
-   from the written description only. The package file is named for the
-   kind, so a second outfit or a second detail study replaces the package
-   of the first: generate one before compiling the next.
+   from the written description only. Each outfit and each detail subject
+   has its own package file, so every sheet of a character can be compiled
+   before the first is generated.
 4. Read the brief the script wrote. It asks for sheet conditions and
    nothing else: plain light background, even light, no cast shadow across
    the face, neutral stance, every figure at the same scale with feet on
@@ -91,9 +95,11 @@ describe them again from text.
    told apart at a glance. If they cannot, the design goes back to
    `character-consistency`.
 9. Promote the pick. Generation saves each candidate as
-   `<CHAR_ID>_<TAG>_V##` (for example `CHAR_MARA_TURN_V01.png`) under
-   `production/characters/<CHAR_ID>/refs/`, always the next free version
-   and never under a `_MASTER` name. Save the selected candidate as
+   `<CHAR_ID>_<TAG>_V##` (for example `CHAR_MARA_TURN_V01.png`, or
+   `CHAR_MARA_WARD_OILSKIN_V01.png` and
+   `CHAR_MARA_DETAIL_TORN_LEFT_CUFF_V01.png` for an outfit and a detail)
+   under `production/characters/<CHAR_ID>/refs/`, always the next free
+   version and never under a `_MASTER` name. Save the selected candidate as
    `<CHAR_ID>_<TAG>_MASTER_V##` (for example `CHAR_MARA_TURN_MASTER_V01`)
    and register it in `production/references/manifest.yaml` with `entity`,
    `kind`, `path`, `status: review`, and `default_role` (`identity`, or

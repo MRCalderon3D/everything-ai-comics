@@ -65,7 +65,7 @@ has to account for every one of those transfers.
 7. Plan a prop sheet for any object whose shape has to survive across
    several pages. List it in `notes`. `/visual-development` compiles it from
    this file with `compile-prompts.js --asset <PROP_ID> --sheet prop`, and
-   the approved pick is registered as `<PROP_ID>_PROP_MASTER_V##`.
+   the approved pick is registered as `<PROP_ID>_SHEET_MASTER_V##`.
    `references` stays empty until then.
 8. Set `status: review`, run `node scripts/validate-workspace.js --root
    production`, then the self-evaluation gates on each prop file.

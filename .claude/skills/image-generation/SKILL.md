@@ -74,7 +74,9 @@ tool reported.
 7. Confirm where the file was saved. The target is always the next free
    version: `issues/<ISS_ID>/pages/<PG_ID>/renders/<PG_ID>_V##.png` for a
    page, `<ENTITY_ID>_<TAG>_V##.png` in the entity's `refs/` directory for
-   a sheet, `references/style/<LOOK_ID>_V##.png` for a look page. A live
+   a sheet (TAG names the kind and its variant, such as `TURN`,
+   `WARD_OILSKIN`, or `SHEET` for a prop),
+   `references/style/<LOOK_ID>_V##.png` for a look page. A live
    API run saves the image there itself. With `harness-native` or `manual`
    the tool or the person saves it at the path the request file gives
    under `body.output.path`. A sheet candidate never takes a `_MASTER`
@@ -129,7 +131,8 @@ tool reported.
 - Filling `model` and `cost` with plausible guesses because the fields
   looked empty.
 - A live run inside a loop with `--yes` hard-coded.
-- Running a stale package after the page or the style block changed.
+- Running a stale package after the page, its reference plan, or the style
+  block changed.
 - Rerolling the same package five times in the hope of a better draw. If
   the plan is ambiguous, every draw is ambiguous.
 - Treating the generating agent's own glance at the image as the review.

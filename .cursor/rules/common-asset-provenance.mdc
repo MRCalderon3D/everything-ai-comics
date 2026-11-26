@@ -109,8 +109,11 @@ usually report neither model, nor cost, nor seed.
   that was neither reported nor marked as an estimate.
 - `scripts/build-reference-plan.js` and `scripts/compile-prompts.js` look
   assets up in `references/manifest.yaml` and attach only approved ones.
-  `scripts/validate-workspace.js` reports a page, reference plan, or page
-  prompt package that cites an unregistered asset.
+  `scripts/validate-workspace.js` reports a page, reference plan, page
+  prompt package, or bible file that cites an unregistered asset. In the
+  registry it fails a duplicate asset ID, an `entity` that is not the prefix
+  of the ID, and an approved asset whose `path` is not on disk (a warning
+  for the other statuses).
 - No script can tell a reported value from an invented one. `production-qa`
   compares records with what the tool returned, and unexplained gaps in a
   lineage go to human review.

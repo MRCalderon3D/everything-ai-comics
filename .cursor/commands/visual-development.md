@@ -64,19 +64,24 @@ with one default role, and from then on outranks any prompt.
    The kinds are `turnaround`, `expressions`, and `wardrobe` for a
    character, `plate` for a location, `prop` for a prop, `look` for a look,
    and `detail` with `--subject "<text>"` for a close study of any entity.
-   `--outfit <WARD_ID>` picks the outfit of a wardrobe sheet and
-   `--expressions a,b,c` the list of an expression sheet. The script writes
-   an asset-scoped package (`page: null`, `asset` set to the entity ID, id
+   `--outfit <WARD_ID>` picks the outfit of a wardrobe sheet,
+   `--expressions a,b,c` the list of an expression sheet, and
+   `--time <state>` the time of day of a plate (one of the location's
+   `time_of_day_states`, default the first). The script writes an
+   asset-scoped package (`page: null`, `asset` set to the entity ID, id
    `PP_<ENTITY_ID>_<PROVIDER>-<TAG>`) to
    `<entity dir>/refs/prompts/<provider>.<kind>.yaml`, and a look page to
-   `references/style/prompts/<provider>.<LOOK_ID>.yaml`. It attaches the
+   `references/style/prompts/<provider>.<LOOK_ID>.yaml`. A wardrobe sheet
+   adds its outfit (`<provider>.wardrobe.<WARD_ID>.yaml`), a detail study a
+   slug of its subject (`<provider>.detail.<slug>.yaml`), and a plate for
+   a non-default time that state (`<provider>.plate.<state>.yaml`); the
+   package ID and the candidate name carry the same variant. It attaches the
    approved look master as a `style` reference and, for expression and
    wardrobe sheets, the character's approved identity master. It refuses a
    sheet while no look master is approved; the first look page is the one
-   request compiled without an image. Nothing is written freehand. One
-   package file exists per entity, provider, and kind, so a second wardrobe
-   or detail sheet of the same entity is compiled after the first has been
-   generated.
+   request compiled without an image. Nothing is written freehand. Each
+   outfit and each detail subject has its own package file, so several
+   sheets of one entity can be compiled before any is generated.
 4. Cost gate: estimate the batch (sheets x variants x provider rate), show
    it, and wait for an explicit confirmation. Run
    `node scripts/generate-assets.js --asset <ENTITY_ID> --root production`
@@ -87,7 +92,9 @@ with one default role, and from then on outranks any prompt.
    candidate, so `variants` is the number of runs per sheet.
 5. Find each returned image where the script put it: the next free
    `<ENTITY_ID>_<TAG>_V##.png` in the entity's `refs/` directory, or
-   `production/references/style/<LOOK_ID>_V##.png` for a look page. A
+   `production/references/style/<LOOK_ID>_V##.png` for a look page. TAG is
+   `TURN`, `EXPR`, `WARD_<OUTFIT>`, `PLATE` (`PLATE_<STATE>` for a
+   non-default time), `SHEET` for a prop, or `DETAIL_<SUBJECT>`. A
    candidate never takes a `_MASTER` name. The record and its
    `GEN_*.request.json` are under `production/generations/<ENTITY_ID>/`.
    When the tool does not report the model, the cost, or the seed, the

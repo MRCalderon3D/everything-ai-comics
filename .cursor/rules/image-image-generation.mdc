@@ -148,7 +148,10 @@ gemini, harness-native, and manual add `4:5`, and gemini also `5:4` and
 - The same script compiles reference art from the bibles:
   `--asset <ENTITY_ID> --sheet <kind>` writes
   `<entity dir>/refs/prompts/<provider>.<kind>.yaml`, and a look page goes to
-  `references/style/prompts/<provider>.<LOOK_ID>.yaml`. Per-panel packages
+  `references/style/prompts/<provider>.<LOOK_ID>.yaml`. A wardrobe package
+  adds its outfit ID to the file name, a detail package a slug of its
+  subject, and a plate for a non-default time of day that state, so no two
+  sheets share a package. Per-panel packages
   (`--panel <PN_ID>`) go to `prompts/<provider>.<PN_ID>.yaml`.
 - The frozen style block (`style/style-block.txt`) appears verbatim in every
   package, and the approved look master is attached as an image on every
@@ -173,8 +176,8 @@ gemini, harness-native, and manual add `4:5`, and gemini also `5:4` and
   files against `manifests/image-providers.json`.
 - `scripts/generate-assets.js` runs dry by default, refuses a live run with
   a missing environment variable, and refuses a live run of a package whose
-  page file or style block changed after it was compiled. A dry run of a
-  stale package prints a warning.
+  page file, reference plan, or style block changed after it was compiled.
+  A dry run of a stale package prints a warning.
 - `hooks/require-cost-confirmation.js` blocks `generate-assets --live`
   without `--yes`. `npm run doctor` reports which provider variables are
   set, without printing their values.

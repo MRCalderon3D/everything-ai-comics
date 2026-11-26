@@ -66,11 +66,13 @@ positions against.
 7. Plan the establishing plate. `/visual-development` compiles it from
    `location.yaml` and `map.yaml` with `compile-prompts.js --asset <LOC_ID>
    --sheet plate`, lit for the first entry of `time_of_day_states`, so put
-   the state the story uses most first. Where a level cannot be seen from
+   the state the story uses most first. A plate for another state is
+   compiled with `--time <state>` and registered as
+   `<LOC_ID>_PLATE_<STATE>_MASTER_V##`. Where a level cannot be seen from
    the plate, plan a `detail` study of it (`--sheet detail --subject
    "<text>"`). List the planned sheets in the file's `notes`. The approved
-   plate is registered as `<LOC_ID>_PLATE_MASTER_V##`; `references` stays
-   empty until then.
+   default plate is registered as `<LOC_ID>_PLATE_MASTER_V##`; `references`
+   stays empty until then.
 8. Set `status: review`, run `node scripts/validate-workspace.js --root
    production`, then the self-evaluation gates on both files. Report the
    levels, the side convention, and any event the map still cannot stage.

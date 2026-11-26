@@ -60,7 +60,8 @@ a prompt exists only in someone's head.
    setting and background, then each drawn character with position (level,
    side, landmark), facing, action, acting, wardrobe, state tags, and held
    props, and the props in view. Characters marked `off_panel` are named as
-   not drawn.
+   not drawn. A panel's `notes`, when it has any, appear as one `Note:`
+   line in its block.
 7. Confirm the difference statements. For every pair on the page listed in
    `visually_adjacent_to`, the prompt states how they differ, using their
    `distinguishing_features`: "Mara is not Oskar. Mara: broken nose, grey
@@ -68,7 +69,10 @@ a prompt exists only in someone's head.
    one face being used for both.
 8. Confirm the lettering. With `lettering.mode: in_image`, every string in
    `lettering_text` appears in the prompt exactly as in `page.yaml`, tied to
-   its panel, type, and speaker. With `overlay`, the prompt asks for art
+   its panel, type, and speaker. When the project sets
+   `page.safe_margin_mm`, the lettering block ends with it as a placement
+   limit, stated as a share of the page width and height (from `trim_mm`).
+   With `overlay`, the prompt asks for art
    with no text and `lettering_text` is empty. No provider in the roster
    declares `textRendering: reliable`. For an `unreliable` provider the
    compiler warns that the review must check every string. For `none`
@@ -96,16 +100,19 @@ a prompt exists only in someone's head.
 12. Confirm `source_hashes` for the page, the reference plan, and the style
     block, and `status: compiled`. Set the page's `status` to `prompted`.
     A package whose hashes no longer match its sources is stale and is
-    recompiled before use: `generate-assets.js` compares the page and
-    style-block hashes, warns in a dry run, and refuses a live run.
+    recompiled before use: `generate-assets.js` compares the page,
+    reference-plan, and style-block hashes, warns in a dry run, and refuses
+    a live run.
 
 ## Outputs
 
 - `issues/<ISS_ID>/pages/<PG_ID>/prompts/<provider>.yaml` (`prompt-package`
   schema), in `generate` or `repair` mode.
 - In per-panel mode, `prompts/<provider>.<PN_ID>.yaml` for each panel.
-- For a reference sheet, `<entity dir>/refs/prompts/<provider>.<kind>.yaml`,
-  and for a look page `references/style/prompts/<provider>.<LOOK_ID>.yaml`.
+- For a reference sheet, `<entity dir>/refs/prompts/<provider>.<kind>.yaml`
+  (`<provider>.wardrobe.<WARD_ID>.yaml`, `<provider>.detail.<slug>.yaml`,
+  and `<provider>.plate.<state>.yaml` for a non-default time of day), and
+  for a look page `references/style/prompts/<provider>.<LOOK_ID>.yaml`.
 
 ## Quality Bar
 
@@ -161,10 +168,12 @@ same script compiles them from the entity's bible file:
 The kinds are `turnaround`, `expressions`, and `wardrobe` for a character,
 `plate` for a location, `prop` for a prop, `look` for a look, and `detail`
 with `--subject "<text>"` for a close study of any entity. `--outfit
-<WARD_ID>` picks the wardrobe state and `--expressions a,b,c` the
-expression list. The package is asset-scoped (`page: null`,
-`asset: <ENTITY_ID>`, id `PP_<ENTITY_ID>_<PROVIDER>-<TAG>`) and hashes only
-the style block. Its rules are the same: no wording the bible lacks, one
+<WARD_ID>` picks the wardrobe state, `--expressions a,b,c` the
+expression list, and `--time <state>` the time of day of a plate. The
+package is asset-scoped (`page: null`, `asset: <ENTITY_ID>`, id
+`PP_<ENTITY_ID>_<PROVIDER>-<TAG>`, with the outfit, the detail subject, or
+a non-default time appended as `-<VARIANT>`) and hashes only the style
+block. Its rules are the same: no wording the bible lacks, one
 role per attached image. A sheet needs an approved look master; the first
 look page of a project is the one request compiled without an image.
 

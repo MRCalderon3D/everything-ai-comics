@@ -91,7 +91,8 @@ every render that depicts a `LOC_*` entity.
   needs its map under this rule.
 - `scripts/validate-workspace.js` schema-checks location and map files,
   checks that each ID matches its directory, and reports a scene whose
-  `location` has no location file.
+  `location` has no location file. It fails a `references` entry that is
+  unregistered or registered for another entity.
 - `hooks/detect-continuity-drift.js` is advisory: it warns on write and never
   blocks.
 - Whether the drawn architecture, dressing, light, and sides match the plate
