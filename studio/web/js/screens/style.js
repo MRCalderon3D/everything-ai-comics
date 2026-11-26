@@ -32,7 +32,7 @@ function presetPicker(ctx, presets) {
     return h('li', { class: 'preset' },
       input,
       h('label', { for: id },
-        h('span', { class: 'preset-name' }, tv('preset', p.key, p.name)),
+        h('span', { class: 'preset-name' }, p.name || p.key),
         h('span', { class: 'preset-color' }, tv('color', p.color_mode, p.color_mode)),
         h('span', { class: 'preset-intent' }, p.intent)),
       h('details', { class: 'preset-more' },

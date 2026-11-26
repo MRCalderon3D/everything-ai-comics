@@ -2,7 +2,7 @@
 // and what holds it back. One obvious thing to do.
 
 import { h } from '/js/dom.js';
-import { t, tn, tv, has } from '/js/i18n.js';
+import { t, tv } from '/js/i18n.js';
 import { state, refreshOverview } from '/js/store.js';
 import { screenHead } from '/js/components/bench.js';
 import { caption, notice } from '/js/components/ui.js';
@@ -15,44 +15,14 @@ export async function load() {
   return (await refreshOverview()) || state.overview;
 }
 
-/** What a screen's state is, in a sentence, from its status and its numbers. */
+/** What a screen's state is, in the server's sentence. */
 export function screenSummary(s) {
-  const c = s.counts || {};
-  switch (s.key) {
-    case 'story':
-      return s.status === 'done' ? tn('summary.story.done', c.facts || 0) : t('summary.story.todo');
-    case 'style':
-      if (s.status === 'done') return t('summary.style.done');
-      if (c.candidates) return tn('summary.style.candidates', c.candidates);
-      return s.status === 'in_progress' ? t('summary.style.defined') : t('summary.style.todo');
-    case 'characters':
-      if (!c.characters) return t('summary.characters.none');
-      return t('summary.characters.count', { n: c.characters, approved: c.approved || 0 });
-    case 'places':
-      return t('summary.places', { locations: c.locations || 0, props: c.props || 0 });
-    case 'pages':
-      if (!c.planned) return t('summary.pages.none');
-      return t('summary.pages.count', { planned: c.planned, drawn: c.rendered || 0, approved: c.plan_approved || 0 });
-    case 'check':
-      if (!c.passed && !c.flagged) return t('summary.check.none');
-      return t('summary.check.count', { passed: c.passed || 0, flagged: c.flagged || 0 })
-        + (c.with_notes ? ` ${tn('summary.check.with_notes', c.with_notes)}` : '')
-        + (c.not_independent ? ` ${tn('summary.check.not_independent', c.not_independent)}` : '');
-    case 'corrections':
-      if (c.flagged) return tn('summary.corrections.flagged', c.flagged);
-      return c.with_notes ? tn('summary.corrections.notes', c.with_notes) : t('summary.corrections.none');
-    case 'cover':
-      if (s.status === 'done' || s.done) return t('summary.cover.done');
-      return c.renders ? tn('summary.cover.renders', c.renders) : t('summary.cover.none');
-    case 'publish':
-      return c.editions ? tn('summary.publish.editions', c.editions) : t('summary.publish.none');
-    default:
-      return s.summary || '';
-  }
+  return s.summary || '';
 }
 
+/** What holds a step back, in the server's sentence. */
 export function blockerText(b) {
-  return has(`blocker.${b.code}`) ? t(`blocker.${b.code}`) : b.message;
+  return b.message || b.detail || b.code;
 }
 
 function nextAction(overview) {

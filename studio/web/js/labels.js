@@ -1,8 +1,9 @@
-// Words for the things the server names with codes: jobs, steps, tools,
-// pages. The server writes its titles in English; these go through the
-// dictionaries, and fall back to the server's text for anything new.
+// Words for what the server names: jobs, steps, tools, pages. The server
+// writes its own sentences (job titles, step labels, notes, errors) in the
+// language of each request; the interface words only the values it sends as
+// plain codes (a status, a tool, an actor) and the page and version names.
 
-import { t, tn, tv, has } from '/js/i18n.js';
+import { t, tn, tv } from '/js/i18n.js';
 
 export function toolName(tool) {
   return tv('tool', tool, tool || '');
@@ -26,36 +27,26 @@ export function versionName(renderId) {
   return m ? t('version.n', { n: Number(m[1]) }) : String(renderId || '');
 }
 
+/**
+ * The title of a job. The server writes it in the language of the request;
+ * the interface adds which page it is about.
+ */
 export function jobTitle(job) {
   if (!job) return '';
-  if (job.op === 'pages.generate' && job.params && Array.isArray(job.params.pages)) {
-    return tn('job.pages.generate.count', job.params.pages.length);
+  const title = job.title || String(job.op || '');
+  const p = job.params || {};
+  if (job.op === 'pages.generate' && Array.isArray(p.pages)) {
+    return p.pages.length === 1 ? `${title}: ${pageName(p.pages[0])}` : `${title} (${tn('job.pages_count', p.pages.length)})`;
   }
-  if ((job.op === 'page.correct' || job.op === 'page.review') && job.params && (job.params.page || job.params.render)) {
-    return `${tv('job', job.op, job.title)}: ${pageName(job.params.page || job.params.render)}`;
+  if ((job.op === 'page.correct' || job.op === 'page.review') && (p.page || p.render)) {
+    return `${title}: ${pageName(p.page || p.render)}`;
   }
-  return tv('job', job.op, job.title);
+  return title;
 }
 
+/** A step of a job, as the server words it in the language of the request. */
 export function stepLabel(job, step) {
-  const op = job.op;
-  const id = String(step.id);
-  const colon = id.indexOf(':');
-  const scope = colon === -1 ? null : id.slice(0, colon);
-  let base = colon === -1 ? id : id.slice(colon + 1);
-  let n = null;
-  const numbered = /^(repair|review)-(\d+)$/.exec(base);
-  if (numbered) {
-    base = numbered[1] === 'repair' ? 'repair' : 'review_repair';
-    n = Number(numbered[2]);
-  }
-  const path = job.params && job.params.path;
-  const keys = [path ? `step.${op}.${base}.${path}` : null, `step.${op}.${base}`, `step.any.${base}`].filter(Boolean);
-  const key = keys.find((k) => has(k));
-  if (!key) return step.label || id;
-  const text = t(key, { n });
-  if (!scope) return text;
-  return `${/^PG_|^CV_/.test(scope) ? pageName(scope) : scope}: ${text}`;
+  return step.label || String(step.id);
 }
 
 export function stepStatus(status) {
@@ -102,10 +93,10 @@ export function jobLink(job) {
   }
 }
 
-/** The path a correction took, in plain words. */
+/** The path a correction took, in the server's words. */
 export function correctionPath(result) {
   if (!result || !result.path) return '';
-  return tv('correction.path', result.path, result.path_label || result.path);
+  return result.path_label || result.path;
 }
 
 /** A result that passed and left notes to read. */
@@ -113,12 +104,17 @@ function hasNotes(result) {
   return result.outcome === 'notes' || (result.outcome === undefined && result.passes && result.open_findings > 0);
 }
 
+/** Why the automatic repairs stopped, in the server's words, after a flagged result. */
+function withStop(text, r) {
+  return !r.passes && r.stopped ? `${text} ${r.stopped}` : text;
+}
+
 /** One or two sentences about how a finished job went. */
 export function jobOutcome(job) {
   const r = job.result;
   if (job.status === 'failed') {
     if (!job.error) return t('job.failed_plain');
-    const text = has(`error.${job.error.code}`) ? t(`error.${job.error.code}`) : job.error.message;
+    const text = job.error.message || t('job.failed_plain');
     const pages = job.error.details && Array.isArray(job.error.details.pages) ? job.error.details.pages : [];
     return pages.length ? `${t('job.failed_pages', { pages: pages.map((p) => pageName(p.page || p)).join(', ') })} ${text}` : text;
   }
@@ -134,9 +130,9 @@ export function jobOutcome(job) {
     }
     case 'page.correct':
     case 'cover.correct':
-      return `${correctionPath(r)} ${r.passes ? (hasNotes(r) ? t('outcome.correct.notes') : t('outcome.correct.passes')) : t('outcome.correct.flagged')}`;
+      return withStop(`${correctionPath(r)} ${r.passes ? (hasNotes(r) ? t('outcome.correct.notes') : t('outcome.correct.passes')) : t('outcome.correct.flagged')}`, r);
     case 'page.review':
-      return r.passes ? (hasNotes(r) ? t('outcome.review.notes') : t('outcome.review.passes')) : t('outcome.review.flagged');
+      return withStop(r.passes ? (hasNotes(r) ? t('outcome.review.notes') : t('outcome.review.passes')) : t('outcome.review.flagged'), r);
     case 'publish.build':
       return r.draft ? t('outcome.publish.draft', { edition: r.edition }) : t('outcome.publish.final', { edition: r.edition });
     case 'style.look':
@@ -146,8 +142,8 @@ export function jobOutcome(job) {
     case 'lettering.apply':
       return r.failed ? tn('outcome.lettering.failed', r.failed) : t('outcome.lettering.done');
     case 'cover.create':
-      if (r.drawn === false) return t('outcome.cover.written_only');
-      return r.passes ? (hasNotes(r) ? t('outcome.cover.notes') : t('outcome.cover.passes')) : t('outcome.cover.flagged');
+      if (r.drawn === false) return r.reason ? `${t('outcome.cover.written_only')} ${r.reason}` : t('outcome.cover.written_only');
+      return withStop(`${r.written === false ? `${t('outcome.cover.as_written')} ` : ''}${r.passes ? (hasNotes(r) ? t('outcome.cover.notes') : t('outcome.cover.passes')) : t('outcome.cover.flagged')}`, r);
     case 'page.manual':
       if (r.handoff) return t('outcome.manual.handoff');
       return r.reviewed === false ? t('outcome.manual.stored_unreviewed') : (r.passes ? t('outcome.review.passes') : t('outcome.review.flagged'));

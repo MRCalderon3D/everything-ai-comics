@@ -24,7 +24,7 @@ export function optionsForm(ctx, { options, choices }) {
       label: t('options.page_size'), value: options.page_size || '',
       options: [
         ...(options.page_size ? [] : [{ value: '', label: t('options.page_size_custom', { ratio: options.page ? options.page.aspect_ratio : '' }) }]),
-        ...choices.page_size.map((p) => ({ value: p.id, label: `${tv('page_size', p.id, p.label)} (${p.width_px} × ${p.height_px})` })),
+        ...choices.page_size.map((p) => ({ value: p.id, label: `${p.label || p.id} (${p.width_px} × ${p.height_px})` })),
       ],
       hint: t('options.page_size_hint'),
     }),
@@ -57,7 +57,7 @@ export function optionsForm(ctx, { options, choices }) {
       ctx.refresh();
       if (list) result.append(list);
     } catch (err) {
-      result.append(notice('bad', err.code === 'format_locked' ? t('error.format_locked') : errorText(err)));
+      result.append(notice('bad', errorText(err)));
     }
   };
 

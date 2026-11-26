@@ -1,19 +1,34 @@
 // The one place that talks to the server. Every route of studio/docs/api.md
 // the interface uses goes through request().
 
-import { t, has } from '/js/i18n.js';
+import { t, getLang } from '/js/i18n.js';
 
+/**
+ * A refusal. For an answer of the server, `message` is its sentence in the
+ * language of the request and `params.detail` the exact technical text (the
+ * file, the ID, the value). `local` marks an error the browser made itself
+ * (no answer at all, or one that is not the server's JSON).
+ */
 export class ApiError extends Error {
-  constructor(status, code, message, details) {
+  constructor(status, code, message, { details, params, local } = {}) {
     super(message);
     this.status = status;
     this.code = code;
     this.details = details || null;
+    this.params = params || {};
+    this.detail = this.params.detail || null;
+    this.local = !!local;
   }
+}
+
+/** Every request carries the language of the interface, so the server writes in it. */
+export function withLang(path) {
+  return `${path}${path.includes('?') ? '&' : '?'}lang=${encodeURIComponent(getLang())}`;
 }
 
 async function request(method, path, { body, raw, signal } = {}) {
   const init = { method, headers: {}, signal };
+  path = withLang(path);
   if (raw !== undefined) {
     init.body = raw;
   } else if (body !== undefined) {
@@ -25,7 +40,7 @@ async function request(method, path, { body, raw, signal } = {}) {
     res = await fetch(path, init);
   } catch (err) {
     if (err && err.name === 'AbortError') throw err;
-    throw new ApiError(0, 'offline', t('error.offline'));
+    throw new ApiError(0, 'offline', t('error.offline'), { local: true });
   }
   const text = await res.text();
   let data = null;
@@ -33,16 +48,21 @@ async function request(method, path, { body, raw, signal } = {}) {
     try { data = JSON.parse(text); } catch (err) { data = null; }
   }
   if (!res.ok) {
-    const e = data && data.error ? data.error : {};
-    throw new ApiError(res.status, e.code || 'http_error', e.message || `${res.status} ${res.statusText}`, e.details);
+    const e = data && data.error ? data.error : null;
+    if (!e || !e.message) {
+      throw new ApiError(res.status, (e && e.code) || 'http_error', t('error.http', { status: res.status }), { local: true });
+    }
+    throw new ApiError(res.status, e.code || 'http_error', e.message, { details: e.details, params: e.params });
   }
   return data;
 }
 
-/** The message to show for a failed call: ours when we have one for the code, else the server's. */
+/**
+ * The message to show for a failed call. The server already wrote it in the
+ * language of the request; the browser words only what it found itself.
+ */
 export function errorText(err) {
   if (!err) return '';
-  if (err.code && has(`error.${err.code}`)) return t(`error.${err.code}`);
   return err.message || String(err);
 }
 
@@ -102,6 +122,8 @@ export const api = {
 
   history: (id, query = '') => request('GET', `${project(id)}/history${query}`),
   restore: (id, entry) => request('POST', `${project(id)}/history/restore`, { body: { entry } }),
+  /** What a commit changed ({ commit }), or what changed between two ({ from, to }). */
+  diff: (id, { commit, from, to, limit }) => request('GET', `${project(id)}/diff${q({ commit, from, to, limit })}`),
 
   approveAsset: (id, body) => request('POST', `${project(id)}/approve/asset`, { body }),
   approvePlan: (id, pages, approved = true) => request('POST', `${project(id)}/approve/plan`, { body: { pages, approved } }),
@@ -111,5 +133,7 @@ export const api = {
   lettering: (id, page, render) => request('GET', `${project(id)}/pages/${enc(page)}/lettering${q({ render })}`),
   sendLettered: (id, page, render, blob) => request('POST', `${project(id)}/pages/${enc(page)}/lettered${q({ render })}`, { raw: blob }),
 
-  eventsUrl: (id) => `${project(id)}/events`,
+  eventsUrl: (id) => withLang(`${project(id)}/events`),
+  /** A file of the workspace as it was at a commit (an image to load, not JSON). */
+  atRawUrl: (id, commit, path) => `${project(id)}/at/${enc(commit)}/raw/${String(path).split('/').map(enc).join('/')}`,
 };

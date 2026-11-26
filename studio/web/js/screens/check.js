@@ -11,14 +11,14 @@ import { panel, actionButton, notice, emptyState } from '/js/components/ui.js';
 import { queueOp } from '/js/components/ask.js';
 import { jobsFor } from '/js/components/jobs.js';
 import { frame, openViewer, versionStrip, compareBox } from '/js/components/viewer.js';
-import { reviewPanel, verdictChip, verdictWords, verdictClass, outcomeOf, approveRender, confirmCorrection, markOverrules } from '/js/components/verdict.js';
+import { reviewPanel, verdictChip, verdictWords, verdictClass, outcomeOf, approveRender, confirmCorrection } from '/js/components/verdict.js';
 import { pageName, versionName } from '/js/labels.js';
 import { renderItems } from '/js/screens/page.js';
 import { queueLine } from '/js/screens/pages.js';
 
 export async function load(ctx) {
   const issueId = state.issue || 'ISS_001';
-  const issue = await markOverrules(ctx.projectId, await api.issue(ctx.projectId, issueId));
+  const issue = await api.issue(ctx.projectId, issueId);
   const wanted = ctx.params.page
     || (issue.pages.find((p) => p.flagged) || issue.pages.find((p) => p.current_render) || issue.pages[0] || {}).id;
   const page = wanted ? await api.page(ctx.projectId, wanted) : null;

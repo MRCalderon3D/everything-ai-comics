@@ -13,10 +13,51 @@ import { queueOp } from '/js/components/ask.js';
 import { toast } from '/js/components/toast.js';
 import { correctionPath, versionName } from '/js/labels.js';
 
+/** "row 1 of 2, panel 2 of 3": where a panel sits, from the numbers of its slot. */
+export function slotWords(slot) {
+  if (!slot) return '';
+  return slot.of > 1
+    ? t('slot.words', { tier: slot.tier, tiers: slot.tiers, slot: slot.slot, of: slot.of })
+    : t('slot.words_full', { tier: slot.tier, tiers: slot.tiers });
+}
+
+/**
+ * A small drawing of the rows of the page with a box per panel, from the
+ * plan's tiers. The plan gives no sizes, so every row is as tall as the
+ * others and every panel in a row as wide: it says which row and which
+ * position, nothing more. The radios beside it stay the way to choose; a box
+ * can also be clicked.
+ */
+export function tierSchematic(panels, selected, onPick) {
+  const placed = panels.filter((p) => p.slot && p.slot.tiers);
+  if (!placed.length || placed.length !== panels.length) return { el: null, select: () => {} };
+  const tiers = placed[0].slot.tiers;
+  const rows = [];
+  for (let tier = 1; tier <= tiers; tier += 1) {
+    rows.push(placed.filter((p) => p.slot.tier === tier).sort((a, b) => a.slot.slot - b.slot.slot));
+  }
+  const cells = new Map();
+  const label = h('p', { class: 'small muted schematic-label', 'aria-live': 'polite' });
+  const select = (id) => {
+    for (const [pid, cell] of cells) cell.classList.toggle('on', pid === id);
+    const p = placed.find((x) => x.id === id);
+    label.textContent = p ? `${t('page.panel_n', { n: p.number })}: ${slotWords(p.slot)}` : t('correct.whole_page');
+  };
+  const grid = h('div', { class: 'schematic', 'aria-hidden': 'true' },
+    rows.map((row) => h('div', { class: 'schematic-row' }, row.map((p) => {
+      const cell = h('div', { class: 'schematic-cell', title: `${t('page.panel_n', { n: p.number })}: ${slotWords(p.slot)}` }, String(p.number));
+      cell.addEventListener('click', () => { onPick(p.id); select(p.id); });
+      cells.set(p.id, cell);
+      return cell;
+    }))));
+  select(selected);
+  return { el: h('div', { class: 'schematic-box' }, grid, label), select };
+}
+
 /**
  * correction(ctx, { key, render, panels, repairLimit, send })
  *   render       the render the request is about (with image and review)
- *   panels       [{ id, number, moment }] for a page; none for a cover
+ *   panels       [{ id, number, moment, slot }] for a page; none for a cover
  *   send(params) starts the operation with { text, render, panel, region, lettering }
  * -> { form, stage }: the form goes with the text, the stage with the images.
  */
@@ -44,12 +85,19 @@ export function correction(ctx, { key, render, panels = [], repairLimit, send })
   const lettering = checkField({ label: t('correct.lettering'), hint: t('correct.lettering_hint'), draft: letteringDraft });
 
   const name = nextId('panel');
+  const schematic = tierSchematic(panels, ui.panel, (id) => {
+    ui.panel = id;
+    const radio = panelPick && panelPick.querySelector(`input[value="${CSS.escape(id)}"]`);
+    if (radio) radio.checked = true;
+  });
   const panelPick = panels.length ? h('fieldset', { class: 'radios' }, h('legend', null, t('correct.where')),
     [{ id: '', number: null, moment: t('correct.whole_page') }, ...panels].map((p) => {
       const id = nextId('pn');
       return h('div', { class: 'check' },
-        h('input', { type: 'radio', name, id, value: p.id, checked: ui.panel === p.id, onchange: () => { ui.panel = p.id; } }),
-        h('label', { for: id }, p.number ? h('strong', null, `${t('page.panel_n', { n: p.number })}: `) : null, p.moment));
+        h('input', { type: 'radio', name, id, value: p.id, checked: ui.panel === p.id, onchange: () => { ui.panel = p.id; schematic.select(p.id); } }),
+        h('label', { for: id },
+          p.number ? h('strong', null, `${t('page.panel_n', { n: p.number })}: `) : null, p.moment,
+          p.slot ? h('span', { class: 'small faint slot-words' }, ` (${slotWords(p.slot)})`) : null));
     })) : null;
 
   const cycle = review && typeof review.repair_cycle === 'number' ? review.repair_cycle : 0;
@@ -75,11 +123,14 @@ export function correction(ctx, { key, render, panels = [], repairLimit, send })
     ui.region = null;
     ui.panel = '';
     picker.clear();
+    schematic.select('');
+    const whole = panelPick && panelPick.querySelector('input[value=""]');
+    if (whole) whole.checked = true;
   };
 
   const form = h('form', { class: 'stack-s', onsubmit: (e) => e.preventDefault() },
     h('p', { class: 'muted' }, t('correct.intro', { version: versionName(render.id) })),
-    panelPick,
+    panelPick ? h('div', { class: 'panel-pick' }, panelPick, schematic.el) : null,
     h('div', { class: 'row' }, h('span', { class: 'small muted' }, t('correct.region_help')), clearBtn),
     what.el,
     lettering.el,

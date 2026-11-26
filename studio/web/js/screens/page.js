@@ -13,6 +13,7 @@ import { jobsFor } from '/js/components/jobs.js';
 import { frame, openViewer, versionStrip } from '/js/components/viewer.js';
 import { verdictChip } from '/js/components/verdict.js';
 import { handoff, noDrawTool } from '/js/components/handoff.js';
+import { slotWords } from '/js/components/correction.js';
 import { toast } from '/js/components/toast.js';
 import { pageName, versionName } from '/js/labels.js';
 import { mechanicalBox, drawPages, queueLine } from '/js/screens/pages.js';
@@ -52,7 +53,7 @@ function planEditor(ctx, data) {
       status.replaceChildren(...[list, res.continuity && res.continuity.length ? mechanicalBox({ continuity: res.continuity }) : null].filter(Boolean));
       ctx.refresh();
     } catch (err) {
-      status.replaceChildren(notice('bad', err.code === 'file_changed' ? t('editor.file_changed_short') : errorText(err)));
+      status.replaceChildren(notice('bad', errorText(err)));
     }
   }, { kind: 'primary', icon: 'check' });
   const setDirty = (value) => {
@@ -77,7 +78,8 @@ function planEditor(ctx, data) {
     if (!target) return null;
     return h('li', { class: 'plan-panel' },
       h('h4', null, t('page.panel_n', { n: p.number }),
-        h('span', { class: 'faint small' }, ` ${t('page.panel_meta', { size: tv('value', p.size, p.size), shot: tv('shot', p.shot, String(p.shot || '').replace(/_/g, ' ')) })}`)),
+        h('span', { class: 'faint small' }, ` ${t('page.panel_meta', { size: tv('value', p.size, p.size), shot: tv('shot', p.shot, String(p.shot || '').replace(/_/g, ' ')) })}`,
+          p.slot ? ` · ${slotWords(p.slot)}` : '')),
       area(t('page.moment'), target.moment, (v) => { target.moment = v; }),
       (target.cast || []).map((c, i) => {
         const shown = p.cast[i] || {};
@@ -217,7 +219,7 @@ export function view(ctx, data) {
 
   const drawBlock = [];
   if (!data.draw.available) {
-    drawBlock.push(noDrawTool(data.draw.reason && !/codex/i.test(data.draw.reason) ? data.draw.reason : t('pages.no_draw_tool')));
+    drawBlock.push(noDrawTool(data.draw.reason || t('pages.no_draw_tool')));
   } else if (!current) {
     drawBlock.push(h('div', { class: 'row' },
       actionButton(t('page.draw'), () => drawPages(ctx, [data.id], { unapproved: approval.approved && !approval.stale ? [] : [data.id] }), { kind: 'primary', disabled: blockers.length > 0 }),

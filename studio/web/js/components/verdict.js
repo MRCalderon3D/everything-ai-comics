@@ -41,38 +41,31 @@ export function outcomeOf(v) {
   return openCount(v) > 0 ? 'notes' : 'pass';
 }
 
-// The sentence the server adds to the notes of a review when the person
-// approves it against the check. It is the only record of an overrule that a
-// later read can see, so it is what the interface looks for.
-const OVERRULE_MARK = 'Overruled by the person';
-
 /**
- * Whether the person approved this render against the check. The review file
- * then reads as passing (its open findings became accepted), so the interface
- * has to say whose decision that was. Accepted findings alone do not say it:
- * approving a page that passed with notes accepts those notes too.
+ * Whether the person approved this render against a flagged check. The
+ * server records it as data on the review and on the page and cover
+ * summaries (`overruled`, `overruled_at`, `overrule_note`), so a list can say
+ * it without opening each review.
  */
-export function isOverruled(review) {
-  if (!review) return false;
-  if (review.overruled === true) return true;
-  return typeof review.notes === 'string' && review.notes.includes(OVERRULE_MARK);
+export function isOverruled(v) {
+  return !!(v && v.overruled === true);
 }
 
-/**
- * Page summaries do not say whether an approval was an overrule. For the few
- * pages where it could be (repaired verdict, approved by the person), look at
- * the review itself and mark the summary.
- */
-export async function markOverrules(projectId, issue) {
-  const suspects = (issue.pages || []).filter((p) => p.verdict === 'fixed' && p.human_approval === 'approved');
-  await Promise.all(suspects.map(async (p) => {
-    try {
-      const detail = await api.page(projectId, p.id);
-      const current = (detail.renders || []).find((r) => r.current);
-      if (current && isOverruled(current.review)) p.overruled = true;
-    } catch (err) { /* the summary stays as it is */ }
-  }));
-  return issue;
+/** The person's approval, from a review ({ status }) or a summary (a string). */
+export function approvalOf(v) {
+  if (!v || !v.human_approval) return null;
+  return typeof v.human_approval === 'string' ? v.human_approval : v.human_approval.status || null;
+}
+
+/** Minor findings the person accepted by approving: from the count, else from the list. */
+function acceptedNotes(v) {
+  if (typeof v.accepted_notes === 'number') return v.accepted_notes;
+  return Array.isArray(v.findings) ? v.findings.filter((f) => f.status === 'accepted' && f.severity === 'minor').length : 0;
+}
+
+/** Approved by the person with the check's notes accepted (not an overrule). */
+export function approvedWithNotes(v) {
+  return !!v && !isOverruled(v) && approvalOf(v) === 'approved' && acceptedNotes(v) > 0;
 }
 
 /** The class that colours a verdict: the outcome, or "overruled". */
@@ -85,6 +78,7 @@ export function verdictClass(v) {
 export function verdictWords(v) {
   if (!v || !v.verdict) return t('verdict.none');
   if (isOverruled(v)) return t('verdict.overruled');
+  if (approvedWithNotes(v)) return tn('verdict.approved_notes', acceptedNotes(v));
   const outcome = outcomeOf(v);
   const open = openCount(v);
   if (outcome === 'flagged') return open ? tn('verdict.flagged_open', open) : t('verdict.flagged');
@@ -93,7 +87,6 @@ export function verdictWords(v) {
   // also covers a page whose notes the person accepted.
   const list = Array.isArray(v.findings) ? v.findings : [];
   if (v.repair_cycle > 0 || list.some((f) => f.status === 'fixed')) return t('verdict.fixed');
-  if (list.some((f) => f.status === 'accepted')) return t('verdict.pass_accepted');
   return t('verdict.pass');
 }
 
@@ -104,11 +97,11 @@ export function verdictWords(v) {
  */
 export function verdictChip(v) {
   if (!v || !v.verdict) return h('span', { class: 'verdict none' }, t('verdict.none'));
-  const approval = typeof v.human_approval === 'string' ? v.human_approval : (v.human_approval && v.human_approval.status);
+  const approval = approvalOf(v);
   return h('span', { class: 'verdict-group' },
     h('span', { class: `verdict ${verdictClass(v)}` }, verdictWords(v)),
     v.independent === false ? h('span', { class: 'verdict-note' }, t('verdict.not_independent_short')) : null,
-    approval === 'approved' && !isOverruled(v) ? h('span', { class: 'verdict-human' }, t('verdict.approved_by_you')) : null);
+    approval === 'approved' && !isOverruled(v) && !approvedWithNotes(v) ? h('span', { class: 'verdict-human' }, t('verdict.approved_by_you')) : null);
 }
 
 function checkRow(key, check) {
@@ -162,6 +155,21 @@ export async function confirmCorrection(finding) {
   return result ? result.note : null;
 }
 
+/** What the person decided against the check: when, about what, and in their words. */
+function overruleNote(review) {
+  const items = review.overruled_items || [];
+  const findings = items.filter((i) => !/^gate /.test(i)).map((i) => i.replace(/!$/, ''));
+  const gates = items.filter((i) => /^gate /.test(i)).map((i) => i.slice(5));
+  const what = [
+    findings.length ? tn('review.overruled_findings', findings.length, { ids: findings.join(', ') }) : null,
+    ...gates.map((g) => t('review.overruled_gate', { gate: tv('gate', g) })),
+  ].filter(Boolean);
+  return h('div', { class: 'overrule-note stack-s' },
+    h('p', { class: 'strong-note' }, review.overruled_at ? t('review.overruled_on', { date: formatDate(review.overruled_at) }) : t('review.overruled_plain')),
+    what.length ? h('p', { class: 'small' }, what.join(' ')) : null,
+    review.overrule_note ? h('p', null, h('span', { class: 'muted' }, t('review.overrule_note')), ' ', h('q', null, review.overrule_note)) : null);
+}
+
 /**
  * The whole review of one render.
  *   review        the render's review (or null)
@@ -191,7 +199,8 @@ export function reviewPanel(review, { panels, repairLimit, onCorrect } = {}) {
   return h('div', { class: 'review', dataset: { outcome: overruled ? 'overruled' : outcome } },
     h('div', { class: `review-verdict ${verdictClass(review)}` },
       h('h3', null, verdictWords(review)),
-      overruled ? h('p', { class: 'strong-note' }, tn('review.overruled', findings.filter((f) => f.status === 'accepted').length)) : null,
+      overruled ? overruleNote(review) : null,
+      !overruled && approvedWithNotes(review) ? h('p', null, tn('review.notes_accepted', acceptedNotes(review))) : null,
       !overruled && outcome === 'notes' ? h('p', null, t('review.notes_intro')) : null,
       h('p', null, human ? t('review.opened_by_request') : t('review.automated')),
       human ? null : h('p', { class: review.independent ? '' : 'strong-note' },

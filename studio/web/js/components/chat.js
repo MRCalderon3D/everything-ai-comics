@@ -9,9 +9,29 @@ import { state, bus, rememberJob, ACTIVE } from '/js/store.js';
 import { toolName, jobStatus } from '/js/labels.js';
 import { actionButton, button } from '/js/components/ui.js';
 import { showFile } from '/js/components/editor.js';
+import { changesView } from '/js/components/diff.js';
 import { toast } from '/js/components/toast.js';
 
-function messageNode(projectId, m) {
+/** "What the AI changed": the diff of the reply's commit, read when asked for. */
+function changesToggle(projectId, m, open) {
+  const holder = h('div', { class: 'chat-changes' });
+  const btn = h('button', { type: 'button', class: 'btn small quiet' });
+  const paint = () => {
+    const shown = open.has(m.id);
+    btn.setAttribute('aria-expanded', String(shown));
+    mount(btn, icon(shown ? 'down' : 'right'), h('span', null, shown ? t('chat.hide_changes') : t('chat.show_changes')));
+    if (shown && !holder.firstChild) holder.append(changesView(projectId, { commit: m.commit }));
+    holder.hidden = !shown;
+  };
+  btn.addEventListener('click', () => {
+    if (open.has(m.id)) open.delete(m.id); else open.add(m.id);
+    paint();
+  });
+  paint();
+  return h('div', { class: 'stack-s' }, h('div', { class: 'row' }, btn), holder);
+}
+
+function messageNode(projectId, m, open) {
   if (m.role === 'user') {
     return h('li', { class: 'msg user' },
       h('div', { class: 'msg-meta' }, t('chat.you'), ' · ', formatTime(m.at)),
@@ -32,6 +52,7 @@ function messageNode(projectId, m) {
         h('p', { class: 'small' }, h('strong', null, tn('chat.changed', files.length))),
         h('ul', { class: 'file-list' }, files.map((path) => h('li', null,
           h('button', { type: 'button', class: 'link', onclick: () => showFile(projectId, path) }, path)))),
+        m.commit ? changesToggle(projectId, m, open) : null,
         m.commit ? h('p', { class: 'small muted' }, t('chat.undo_hint'), ' ',
           h('a', { href: `/p/${encodeURIComponent(projectId)}/history` }, t('nav.history'))) : null)
       : (m.error ? null : h('p', { class: 'msg-extra small faint' }, t('chat.no_changes'))));
@@ -55,6 +76,7 @@ export function chatPanel(ctx, key, { title, examples } = {}) {
   let contextFiles = [];
   let loaded = false;
   let failed = false;
+  const openChanges = new Set();
 
   const scrollDown = () => { list.scrollTop = list.scrollHeight; };
 
@@ -83,7 +105,7 @@ export function chatPanel(ctx, key, { title, examples } = {}) {
           h('button', { type: 'button', class: 'link', onclick: () => { input.value = ex; draft.set(ex); input.focus(); } }, ex)))) : null,
         contextFiles.length ? h('p', { class: 'small faint' }, tn('chat.context', contextFiles.length)) : null));
     } else {
-      mount(list, messages.map((m) => messageNode(projectId, m)));
+      mount(list, messages.map((m) => messageNode(projectId, m, openChanges)));
     }
     paintPending();
     scrollDown();

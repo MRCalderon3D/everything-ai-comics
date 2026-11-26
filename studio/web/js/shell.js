@@ -2,9 +2,9 @@
 // of the comic down the left with what is done, what is next and what waits.
 
 import { h, icon, mount } from '/js/dom.js';
-import { t, tv, getLang, setLang, rememberLanguage, LANGUAGES } from '/js/i18n.js';
-import { api, errorText } from '/js/api.js';
-import { state, bus, getTheme, setTheme, effectiveTheme, refreshOverview } from '/js/store.js';
+import { t, tv, getLang, LANGUAGES } from '/js/i18n.js';
+import { errorText } from '/js/api.js';
+import { state, bus, getTheme, setTheme, effectiveTheme, changeLanguage } from '/js/store.js';
 import { jobsIndicator } from '/js/components/jobs.js';
 import { toast } from '/js/components/toast.js';
 
@@ -14,16 +14,10 @@ let indicator = null;
 let activeScreen = null;
 
 async function chooseLanguage(lang) {
-  rememberLanguage(lang);
-  if (state.projectId) {
-    try {
-      await api.saveSettings(state.projectId, { language: lang });
-      await refreshOverview();
-    } catch (err) {
-      toast(errorText(err), { kind: 'bad' });
-    }
-  } else {
-    setLang(lang);
+  try {
+    await changeLanguage(lang);
+  } catch (err) {
+    toast(errorText(err), { kind: 'bad' });
   }
 }
 

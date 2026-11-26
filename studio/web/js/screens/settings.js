@@ -2,9 +2,9 @@
 // project which AI tool does what.
 
 import { h } from '/js/dom.js';
-import { t, tv, getLang, setLang, rememberLanguage, LANGUAGES } from '/js/i18n.js';
+import { t, tv, getLang, LANGUAGES } from '/js/i18n.js';
 import { api, errorText } from '/js/api.js';
-import { state, loadHealth, getTheme, setTheme, refreshOverview } from '/js/store.js';
+import { state, loadHealth, getTheme, setTheme, refreshOverview, changeLanguage } from '/js/store.js';
 import { screenHead } from '/js/components/bench.js';
 import { panel, selectField, textField, actionButton, notice, radioField } from '/js/components/ui.js';
 import { toolsPanel } from '/js/components/tools.js';
@@ -23,16 +23,10 @@ function interfacePanel(ctx, data) {
     options: LANGUAGES.map((l) => ({ value: l, label: tv('language', l, l) })),
     hint: ctx.projectId ? t('settings.language_project_hint') : t('settings.language_local_hint'),
     onchange: async (value) => {
-      rememberLanguage(value);
-      if (ctx.projectId) {
-        try {
-          await api.saveSettings(ctx.projectId, { language: value });
-          await refreshOverview();
-        } catch (err) {
-          toast(errorText(err), { kind: 'bad' });
-        }
-      } else {
-        setLang(value);
+      try {
+        await changeLanguage(value);
+      } catch (err) {
+        toast(errorText(err), { kind: 'bad' });
       }
     },
   });

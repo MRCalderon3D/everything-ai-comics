@@ -2,7 +2,7 @@
 // jobs and their live log. Screens read it and subscribe to changes.
 
 import { api } from '/js/api.js';
-import { setLang, localLanguage } from '/js/i18n.js';
+import { setLang, getLang, localLanguage, rememberLanguage, onLangChange } from '/js/i18n.js';
 
 export const state = {
   health: null,
@@ -14,6 +14,8 @@ export const state = {
   logs: new Map(),
   connection: 'idle', // idle | connecting | live | lost
   issue: null,
+  /** A language the person chose that the project has not saved yet. */
+  langPending: null,
 };
 
 const listeners = new Map();
@@ -87,19 +89,28 @@ function scheduleOverview() {
 export async function refreshOverview() {
   if (!state.projectId) return null;
   const id = state.projectId;
+  const pendingAtStart = state.langPending;
   const overview = await api.overview(id);
   if (state.projectId !== id) return null;
   state.overview = overview;
   if (!state.issue || !overview.issues.some((i) => i.id === state.issue)) {
     state.issue = overview.first_issue || (overview.issues[0] && overview.issues[0].id) || 'ISS_001';
   }
-  setLang(overview.settings.language);
+  // The project's interface language wins, unless the person just chose
+  // another one and the project has not saved it yet.
+  if (!pendingAtStart && !state.langPending && overview.settings.language !== getLang()) {
+    setLang(overview.settings.language);
+    return state.overview;
+  }
   bus.emit('overview', overview);
   return overview;
 }
 
+let streamLang = null;
+
 function connect(id) {
   if (source) source.close();
+  streamLang = getLang();
   state.connection = 'connecting';
   bus.emit('connection', state.connection);
   source = new EventSource(api.eventsUrl(id));
@@ -188,6 +199,7 @@ export async function openProject(id) {
 export function closeProject() {
   if (source) source.close();
   source = null;
+  streamLang = null;
   clearTimeout(filesTimer);
   clearTimeout(overviewTimer);
   pendingPaths = new Set();
@@ -239,6 +251,43 @@ export function whenJobSettles(jobId) {
     const off = bus.on('job', check);
     check();
   });
+}
+
+// --- language ---------------------------------------------------------------
+
+// The server writes job titles, step labels, summaries and errors in the
+// language each request asks for, and the event stream in the language it was
+// opened with. When the language changes, what the interface holds is asked
+// for again: the overview, the recent jobs, and a new stream.
+onLangChange((lang) => {
+  if (!state.projectId) return;
+  if (source && streamLang !== lang) connect(state.projectId);
+  loadJobs().catch(() => {});
+  refreshOverview().catch(() => {});
+});
+
+/**
+ * The person picks the interface language. It applies at once, so every
+ * request from now on asks for it, and inside a project it is saved there.
+ */
+export async function changeLanguage(lang) {
+  rememberLanguage(lang);
+  if (!state.projectId) {
+    setLang(lang);
+    return;
+  }
+  state.langPending = lang;
+  setLang(lang);
+  try {
+    await api.saveSettings(state.projectId, { language: lang });
+  } catch (err) {
+    // Not saved: the project's own language comes back.
+    state.langPending = null;
+    await refreshOverview().catch(() => {});
+    throw err;
+  }
+  state.langPending = null;
+  await refreshOverview();
 }
 
 // --- theme ------------------------------------------------------------------

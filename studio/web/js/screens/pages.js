@@ -12,7 +12,7 @@ import { docEditor, continuityList } from '/js/components/editor.js';
 import { queueOp } from '/js/components/ask.js';
 import { jobsFor, liveNode, pageQueueState } from '/js/components/jobs.js';
 import { frame } from '/js/components/viewer.js';
-import { verdictChip, markOverrules } from '/js/components/verdict.js';
+import { verdictChip } from '/js/components/verdict.js';
 import { confirmDialog } from '/js/components/dialog.js';
 import { noDrawTool } from '/js/components/handoff.js';
 import { toast } from '/js/components/toast.js';
@@ -22,7 +22,7 @@ import { blockerText } from '/js/screens/home.js';
 export async function load(ctx) {
   const issue = ctx.query.get('issue') || state.issue || 'ISS_001';
   state.issue = issue;
-  return markOverrules(ctx.projectId, await api.issue(ctx.projectId, issue));
+  return api.issue(ctx.projectId, issue);
 }
 
 /** The findings of the mechanical checks of an issue or a page. Errors are always shown. */
@@ -45,7 +45,7 @@ export function mechanicalBox(mech, { quietWhenClean = true } = {}) {
         validation.errors.map((f) => fileItem(f, t('mech.error'))),
         validation.warnings.map((f) => fileItem(f, t('mech.warning'))))
       : null,
-    h('p', { class: 'small' }, t('mech.note')));
+    h('p', { class: 'small' }, mech.note || t('mech.note')));
 }
 
 export function queueLine(pageId) {

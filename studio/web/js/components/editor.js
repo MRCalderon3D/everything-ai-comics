@@ -154,7 +154,7 @@ export function docEditor(ctx, doc, { key, title, form = true, readonly, onSaved
         };
       } else if (err.code === 'yaml_parse' || err.code === 'yaml_empty') {
         const line = err.details && err.details.line;
-        s.result = { error: notice('bad', t('editor.yaml_refused', { message: err.message })) };
+        s.result = { error: notice('bad', errorText(err)) };
         if (line && s.mode === 'file') {
           const lines = area.value.split('\n');
           const start = lines.slice(0, line - 1).join('\n').length + (line > 1 ? 1 : 0);
@@ -216,7 +216,7 @@ export async function showFile(projectId, path) {
       ? h('pre', { class: 'file-view', tabIndex: 0 }, file.text)
       : h('p', { class: 'muted' }, t('editor.file_gone')));
   } catch (err) {
-    dialog.setBody(h('p', { class: 'muted' }, err.code === 'not_text' ? t('editor.not_text') : errorText(err)),
+    dialog.setBody(h('p', { class: 'muted' }, errorText(err)),
       h('p', null, h('a', { href: `/api/projects/${encodeURIComponent(projectId)}/raw/${path.split('/').map(encodeURIComponent).join('/')}`, target: '_blank', rel: 'noopener' }, t('editor.open_raw'))));
   }
 }

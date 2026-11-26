@@ -53,9 +53,7 @@ export function uploader(ctx, { kind = 'image', multiple = true, label, hint, ke
         Object.assign(item, upload, { pending: false });
       } catch (err) {
         items.splice(items.indexOf(item), 1);
-        problem.textContent = `${file.name}: ${err.code === 'unsupported_file' || err.code === 'not_an_image' || err.code === 'not_text'
-          ? (kind === 'image' ? t('upload.bad_image') : t('upload.bad_text'))
-          : errorText(err)}`;
+        problem.textContent = `${file.name}: ${errorText(err)}`;
         problem.hidden = false;
       }
       paint();

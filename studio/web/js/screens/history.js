@@ -1,7 +1,7 @@
 // Everything that was done, newest first: who did it, the files it touched,
 // the images it made. Any point that changed files can be restored.
 
-import { h } from '/js/dom.js';
+import { h, icon, mount } from '/js/dom.js';
 import { t, tn, tv, formatDateTime } from '/js/i18n.js';
 import { api } from '/js/api.js';
 import { state, bus } from '/js/store.js';
@@ -11,7 +11,8 @@ import { confirmDialog } from '/js/components/dialog.js';
 import { showFile } from '/js/components/editor.js';
 import { openViewer } from '/js/components/viewer.js';
 import { toast } from '/js/components/toast.js';
-import { actorName, jobTitle, stepLabel } from '/js/labels.js';
+import { changesView } from '/js/components/diff.js';
+import { actorName } from '/js/labels.js';
 
 const PAGE = 60;
 
@@ -20,18 +21,9 @@ export async function load(ctx) {
   return api.history(ctx.projectId, `?limit=${limit}`);
 }
 
+/** What happened, in the server's words and in the language of the request. */
 function entryTitle(entry) {
-  if (entry.kind === 'step' && entry.op) {
-    const fake = { op: entry.op, params: {}, title: null };
-    const job = state.jobs.get(entry.job) || fake;
-    const title = tv('job', entry.op, null);
-    if (title && entry.step) {
-      const label = stepLabel(Object.assign({}, job, { op: entry.op }), { id: entry.step, label: null });
-      if (label && label !== entry.step) return label === title ? title : `${title}: ${label}`;
-    }
-  }
-  if (entry.kind === 'save' && entry.files && entry.files.length === 1) return t('history.saved_file', { path: entry.files[0].path });
-  return entry.title;
+  return entry.title || entry.op || entry.kind;
 }
 
 async function restore(ctx, entry) {
@@ -53,6 +45,26 @@ async function restore(ctx, entry) {
   const res = result.result;
   toast(res.unchanged ? t('history.restore_unchanged') : tn('history.restored', res.files), { kind: 'ok' });
   ctx.refresh();
+}
+
+/** "What changed": the files of the entry's commit, read when asked for. */
+function changesToggle(ctx, entry) {
+  const open = ctx.ui.changes || (ctx.ui.changes = new Set());
+  const holder = h('div', { class: 'history-changes' });
+  const btn = h('button', { type: 'button', class: 'btn small quiet', 'aria-expanded': String(open.has(entry.id)) });
+  const paint = () => {
+    const shown = open.has(entry.id);
+    btn.setAttribute('aria-expanded', String(shown));
+    mount(btn, icon(shown ? 'down' : 'right'), h('span', null, shown ? t('history.hide_changes') : t('history.show_changes')));
+    if (shown && !holder.firstChild) holder.append(changesView(ctx.projectId, { commit: entry.commit }));
+    holder.hidden = !shown;
+  };
+  btn.addEventListener('click', () => {
+    if (open.has(entry.id)) open.delete(entry.id); else open.add(entry.id);
+    paint();
+  });
+  paint();
+  return h('div', { class: 'stack-s' }, h('div', { class: 'row' }, btn), holder);
 }
 
 function entryRow(ctx, entry, canRestore) {
@@ -78,7 +90,8 @@ function entryRow(ctx, entry, canRestore) {
           f.change === 'deleted' || !/\.(ya?ml|md|txt|fountain)$/i.test(f.path)
             ? h('span', null, f.path)
             : h('button', { type: 'button', class: 'link', onclick: () => showFile(ctx.projectId, f.path) }, f.path)))))
-        : h('p', { class: 'small faint' }, t('history.no_files'))),
+        : h('p', { class: 'small faint' }, t('history.no_files')),
+      entry.commit && files.length ? changesToggle(ctx, entry) : null),
     h('div', { class: 'history-actions' },
       entry.restorable && canRestore
         ? button(t('history.restore'), { kind: 'quiet', small: true, onclick: () => restore(ctx, entry) })
@@ -92,7 +105,7 @@ export function view(ctx, data) {
   const canRestore = data.restore && data.restore.available;
   return h('div', { class: 'screen history' },
     screenHead({ title: t('nav.history'), lede: tn('history.lede', data.total) }),
-    !canRestore ? notice('warn', t('history.no_git')) : h('p', { class: 'muted' }, t('history.restore_intro')),
+    !canRestore ? notice('warn', (data.restore && data.restore.reason) || t('history.no_git')) : h('p', { class: 'muted' }, t('history.restore_intro')),
     data.entries.length
       ? h('ol', { class: 'history-list' }, data.entries.map((e) => entryRow(ctx, e, canRestore)))
       : emptyState(t('history.empty_title'), t('history.empty_body')),

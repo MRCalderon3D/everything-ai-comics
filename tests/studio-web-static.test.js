@@ -10,7 +10,11 @@
  *   exported by it.
  * - Both dictionaries have the same keys and placeholders, and every key the
  *   code uses exists.
- * - Every request the API client makes matches a route of the server.
+ * - Every request the API client makes matches a route of the server, and
+ *   every request and the event stream carry the interface language.
+ * - The sentences the server writes (job titles, step labels, summaries,
+ *   blockers, errors) are shown as the server sends them, not rebuilt from
+ *   their codes with dictionaries of the app's own.
  * - Text from files or from the AI is never parsed as markup.
  */
 
@@ -218,10 +222,8 @@ function checkDictionaries() {
     check_result: ['pass', 'fail', 'not_applicable', 'not_performed'],
     finding_status: ['open', 'fixed', 'accepted'],
     severity: ['blocking', 'minor'],
-    'correction.path': ['edit', 'redraw'],
-    pubformat: ['pdf', 'cbz', 'web', 'images', 'epub'],
-    'publish.blocker': ['no_render', 'render_missing', 'no_review', 'not_passing', 'not_lettered', 'continuity'],
     actor: ['person', 'claude', 'codex', 'studio'],
+    change: ['added', 'modified', 'deleted'],
     check: ['identity', 'cast_count', 'position', 'movement', 'role_causality', 'object_identity', 'object_custody',
       'physical_state', 'wardrobe', 'spatial_logic', 'drawing_clarity', 'lettering', 'page_structure', 'style_fidelity'],
   };
@@ -231,11 +233,41 @@ function checkDictionaries() {
   return { en, es };
 }
 
-function checkOperationsHaveWords(en) {
-  const ops = require('../studio/server/ops');
-  for (const op of ops.catalog()) {
-    assert.ok(`job.${op.name}` in en, `no title in the dictionaries for the operation ${op.name}`);
+/**
+ * The server localizes its own sentences. The app keeps no copy of them: no
+ * dictionary families for job titles, step labels, screen summaries,
+ * blockers, correction paths, presets, page sizes or the server's error
+ * codes, and the code shows the server's fields.
+ */
+function checkServerTextNotRebuilt(en) {
+  const families = ['job.project.', 'job.pages.generate', 'job.page.', 'job.cover.', 'step.', 'summary.', 'blocker.',
+    'publish.blocker.', 'correction.path.', 'preset.', 'page_size.', 'pubformat.'];
+  for (const key of Object.keys(en)) {
+    assert.ok(!families.some((f) => key.startsWith(f)), `en.js keeps "${key}", a sentence the server now writes`);
   }
+  const serverCodes = Object.keys(require('../studio/server/i18n-text.js').en || {})
+    .filter((k) => k.startsWith('error.')).filter((k) => k !== 'error.other');
+  const local = ['error.offline', 'error.http', 'error.not_found_title', 'error.screen_title', 'error.no_such_screen'];
+  for (const key of serverCodes) {
+    if (local.includes(key)) continue;
+    assert.ok(!(key in en), `en.js words the server error ${key}; show the server's message instead`);
+  }
+  const api = code(read(path.join(WEB, 'js', 'api.js')));
+  assert.ok(!/has\(`error\./.test(api), 'api.js rebuilds error messages from their codes');
+  const labels = code(read(path.join(WEB, 'js', 'labels.js')));
+  assert.ok(/job\.title/.test(labels) && /step\.label/.test(labels), 'labels.js does not use the job title and step label the server sends');
+  const home = code(read(path.join(WEB, 'js', 'screens', 'home.js')));
+  assert.ok(/s\.summary/.test(home) && /b\.message/.test(home), 'home.js does not show the summaries and blockers the server sends');
+  // Overrules are data on the summaries: no sentence matching, no fetch per page.
+  for (const file of jsFiles) {
+    const text = code(read(file));
+    assert.ok(!/Overruled by the person/.test(text), `${rel(file)}: looks for an overrule in the text of a review`);
+    assert.ok(!/markOverrules/.test(text), `${rel(file)}: fetches every page to find overrules`);
+  }
+  // The web reader is the real one, in a sandboxed frame.
+  const publish = code(read(path.join(WEB, 'js', 'screens', 'publish.js')));
+  assert.ok(/'iframe'/.test(publish) && /sandbox:\s*'allow-scripts'/.test(publish), 'publish.js does not frame the web reader with sandbox="allow-scripts"');
+  assert.ok(!/DOMParser/.test(publish), 'publish.js parses the reader instead of showing it');
 }
 
 function checkApiClient() {
@@ -257,7 +289,17 @@ function checkApiClient() {
       const match = router.match(method, url);
       assert.ok(match && match.route, `api.js calls ${method} ${url}, which the server does not route`);
     }
-    assert.ok(/eventsUrl:\s*\(id\)\s*=>\s*`\$\{project\(id\)\}\/events`/.test(text), 'api.js has no events URL');
+    for (const route of ['/diff', '/history', '/approve/page']) {
+      assert.ok(calls.some(([, , raw]) => raw.includes(`${route}`)), `api.js does not call ${route}`);
+    }
+    // The history and the chat show files as they were at a commit through
+    // the before_url and after_url of a diff.
+    assert.ok(router.match('GET', '/api/projects/the-night-ferry/at/0123abc/raw/story/story-bible.yaml'), 'the server has no file-at-a-commit route');
+    const diff = code(read(path.join(WEB, 'js', 'components', 'diff.js')));
+    assert.ok(/before_url/.test(diff) && /after_url/.test(diff), 'diff.js does not use before_url and after_url');
+    // Every request asks for the interface language, the stream too.
+    assert.ok(/path = withLang\(path\)/.test(text) && /lang=\$\{encodeURIComponent\(getLang\(\)\)\}/.test(text), 'api.js requests do not carry ?lang=');
+    assert.ok(/eventsUrl:\s*\(id\)\s*=>\s*withLang\(`\$\{project\(id\)\}\/events`\)/.test(text), 'the events URL does not carry ?lang=');
     assert.ok(router.match('GET', '/api/projects/x/events'), 'the server has no events route');
   } finally {
     app.services.events.close();
@@ -300,7 +342,7 @@ function main() {
   checkImports();
   checkScreens();
   const { en } = checkDictionaries();
-  checkOperationsHaveWords(en);
+  checkServerTextNotRebuilt(en);
   checkApiClient();
   checkEventTypes();
   checkSafety();

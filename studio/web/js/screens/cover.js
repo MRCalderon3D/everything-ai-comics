@@ -27,10 +27,11 @@ export async function load(ctx) {
   return { issue, cover, repairLimit };
 }
 
-function createForm(ctx, issue, canDraw, existing) {
+/** A new cover: from a description, or proposed by the AI when it is left empty. */
+function createForm(ctx, issue, canDraw) {
   const about = textField({
     label: t('cover.describe'), multiline: true, rows: 4, optional: true, draft: ctx.draft('cover'),
-    value: existing || '', hint: t('cover.describe_hint'), placeholder: t('cover.describe_placeholder'),
+    hint: t('cover.describe_hint'), placeholder: t('cover.describe_placeholder'),
   });
   const go = async () => {
     await queueOp('cover.create', { issue, description: about.value.trim() || undefined, draw: canDraw });
@@ -41,6 +42,40 @@ function createForm(ctx, issue, canDraw, existing) {
     h('div', { class: 'row' },
       actionButton(canDraw ? t('cover.make') : t('cover.write_only'), go, { kind: 'primary' }),
       canDraw ? h('span', { class: 'small muted' }, t('style.draw_time')) : null));
+}
+
+/**
+ * A cover that exists: draw it again exactly as its text says (the server
+ * then writes nothing), or rewrite it from a new description and draw that.
+ */
+function againPanel(ctx, issue, canDraw, why, drawn) {
+  const drawAgain = h('section', { class: 'stack-s' },
+    h('h3', null, drawn ? t('cover.again_title') : t('cover.draw_title')),
+    h('p', { class: 'muted' }, drawn ? t('cover.again_body') : t('cover.draw_body')),
+    why,
+    h('div', { class: 'row' },
+      actionButton(drawn ? t('cover.draw_again') : t('cover.draw_now'), () => queueOp('cover.create', { issue }),
+        { kind: 'primary', disabled: !canDraw }),
+      canDraw ? h('span', { class: 'small muted' }, t('style.draw_time')) : null));
+  const about = textField({
+    label: t('cover.new_description'), multiline: true, rows: 4, draft: ctx.draft('cover-rewrite'),
+    hint: canDraw ? t('cover.rewrite_hint') : t('cover.rewrite_hint_no_draw'), placeholder: t('cover.describe_placeholder'),
+  });
+  const rewrite = async () => {
+    const text = about.value.trim();
+    if (!text) {
+      about.input.focus();
+      toast(t('form.write_first'), { kind: 'warn' });
+      return;
+    }
+    await queueOp('cover.create', { issue, description: text, draw: canDraw });
+    about.clear();
+  };
+  const rewriteForm = h('form', { class: 'stack-s', onsubmit: (e) => e.preventDefault() },
+    h('h3', null, t('cover.rewrite_title')),
+    about.el,
+    h('div', { class: 'row' }, actionButton(canDraw ? t('cover.rewrite') : t('cover.rewrite_only'), rewrite)));
+  return h('div', { class: 'stack' }, drawAgain, rewriteForm);
 }
 
 export function view(ctx, { issue, cover, repairLimit }) {
@@ -66,7 +101,6 @@ export function view(ctx, { issue, cover, repairLimit }) {
   const shown = renders.find((r) => r.id === shownId) || null;
   const items = renders.map((r) => ({ id: r.id, label: versionName(r.id), image: r.lettered || r.image, alt: `${t('cover.name')}, ${versionName(r.id)}` }));
   const approved = cover.status === 'approved' && cover.approved_render;
-  const concept = cover.cover && cover.cover.data ? cover.cover.data.concept : '';
 
   const flagged = !!current && outcomeOf(current.review) === 'flagged';
   const correctFinding = async (finding) => {
@@ -100,10 +134,7 @@ export function view(ctx, { issue, cover, repairLimit }) {
         { id: 'text', label: t('cover.tab_text'), render: () => docEditor(ctx, cover.cover, { key: 'cover', title: t('cover.text_title') }) },
         {
           id: 'again', label: current ? t('cover.tab_again') : t('cover.tab_draw'),
-          render: () => h('div', { class: 'stack-s' },
-            h('p', { class: 'muted' }, current ? t('cover.again_body') : t('cover.draw_body')),
-            why,
-            createForm(ctx, issue, canDraw, concept)),
+          render: () => againPanel(ctx, issue, canDraw, why, !!current),
         },
       ], { label: t('screen.cover') })));
 
@@ -133,7 +164,8 @@ export function view(ctx, { issue, cover, repairLimit }) {
           const r = renders.find((x) => x.id === it.id);
           return Object.assign({}, it, { badge: r && r.review ? verdictWords(r.review) : t('verdict.none') });
         }), (shown || current).id, (id) => { ctx.ui.version = id; ctx.refresh(); }) : null)
-      : h('div', { class: 'art-empty' }, h('h2', null, t('cover.not_drawn_title')), h('p', null, t('cover.not_drawn_body'))),
+      : h('div', { class: 'art-empty' }, h('h2', null, t('cover.not_drawn_title')), h('p', null, t('cover.not_drawn_body')),
+        canDraw ? h('div', { class: 'row' }, actionButton(t('cover.draw_now'), () => queueOp('cover.create', { issue }), { kind: 'primary' })) : null),
     decision,
     last,
     lookOk && (!draw.available || ctx.ui.manual)

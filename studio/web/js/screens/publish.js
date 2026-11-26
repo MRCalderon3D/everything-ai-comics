@@ -2,18 +2,18 @@
 // a final one, download each file, open the web reader. With overlay
 // lettering the browser flattens each page and sends the image back.
 
-import { h, nextId } from '/js/dom.js';
+import { h, icon, nextId } from '/js/dom.js';
 import { t, tn, tv, formatBytes, formatDate } from '/js/i18n.js';
 import { api, errorText } from '/js/api.js';
 import { state } from '/js/store.js';
 import { screenHead, bench } from '/js/components/bench.js';
-import { panel, actionButton, notice, emptyState } from '/js/components/ui.js';
+import { panel, actionButton, button, notice, emptyState } from '/js/components/ui.js';
 import { queueOp } from '/js/components/ask.js';
 import { jobsFor } from '/js/components/jobs.js';
 import { openViewer } from '/js/components/viewer.js';
+import { openDialog } from '/js/components/dialog.js';
 import { toast } from '/js/components/toast.js';
 import { pageName, versionName } from '/js/labels.js';
-import { has } from '/js/i18n.js';
 
 export async function load(ctx) {
   const issue = state.issue || 'ISS_001';
@@ -85,29 +85,33 @@ function letteringPanel(ctx, data) {
 }
 
 /**
- * Read a built web edition inside the studio. The page list comes from the
- * reader's own index.html, so what is shown is what the edition ships. The
- * reader itself is not framed: the server sends it sandboxed, and its images
- * are then refused by the same server (see the report of the web agent).
+ * Read a built web edition: the reader itself, in a sandboxed frame (the
+ * server serves it sandboxed too, and its page images load inside that
+ * sandbox), with a link that opens it in a tab of its own.
  */
-async function readEdition(exp, title) {
-  const res = await fetch(exp.url);
-  if (!res.ok) throw new Error(t('publish.file_missing'));
-  const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
-  const base = new URL(exp.url, location.href);
-  const items = [...doc.querySelectorAll('img[src]')].map((img, index) => {
-    const url = new URL(img.getAttribute('src'), base);
-    return {
-      id: String(index),
-      label: img.getAttribute('alt') || String(index + 1),
-      image: { url: url.pathname + url.search, width: Number(img.getAttribute('width')) || null, height: Number(img.getAttribute('height')) || null },
-    };
+function readEdition(exp, title) {
+  // The sandbox is set before the address, so the reader never loads without it.
+  const frameEl = h('iframe', {
+    sandbox: 'allow-scripts', referrerpolicy: 'no-referrer',
+    class: 'reader-frame', title: t('publish.reader_frame', { title }), src: exp.url,
   });
-  if (!items.length) throw new Error(t('publish.reader_empty'));
-  openViewer(items, '0', { title });
+  openDialog({
+    title,
+    wide: true,
+    body: h('div', { class: 'reader stack-s' },
+      h('div', { class: 'row spread' },
+        h('p', { class: 'small muted' }, t('publish.reader_hint')),
+        readerTabLink(exp)),
+      frameEl),
+  });
 }
 
-function editionCard(ed) {
+function readerTabLink(exp, { small = true } = {}) {
+  return h('a', { class: `btn quiet${small ? ' small' : ''}`, href: exp.url, target: '_blank', rel: 'noopener' },
+    icon('open'), h('span', null, t('publish.reader_tab')));
+}
+
+function editionCard(ed, formatLabel) {
   const draft = ed.status === 'draft';
   return h('li', { class: 'edition', dataset: { status: ed.status } },
     h('div', { class: 'row spread' },
@@ -118,14 +122,15 @@ function editionCard(ed) {
     ed.changes && ed.changes.length ? h('ul', { class: 'bullets small' }, ed.changes.map((c) => h('li', null, typeof c === 'string' ? c : JSON.stringify(c)))) : null,
     ed.exports && ed.exports.length
       ? h('ul', { class: 'export-list' }, ed.exports.map((exp) => {
-        const label = tv('pubformat', exp.format, exp.format);
+        const label = formatLabel(exp.format);
         return h('li', null,
           h('span', { class: 'grow' }, h('strong', null, label),
             exp.draft ? h('span', { class: 'draft-mark' }, ` ${t('publish.draft_mark')}`) : null,
             h('span', { class: 'faint small' }, exp.exists ? ` ${formatBytes(exp.bytes)}` : ` ${t('publish.file_missing')}`)),
           exp.exists && exp.browsable
-            ? actionButton(t('publish.open_reader'), () => readEdition(exp, ed.title || ed.id), { small: true })
+            ? button(t('publish.open_reader'), { small: true, onclick: () => readEdition(exp, ed.title || ed.id) })
             : null,
+          exp.exists && exp.browsable ? readerTabLink(exp) : null,
           exp.exists && exp.download_url
             ? h('a', { class: 'btn small', href: exp.download_url, download: '' }, t('action.download'))
             : null);
@@ -152,7 +157,7 @@ export function view(ctx, data) {
       const box = h('input', { type: 'checkbox', id, checked: chosen.has(f.id) });
       box.addEventListener('change', () => { if (box.checked) chosen.add(f.id); else chosen.delete(f.id); });
       return h('div', { class: 'check' }, box, h('div', null,
-        h('label', { for: id }, tv('pubformat', f.id, f.label)),
+        h('label', { for: id }, f.label || f.id),
         h('p', { class: 'hint' }, tv('pubformat_hint', f.id, ''))));
     }));
 
@@ -165,6 +170,7 @@ export function view(ctx, data) {
   };
 
   const blockers = ready.blockers || [];
+  const formatLabel = (id) => (data.formats.find((f) => f.id === id) || {}).label || id;
   const text = h('div', { class: 'stack' },
     jobsFor((j) => j.op === 'publish.build' || j.op === 'lettering.apply'),
     h('section', { class: `panel stack-s readiness ${ready.final_possible ? 'ok' : 'wait'}` },
@@ -175,9 +181,9 @@ export function view(ctx, data) {
           h('ul', { class: 'blockers' }, blockers.map((b) => h('li', null,
             b.page ? h('a', { href: `${base}/${b.code === 'continuity' ? 'pages' : 'check'}/${b.page}` }, pageName(b.page)) : null,
             b.page ? ': ' : '',
-            has(`publish.blocker.${b.code}`) ? t(`publish.blocker.${b.code}`) : b.message))))
+            b.message || b.code))))
         : h('p', { class: 'muted' }, t('publish.no_blockers')),
-      h('p', { class: 'small muted' }, t('publish.final_meaning'))),
+      h('p', { class: 'small muted' }, ready.note || t('publish.final_meaning'))),
     data.lettering.mode === 'overlay' ? letteringPanel(ctx, data) : null,
     panel(t('publish.build_title'),
       formatBoxes,
@@ -204,7 +210,7 @@ export function view(ctx, data) {
     h('section', { class: 'stack-s' },
       h('h2', { class: 'panel-title' }, t('publish.editions_title')),
       data.editions.length
-        ? h('ul', { class: 'edition-list' }, data.editions.map(editionCard))
+        ? h('ul', { class: 'edition-list' }, data.editions.map((ed) => editionCard(ed, formatLabel)))
         : h('p', { class: 'muted' }, t('publish.no_editions'))));
 
   return h('div', { class: 'screen' },

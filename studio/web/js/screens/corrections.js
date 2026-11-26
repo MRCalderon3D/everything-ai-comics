@@ -10,13 +10,13 @@ import { panel, emptyState, notice } from '/js/components/ui.js';
 import { queueOp } from '/js/components/ask.js';
 import { jobsFor } from '/js/components/jobs.js';
 import { correction, lastCorrection } from '/js/components/correction.js';
-import { approveRender, verdictChip, markOverrules } from '/js/components/verdict.js';
+import { approveRender, verdictChip } from '/js/components/verdict.js';
 import { pageName, versionName } from '/js/labels.js';
 import { pageStrip } from '/js/screens/check.js';
 
 export async function load(ctx) {
   const issueId = state.issue || 'ISS_001';
-  const issue = await markOverrules(ctx.projectId, await api.issue(ctx.projectId, issueId));
+  const issue = await api.issue(ctx.projectId, issueId);
   const wanted = ctx.params.page
     || (issue.pages.find((p) => p.flagged) || issue.pages.find((p) => p.current_render) || issue.pages[0] || {}).id;
   const page = wanted ? await api.page(ctx.projectId, wanted) : null;
@@ -60,7 +60,7 @@ export function view(ctx, { issue, page }) {
   const box = correction(ctx, {
     key: page.id,
     render: current,
-    panels: page.plan.panels.map((p) => ({ id: p.id, number: p.number, moment: p.moment })),
+    panels: page.plan.panels.map((p) => ({ id: p.id, number: p.number, moment: p.moment, slot: p.slot || null })),
     repairLimit: page.repair_limit,
     send: (params) => queueOp('page.correct', Object.assign({ page: page.id }, params)),
   });
