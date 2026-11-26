@@ -1,0 +1,45 @@
+page: PG_001_001
+render: PG_001_001_V01
+canvas: { width_px: 400, height_px: 600 }
+font:
+  family: Comic Neue
+  size_px: 12
+  line_height: 1.15
+elements:
+  - id: L01
+    panel: PN_001_001_01
+    type: caption
+    text: Last crossing of the night.
+    box: { x: 16, y: 16, width: 240, height: 24 }
+    shape: rect
+    tail: null
+    style: { fill: "#FFFFFF", stroke: "#000000", text: "#000000" }
+  - id: L02
+    panel: PN_001_001_02
+    type: balloon
+    text: "Who's there? <Answer> & be quick."
+    box: { x: 20, y: 200, width: 170, height: 80 }
+    shape: ellipse
+    tail: { x: 120, y: 320 }
+  - id: L03
+    panel: PN_001_001_02
+    type: thought
+    text: Rats don't cough.
+    box: { x: 30, y: 300, width: 150, height: 70 }
+    shape: cloud
+    tail: { x: 150, y: 395 }
+  - id: L04
+    panel: PN_001_001_03
+    type: sfx
+    text: Thunk
+    box: { x: 230, y: 230, width: 140, height: 50 }
+    shape: none
+    tail: null
+    style: { fill: "#FFFFFF", stroke: "#000000", text: "#C0392B" }
+  - id: L05
+    panel: PN_001_001_04
+    type: shout
+    text: Out. Now!
+    box: { x: 200, y: 420, width: 180, height: 110 }
+    shape: burst
+    tail: { x: 190, y: 560 }

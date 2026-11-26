@@ -1,0 +1,22 @@
+page: PG_001_001
+render: PG_001_001_V01
+supersedes: null
+reviewer: visual-reviewer
+independent: true
+compared_against:
+  references: []
+  neighbors: []
+checks:
+  identity: { result: pass, evidence: "Mara's cropped grey hair and broken nose read in panels 2 and 4." }
+  page_structure: { result: pass, evidence: "Four panels in the planned 1 / 2 / 1 grid." }
+findings: []
+gates:
+  style_fidelity: pass
+  narrative_continuity: pass
+verdict: pass
+repair_cycle: 0
+reviewed_at: "2026-11-26"
+human_approval:
+  status: pending
+  by: null
+  at: null

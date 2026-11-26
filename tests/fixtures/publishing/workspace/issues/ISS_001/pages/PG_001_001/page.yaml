@@ -1,0 +1,109 @@
+id: PG_001_001
+issue: ISS_001
+number: 1
+scene: SC_001_01
+side: right
+spread_with: null
+purpose: Establish the ferry, Mara alone, and the sound that breaks the routine.
+page_turn: reveal
+layout:
+  grid: three tiers, 1 / 2 / 1
+  tiers: [1, 2, 1]
+  reading_order: [1, 2, 3, 4]
+panels:
+  - id: PN_001_001_01
+    order: 1
+    tier: 1
+    size: wide
+    framing:
+      shot_size: extreme_wide
+      angle: high_angle
+      view: three_quarter
+    moment: The ferry crosses dark water with one shielded lamp lit.
+    location: LOC_FERRY_DECK
+    transition_in: null
+    cast: []
+    lettering:
+      - id: L01
+        type: caption
+        speaker: null
+        text: Last crossing of the night.
+        order: 1
+  - id: PN_001_001_02
+    order: 2
+    tier: 2
+    size: medium
+    framing:
+      shot_size: medium
+      angle: eye_level
+      view: profile
+    moment: Mara steers with one hand and turns her head toward the deck.
+    location: LOC_FERRY_DECK
+    transition_in: subject
+    cast:
+      - character: CHAR_MARA
+        position: { level: wheelhouse, side: right, landmark: null }
+        facing: left
+        action: Steers with one hand.
+        wardrobe: WARD_MARA_OILSKIN
+        state: []
+        holding: []
+    lettering:
+      - id: L02
+        type: balloon
+        speaker: CHAR_MARA
+        text: "Who's there? <Answer> & be quick."
+        order: 2
+      - id: L03
+        type: thought
+        speaker: CHAR_MARA
+        text: Rats don't cough.
+        order: 3
+  - id: PN_001_001_03
+    order: 3
+    tier: 2
+    size: medium
+    framing:
+      shot_size: insert
+      angle: eye_level
+    moment: A lashed crate shifts against its rope.
+    location: LOC_FERRY_DECK
+    transition_in: subject
+    cast: []
+    lettering:
+      - id: L04
+        type: sfx
+        speaker: null
+        text: Thunk
+        order: 4
+  - id: PN_001_001_04
+    order: 4
+    tier: 3
+    size: wide
+    framing:
+      shot_size: wide
+      angle: low_angle
+      view: front
+    moment: Mara at the top of the ladder, lamp behind her, looking down at the crates.
+    location: LOC_FERRY_DECK
+    transition_in: action
+    cast:
+      - character: CHAR_MARA
+        position: { level: wheelhouse, side: right, landmark: ladder }
+        facing: left
+        action: Stands at the ladder head.
+        wardrobe: WARD_MARA_OILSKIN
+        state: []
+        holding: []
+    lettering:
+      - id: L05
+        type: shout
+        speaker: CHAR_MARA
+        text: Out. Now!
+        order: 5
+continuity:
+  enters_from: null
+  exits_to: PG_001_002
+  attach_previous_render: false
+status: reviewed
+current_render: PG_001_001_V01

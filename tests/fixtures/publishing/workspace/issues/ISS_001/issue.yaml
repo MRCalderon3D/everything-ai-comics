@@ -1,0 +1,9 @@
+id: ISS_001
+number: 1
+title: Crossing
+summary: Mara finds Oskar and decides not to hand him over.
+scenes: [SC_001_01]
+page_count: 3
+panel_count: 9
+opens_from: null
+status: production

@@ -1,0 +1,97 @@
+id: PG_001_002
+issue: ISS_001
+number: 2
+scene: SC_001_01
+side: left
+spread_with: null
+purpose: Mara comes down to the deck and finds the boy behind the crates.
+page_turn: continuation
+layout:
+  grid: two tiers, 2 / 2
+  tiers: [2, 2]
+  reading_order: [1, 2, 3, 4]
+panels:
+  - id: PN_001_002_01
+    order: 1
+    size: medium
+    framing:
+      shot_size: full
+      angle: eye_level
+    moment: Mara climbs down the ladder.
+    location: LOC_FERRY_DECK
+    transition_in: action
+    cast:
+      - character: CHAR_MARA
+        position: { level: deck, side: right, landmark: ladder }
+        action: Climbs down the ladder.
+        wardrobe: WARD_MARA_OILSKIN
+        state: []
+        moved: Down the ladder from the wheelhouse.
+    lettering: []
+  - id: PN_001_002_02
+    order: 2
+    size: medium
+    framing:
+      shot_size: medium
+      angle: eye_level
+    moment: Mara lifts the flare gun from its bracket.
+    location: LOC_FERRY_DECK
+    transition_in: action
+    cast:
+      - character: CHAR_MARA
+        position: { level: deck, side: right, landmark: ladder }
+        action: Takes the flare gun.
+        wardrobe: WARD_MARA_OILSKIN
+        state: []
+        holding: [PROP_FLARE_GUN]
+    lettering: []
+  - id: PN_001_002_03
+    order: 3
+    size: medium
+    framing:
+      shot_size: medium_close_up
+      angle: high_angle
+    moment: Oskar crouches behind the crates, holding his cut left hand.
+    location: LOC_FERRY_DECK
+    transition_in: subject
+    cast:
+      - character: CHAR_OSKAR
+        position: { level: deck, side: left, landmark: crates }
+        action: Crouches, cradling his hand.
+        wardrobe: WARD_OSKAR_HOODED
+        state: [cut_left_hand]
+    lettering:
+      - id: L01
+        type: balloon
+        speaker: CHAR_OSKAR
+        text: Please.
+        order: 1
+  - id: PN_001_002_04
+    order: 4
+    size: medium
+    framing:
+      shot_size: wide
+      angle: eye_level
+    moment: Mara lowers the gun.
+    location: LOC_FERRY_DECK
+    transition_in: action
+    cast:
+      - character: CHAR_MARA
+        position: { level: deck, side: left, landmark: crates }
+        action: Lowers the flare gun.
+        wardrobe: WARD_MARA_OILSKIN
+        state: []
+        holding: [PROP_FLARE_GUN]
+      - character: CHAR_OSKAR
+        off_panel: true
+        position: { level: deck, side: left, landmark: crates }
+        action: Stays crouched.
+        wardrobe: WARD_OSKAR_HOODED
+        state: [cut_left_hand]
+    lettering: []
+continuity:
+  enters_from: PG_001_001
+  exits_to: PG_001_003
+  attach_previous_render: true
+status: reviewed
+current_render: PG_001_002_V02

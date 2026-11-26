@@ -1,0 +1,31 @@
+id: PG_001_003
+issue: ISS_001
+number: 3
+scene: SC_001_01
+side: right
+spread_with: null
+purpose: The patrol launch appears astern and the choice becomes urgent.
+page_turn: cliffhanger
+layout:
+  grid: one splash
+  tiers: [1]
+  reading_order: [1]
+panels:
+  - id: PN_001_003_01
+    order: 1
+    tier: 1
+    size: splash
+    framing:
+      shot_size: extreme_wide
+      angle: low_angle
+    moment: A searchlight sweeps the river behind the ferry.
+    location: LOC_FERRY_DECK
+    transition_in: scene
+    cast: []
+    lettering: []
+continuity:
+  enters_from: PG_001_002
+  exits_to: null
+  attach_previous_render: true
+status: reviewed
+current_render: PG_001_003_V01
