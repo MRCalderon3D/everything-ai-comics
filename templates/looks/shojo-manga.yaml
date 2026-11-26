@@ -1,0 +1,55 @@
+# LOOK preset: shojo manga. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+# Reading direction is not part of a look: set reading_direction in project.yaml.
+
+id: LOOK_SHOJO_MANGA_V01
+name: Shōjo manga
+intent: "Romance, friendship, and coming-of-age stories told through feeling. Use it when a glance or a silence should fill a page and the layout itself carries the emotion."
+status: draft
+
+line: "Very fine, light pen line with delicate tapering. Long flowing hair drawn as many thin strands. Slender figures."
+inking: "Little solid black: pupils, some hair, a dark coat. Fine hatching lines on cheeks for blushes."
+tone: "Light screentone greys, gradient tone in backgrounds, decorative tones (flowers, bubbles, sparkles, soft light dots) placed behind emotional moments."
+color_mode: monochrome
+palette: []
+rendering: "Large, detailed eyes with several highlights, small nose and mouth, tall slender figures. Backgrounds often dissolve into pattern or white space. Close-ups and full-body fashion shots alternate."
+lettering_style: "Sentence case in soft oval balloons. Interior thoughts set free on the page without a balloon. Small hand-drawn sound effects and emotive marks."
+
+style_block: |
+  Black-and-white shojo manga page.
+  Line: very fine light pen line with delicate tapering, long hair in many thin strands, slender figures.
+  Blacks and shadow: minimal solid black, fine hatched blush lines on cheeks.
+  Tone: light screentone greys, gradient tone backgrounds, decorative flower, bubble, and sparkle tones behind emotional moments.
+  Color: black ink and dot tone on white paper.
+  Rendering: large detailed eyes with several highlights, small nose and mouth, tall slender figures, backgrounds dissolving into pattern.
+  Panels: overlapping and borderless panels, full-height figures running down the page outside the panels, wide white space.
+  Lettering: sentence-case text in soft oval balloons, unballooned interior monologue floating on the page.
+
+prompt_vocabulary:
+  - fine delicate pen line
+  - decorative flower and sparkle screentone
+  - large detailed eyes with highlights
+  - borderless overlapping panels
+  - full-height figure outside the panels
+  - soft gradient tone
+  - floating interior monologue
+
+negative_vocabulary:
+  - heavy brush blacks
+  - thick outlines
+  - gritty texture
+  - muscular action anatomy
+  - color
+  - dense cross-hatching
+  - rigid regular grid
+
+drift_risks:
+  - "Screentone turns into soft grey airbrush or watercolor."
+  - "Eyes and face shapes become generic, and adult characters start to look like teenagers."
+  - "Decorative tones spread to every panel, not only the emotional beats."
+  - "Borderless layouts collapse into a regular grid."
+
+pairs_with:
+  comic_formats: [paged, webtoon]
+  publications: [ongoing, miniseries, webtoon-series]
+  typical_genres: [romance, drama, slice of life, fantasy]

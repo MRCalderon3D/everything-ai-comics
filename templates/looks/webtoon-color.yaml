@@ -1,0 +1,58 @@
+# LOOK preset: full-color webtoon. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+
+id: LOOK_WEBTOON_COLOR_V01
+name: Full-color webtoon
+intent: "Serial stories read on a phone, one scroll per episode: romance, fantasy, school, thriller. Use it when the comic is made for vertical reading and has to look polished in color every week."
+status: draft
+
+line: "Clean digital line, thin and even with slight taper. Closed contours suitable for flat fill."
+inking: "Black used sparingly: hair shadows, pupils, night. Line color sometimes tinted darker than the fill instead of black."
+tone: "Soft cel shading with one shadow step, a gentle airbrushed gradient on skin and sky, a bright rim or bloom on light sources."
+color_mode: full_color
+palette:
+  - "clean pastel-to-mid local colors, one per character outfit"
+  - "warm peach skin with a rose-pink shadow step"
+  - "background colors desaturated and slightly blurred behind figures"
+  - "one glow color for lamps, screens, or magic"
+rendering: "Attractive, slightly stylised faces with big expressive eyes and simple noses. Figures large in frame; backgrounds painted, photo-like, or a soft gradient. Mood shifts through background color more than through line."
+lettering_style: "Digital sentence case in white rounded balloons with a thin outline, kept short for small screens. Narration in semi-transparent boxes. Sound effects in color, integrated into the art."
+
+style_block: |
+  Full-color vertical scroll webtoon panel art.
+  Line: clean thin digital line with slight taper, closed contours.
+  Blacks and shadow: black used sparingly for hair shadow, pupils, and night; line sometimes tinted darker than the fill.
+  Tone: soft cel shading with one shadow step, gentle gradient on skin and sky, bloom on light sources.
+  Color: clean pastel-to-mid local colors, peach skin with rose-pink shadow, desaturated soft-focus backgrounds, one glow color.
+  Rendering: attractive stylised faces with big expressive eyes, large figures in frame, soft painted or gradient backgrounds.
+  Panels: borderless or thin-bordered panels stacked vertically with wide white or colored space between beats, one panel across the width at a time.
+  Lettering: short digital sentence-case lines in white rounded balloons, narration in semi-transparent boxes, colored sound effects.
+
+prompt_vocabulary:
+  - full-color webtoon
+  - clean thin digital line
+  - soft cel shading
+  - pastel local colors
+  - soft-focus background
+  - vertical scroll panel spacing
+  - bloom light
+
+negative_vocabulary:
+  - halftone dots
+  - screentone
+  - heavy black ink
+  - cross-hatching
+  - dense multi-panel grid
+  - rough paper texture
+  - muddy desaturated color
+
+drift_risks:
+  - "Cel shading turns into heavy airbrush and the figures look like glossy 3D renders."
+  - "Characters converge on one generic pretty face, so the recurring character is harder to tell apart."
+  - "Panels pack into a paged grid when the frame is portrait, losing the scroll rhythm."
+  - "Outfit colors shift slightly between episodes."
+
+pairs_with:
+  comic_formats: [webtoon]
+  publications: [webtoon-series]
+  typical_genres: [romance, fantasy, school, thriller, drama]

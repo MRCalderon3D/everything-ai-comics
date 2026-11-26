@@ -1,0 +1,54 @@
+# LOOK preset: horror scratch and wash. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+
+id: LOOK_HORROR_SCRATCH_WASH_V01
+name: Horror scratch and wash
+intent: "Horror, ghost stories, and dread that builds slowly. Use it when the page should feel unsettled before anything happens, and darkness should seep rather than fall."
+status: draft
+
+line: "Scratchy, nervous nib line, broken and repeated, as if drawn in a hurry. Contours fray into loose strokes."
+inking: "Black ink washes pooled in corners and behind figures, splatter and dry-brush scrapes. No clean spotted blacks."
+tone: "Diluted ink washes in three or four greys, with blooms and hard drying edges. Paper texture shows in the pale washes."
+color_mode: monochrome
+palette: []
+rendering: "Realistic figures with slightly elongated, gaunt faces. Deep shadows swallow the edges of the panel. Eyes and hands get the detail; what scares stays half-seen."
+lettering_style: "Hand-lettered upper case, slightly shaky. Balloons with a thin uneven outline, captions in off-white boxes with a torn edge. Sound effects scratched into the art."
+
+style_block: |
+  Black-and-white horror comic page in scratchy pen with grey ink wash.
+  Line: scratchy nervous nib line, broken and repeated strokes, contours fraying into loose marks.
+  Blacks and shadow: black ink washes pooling in corners and behind figures, splatter and dry-brush scrapes, no clean spotted blacks.
+  Tone: diluted ink washes in three or four greys, with blooms and hard drying edges, paper texture in the pale washes.
+  Color: black ink and grey wash on off-white paper.
+  Rendering: realistic slightly gaunt figures, darkness eating the panel edges, detail on eyes and hands, threats left half-seen.
+  Panels: irregular panels with thin shaky borders, some panels bleeding into darkness, off-white gutters.
+  Lettering: slightly shaky hand-lettered upper case in thin uneven balloons, torn-edge off-white captions.
+
+prompt_vocabulary:
+  - scratchy nib pen line
+  - grey ink wash with blooms
+  - ink splatter and dry-brush scrapes
+  - darkness pooling at panel edges
+  - gaunt realistic faces
+  - half-seen shapes
+  - shaky hand lettering
+
+negative_vocabulary:
+  - clean confident line
+  - flat digital grey
+  - bright color
+  - cartoon proportions
+  - even lighting
+  - screentone
+  - glossy rendering
+
+drift_risks:
+  - "Washes turn into flat digital grey fills or smooth gradients."
+  - "The scratchy line cleans up into a confident inked contour."
+  - "Pages darken overall until faces and hands stop reading."
+  - "The recurring character becomes more gaunt and monstrous from page to page without the story asking for it."
+
+pairs_with:
+  comic_formats: [paged, webtoon]
+  publications: [one-shot, miniseries, graphic-novel]
+  typical_genres: [horror, ghost story, thriller, gothic]

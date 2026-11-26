@@ -1,0 +1,54 @@
+# LOOK preset: woodcut and linocut. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+
+id: LOOK_WOODCUT_PRINT_V01
+name: Woodcut and linocut
+intent: "Fables, folk tales, social stories, and wordless novels in the relief-print tradition. Use it when the story is stark and symbolic and each panel should read as a carved image."
+status: draft
+
+line: "There is no drawn line: forms are carved. White lines are cut out of solid black with a gouge, tapering at both ends."
+inking: "Large solid black masses printed from the block. Light is made by cutting away: parallel gouge strokes, crosscuts, and white flecks."
+tone: "No greys. Mid-values are only the rhythm and density of carved white lines."
+color_mode: monochrome
+palette: []
+rendering: "Simplified, chunky figures with angular faces and expressive hands, slightly stiff. Wood grain or lino texture visible in the black. Strong graphic composition, often symmetrical, with tilted horizons."
+lettering_style: "Few words. Hand-cut upper case, irregular, in rectangular captions above or below the image; balloons rare and carved with a rough edge."
+
+style_block: |
+  Black-and-white relief print comic page in a woodcut and linocut style.
+  Line: no drawn outlines; forms carved as white gouge lines tapering at both ends out of solid black.
+  Blacks and shadow: large solid black masses; light made by cutting away with parallel gouge strokes, crosscuts, and white flecks.
+  Tone: no grey at all; mid-values only from the density of carved white lines.
+  Color: black ink on cream paper, slight uneven ink coverage and visible wood grain in the black.
+  Rendering: simplified chunky figures with angular faces and expressive hands, strong graphic symbolic compositions.
+  Panels: rectangular panels with rough carved black borders, wide cream margins.
+  Lettering: very few words in irregular hand-cut upper case inside rectangular captions.
+
+prompt_vocabulary:
+  - woodcut relief print
+  - linocut gouge marks
+  - white lines carved out of black
+  - solid black masses
+  - visible wood grain
+  - uneven ink coverage on cream paper
+  - stark graphic composition
+
+negative_vocabulary:
+  - grey tones
+  - gradients
+  - thin pen line
+  - screentone
+  - color
+  - smooth digital fill
+  - photorealistic rendering
+
+drift_risks:
+  - "Carved white lines turn into drawn black lines on white, inverting the method."
+  - "Grey shading or crosshatched pen work appears between the black and white."
+  - "Faces get softer and more detailed than a gouge can cut."
+  - "Lettering becomes clean and typeset."
+
+pairs_with:
+  comic_formats: [paged]
+  publications: [one-shot, graphic-novel]
+  typical_genres: [fable, folk tale, historical, social drama, horror]

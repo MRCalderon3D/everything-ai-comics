@@ -42,6 +42,12 @@ negative_vocabulary:
   - dramatic cinematic lighting
   - small fine lettering
 
+drift_risks:
+  - "Detail creeps back into the backgrounds."
+  - "The single tier grows into a multi-tier page."
+  - "The bold line thins out and gets sketchy."
+  - "Lettering shrinks and balloons lose their share of the panel."
+
 pairs_with:
   comic_formats: [paged]
   publications: [strip]

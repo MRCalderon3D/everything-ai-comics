@@ -1,0 +1,60 @@
+# LOOK preset: young readers cartoon. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+
+id: LOOK_YOUNG_READERS_CARTOON_V01
+name: Young readers cartoon
+intent: "Funny, warm stories for children from about six to eleven. Use it when every panel must read at a glance, emotions are big, and nothing on the page should frighten or confuse."
+status: draft
+
+line: "Thick, rounded, even outline with soft ends. Simple shapes: circles, ovals, rounded rectangles. No sharp corners on characters."
+inking: "Black only in outlines, pupils, and small details. No black shadow shapes."
+tone: "One soft cel-shadow step in a darker version of each fill, laid on cleanly. No texture and no gradients."
+color_mode: full_color
+palette:
+  - "sunny yellow"
+  - "tomato red"
+  - "sky blue"
+  - "grass green"
+  - "warm orange and soft pink for skin and accents"
+  - "light cream or pale blue backgrounds"
+rendering: "Big heads, big eyes, expressive mouths and eyebrows, chunky hands with four fingers. Backgrounds clear and simple with bright flat color. Characters always readable by silhouette and color."
+lettering_style: "Large rounded sentence case, easy for new readers. Big white round balloons with thick outlines, short lines. Colorful bouncy sound effects."
+
+style_block: |
+  Full-color cartoon comic page for young readers.
+  Line: thick rounded even outlines with soft ends, simple round shapes, no sharp corners on characters.
+  Blacks and shadow: black only in outlines, pupils, and small details, no black shadow shapes.
+  Tone: one clean soft cel-shadow step in a darker version of each fill, no texture, no gradients.
+  Color: bright cheerful flat colors (sunny yellow, tomato red, sky blue, grass green) on light cream or pale blue backgrounds.
+  Rendering: big heads and eyes, expressive mouths and brows, chunky four-fingered hands, clear simple backgrounds, readable silhouettes.
+  Panels: four to six large panels with thick rounded-corner borders and wide white gutters.
+  Lettering: large rounded sentence-case text in big white round balloons with thick outlines, colorful bouncy sound effects.
+
+prompt_vocabulary:
+  - bright cartoon for young readers
+  - thick rounded outline
+  - simple round shapes
+  - flat cheerful colors
+  - one soft cel-shadow step
+  - big expressive eyes
+  - large rounded lettering
+
+negative_vocabulary:
+  - realistic anatomy
+  - cross-hatching
+  - dark moody lighting
+  - muted desaturated palette
+  - sharp angular shapes
+  - scary imagery
+  - small dense text
+
+drift_risks:
+  - "Outlines thin out and lose their rounded, even weight."
+  - "Shading grows into gradients and soft 3D modelling, moving towards an animated-film render."
+  - "Hands gain a fifth finger in some panels and not others."
+  - "The cheerful palette darkens in night or indoor scenes beyond what young readers need."
+
+pairs_with:
+  comic_formats: [paged, webtoon]
+  publications: [graphic-novel, ongoing, one-shot]
+  typical_genres: [children, humor, adventure, all-ages]

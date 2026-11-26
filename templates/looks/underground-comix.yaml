@@ -1,0 +1,54 @@
+# LOOK preset: underground comix. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+
+id: LOOK_UNDERGROUND_COMIX_V01
+name: Underground comix
+intent: "Satire, confession, and stories that should feel handmade and a bit unruly. Use it when the drawing itself carries the attitude."
+status: draft
+
+line: "Nib pen line, wobbly and alive. Rubbery figures with bulging volumes, oversized feet and hands, wide mouths."
+inking: "Dense cross-hatching and stippling build every shadow and texture. Spot blacks are small; the darkness comes from layered hatching."
+tone: "None. Every grey is ink: hatching, cross-hatching, stipple."
+color_mode: monochrome
+palette: []
+rendering: "Bodies stretch and sag, faces exaggerate, every surface gets texture (wood grain, cracks, sweat drops). Crowded backgrounds full of small jokes and clutter."
+lettering_style: "Hand-lettered upper case, uneven and personal. Lumpy balloons with wobbly outlines, big hand-drawn sound effects with hatched shadows."
+
+style_block: |
+  Black-and-white underground comix page in the 1970s self-published small-press tradition.
+  Line: wobbly nib pen line, rubbery figures with bulging volumes, oversized hands and feet.
+  Blacks and shadow: dense cross-hatching and stippling for every shadow and texture, small spot blacks.
+  Tone: no grey tones and no screentone; all greys made from ink hatching.
+  Color: black ink on white paper.
+  Rendering: stretched, exaggerated bodies and faces, heavy surface texture, cluttered detailed backgrounds.
+  Panels: hand-ruled, slightly uneven black borders, irregular grid, narrow white gutters.
+  Lettering: uneven hand-lettered upper case in lumpy wobbly balloons, hatched hand-drawn sound effects.
+
+prompt_vocabulary:
+  - dense cross-hatching
+  - stippling
+  - rubbery exaggerated figures
+  - wobbly nib pen line
+  - hand-ruled panel borders
+  - cluttered background detail
+  - 1970s underground comix
+
+negative_vocabulary:
+  - clean digital line
+  - smooth grey gradients
+  - screentone
+  - color
+  - idealised anatomy
+  - minimal backgrounds
+  - typeset lettering
+
+drift_risks:
+  - "Cross-hatching thins out into a clean cartoon line after a page or two."
+  - "Hatched greys get replaced by flat grey fill."
+  - "Exaggeration grows until the recurring character's proportions change from panel to panel."
+  - "Hand lettering turns into a typeset comic font."
+
+pairs_with:
+  comic_formats: [paged]
+  publications: [one-shot, miniseries, graphic-novel]
+  typical_genres: [satire, humor, memoir, horror, slice of life]

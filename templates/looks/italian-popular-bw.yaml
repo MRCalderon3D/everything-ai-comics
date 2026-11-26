@@ -1,0 +1,54 @@
+# LOOK preset: Italian popular black and white. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+
+id: LOOK_ITALIAN_POPULAR_BW_V01
+name: Italian popular black and white
+intent: "Long-running genre serials (western, detective, horror, adventure) read in a thick monthly booklet. Use it when you need many pages in a steady rhythm and a realistic world drawn in pen alone."
+status: draft
+
+line: "Fine steel nib, realistic and precise, with modest weight variation. Ruled lines for buildings and interiors."
+inking: "Tone built from parallel hatching and cross-hatching that follows the form. Solid blacks kept for night, hair, and deep interiors."
+tone: "None. Greys are hatching density only."
+color_mode: monochrome
+palette: []
+rendering: "Realistic anatomy and recognisable, lived-in faces. Detailed settings in every panel, filmic but restrained camera. The same steady grid page after page."
+lettering_style: "Hand-lettered upper case, small and dense. Oval balloons that can hold several lines, rectangular captions, sound effects small and drawn."
+
+style_block: |
+  Black-and-white Italian popular comic page in the small monthly booklet tradition.
+  Line: fine steel nib, realistic and precise, modest weight variation, ruled lines for architecture.
+  Blacks and shadow: parallel hatching and cross-hatching that follows the form, solid black for night, hair, and deep interiors.
+  Tone: no grey tones, no wash, no screentone; greys come from hatching density.
+  Color: black ink on white paper.
+  Rendering: realistic anatomy, lived-in faces, detailed settings in every panel, restrained filmic framing.
+  Panels: fixed grid of three tiers with two panels each, panels sometimes merged across a tier, thin black borders, white gutters.
+  Lettering: small dense hand-lettered upper case in oval balloons, rectangular captions.
+
+prompt_vocabulary:
+  - fine steel nib pen
+  - hatching that follows the form
+  - realistic black-and-white comic
+  - three-tier six-panel grid
+  - detailed backgrounds in every panel
+  - small dense hand lettering
+  - ruled architecture lines
+
+negative_vocabulary:
+  - grey wash
+  - screentone
+  - color
+  - heavy brush blacks covering the panel
+  - cartoon proportions
+  - dynamic angled panels
+  - digital gradients
+
+drift_risks:
+  - "Hatching turns into grey shading or screentone."
+  - "The six-panel grid breaks into angled or overlapping panels."
+  - "Backgrounds empty out in close shots."
+  - "Line weight thickens towards a brush noir look."
+
+pairs_with:
+  comic_formats: [paged]
+  publications: [ongoing, miniseries, graphic-novel]
+  typical_genres: [western, detective, horror, adventure, crime]

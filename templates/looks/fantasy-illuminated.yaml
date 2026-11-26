@@ -1,0 +1,61 @@
+# LOOK preset: fantasy illuminated. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+
+id: LOOK_FANTASY_ILLUMINATED_V01
+name: Fantasy illuminated
+intent: "Myths, quests, and court intrigue where the book itself should feel precious. Use it when the page design, with its borders and gold, is part of the world's sense of history."
+status: draft
+
+line: "Fine, confident pen line in dark sepia brown, with calligraphic swells. Ornamental detail in borders, armour, and embroidery."
+inking: "Little pure black. Darks in deep sepia and ultramarine. Patterned fills (diaper patterns, stars, vines) behind figures in some panels."
+tone: "Flat jewel-tone color with gentle modelling, gold leaf on borders, halos, crowns, and initials, catching light with a metallic sheen."
+color_mode: full_color
+palette:
+  - "ultramarine blue"
+  - "vermilion red"
+  - "deep emerald green"
+  - "burnished gold leaf"
+  - "rose madder"
+  - "warm parchment ground"
+  - "dark sepia brown line"
+rendering: "Elegant, slightly elongated figures with expressive hands, stylised trees, castles, and beasts. Spatial depth kept shallow, like a medieval manuscript, with readable comic staging."
+lettering_style: "Calligraphic hand lettering in sentence case with an uncial or blackletter flavour. Captions on parchment scrolls or banners; balloons with a fine sepia outline. Large decorated initial letters open a chapter."
+
+style_block: |
+  Full-color fantasy comic page in the style of an illuminated medieval manuscript.
+  Line: fine confident dark sepia pen line with calligraphic swells, ornamental detail on borders, armour, and embroidery.
+  Blacks and shadow: little pure black; darks in deep sepia and ultramarine, patterned diaper and vine fills behind figures.
+  Tone: flat jewel-tone color with gentle modelling, burnished gold leaf on borders, halos, crowns, and initials with a metallic sheen.
+  Color: ultramarine, vermilion, emerald, rose madder, and gold on a warm parchment ground.
+  Rendering: elegant elongated figures with expressive hands, stylised trees, castles, and beasts, shallow manuscript-like depth with clear comic staging.
+  Panels: arched and rectangular panels framed by ornate gold and vine borders, parchment gutters, a decorated initial on the opening page.
+  Lettering: calligraphic sentence-case lettering, captions on parchment scrolls and banners, balloons with a fine sepia outline.
+
+prompt_vocabulary:
+  - illuminated manuscript comic page
+  - ornate gold leaf borders
+  - jewel-tone flat color
+  - sepia pen line
+  - parchment ground
+  - vine and diaper pattern fills
+  - calligraphic lettering on scrolls
+
+negative_vocabulary:
+  - modern digital gradients
+  - photorealism
+  - neon colors
+  - gritty texture
+  - black ink noir shadows
+  - plain white gutters
+  - typeset sans-serif text
+
+drift_risks:
+  - "Ornate borders take over the page and shrink the panels until the story stops reading."
+  - "Gold leaf renders as flat yellow, or spreads to everything."
+  - "Calligraphic lettering becomes illegible pseudo-script."
+  - "Manuscript flatness gives way to a modern painted fantasy illustration with deep perspective."
+
+pairs_with:
+  comic_formats: [paged]
+  publications: [graphic-novel, one-shot, miniseries]
+  typical_genres: [fantasy, mythology, historical, fairy tale]

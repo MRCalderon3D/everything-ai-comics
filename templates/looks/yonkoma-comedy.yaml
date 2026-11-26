@@ -1,0 +1,55 @@
+# LOOK preset: comedic yonkoma. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+# Reading direction is not part of a look: set reading_direction in project.yaml.
+
+id: LOOK_YONKOMA_COMEDY_V01
+name: Comedic yonkoma
+intent: "Four-panel gag strips and gentle everyday comedy with a small cast. Use it when each strip is a complete joke: set-up, development, turn, punchline."
+status: draft
+
+line: "Clean, rounded pen line of nearly even weight. Super-deformed figures two to three heads tall."
+inking: "Solid black for hair and pupils only. Comic symbols carry the emotion: sweat drops, cross-popping veins, swirl eyes, blush stripes."
+tone: "One or two flat screentones (a light grey for clothes, a dot pattern for backgrounds). No gradients."
+color_mode: monochrome
+palette: []
+rendering: "Big heads, tiny bodies, mitten-like hands, dot or oval eyes that turn to lines or arcs for jokes. Backgrounds reduced to a floor line or a single prop; the last panel often breaks the pattern for the punchline."
+lettering_style: "Sentence case in small round balloons, short lines. Hand-drawn reaction sounds and emotive marks, a small title bar above the first panel."
+
+style_block: |
+  Black-and-white comedic four-panel yonkoma strip.
+  Line: clean rounded pen line of nearly even weight, super-deformed figures two to three heads tall.
+  Blacks and shadow: solid black for hair and pupils only, comic emotive symbols such as sweat drops, swirl eyes, and blush stripes.
+  Tone: one or two flat screentones, no gradients.
+  Color: black ink and flat dot tone on white paper.
+  Rendering: big heads, tiny bodies, simple mitten hands, dot eyes, minimal backgrounds of a floor line or one prop.
+  Panels: four equal panels stacked vertically in one column, thin black borders, even white gutters, small title bar on top.
+  Lettering: short sentence-case lines in small round balloons, hand-drawn reaction sounds.
+
+prompt_vocabulary:
+  - four-panel vertical yonkoma
+  - super-deformed chibi proportions
+  - clean rounded pen line
+  - comic emotive symbols
+  - flat screentone
+  - minimal background
+  - punchline panel
+
+negative_vocabulary:
+  - realistic anatomy
+  - detailed backgrounds
+  - heavy hatching
+  - dramatic lighting
+  - color
+  - dynamic angled panels
+  - long blocks of text
+
+drift_risks:
+  - "Chibi proportions creep back towards normal anatomy, so the same character changes height between strips."
+  - "The vertical column of four turns into a two-by-two grid or a horizontal strip."
+  - "Flat tone becomes gradient shading."
+  - "Mitten hands gain full fingers in some panels and not others."
+
+pairs_with:
+  comic_formats: [paged, webtoon]
+  publications: [strip, ongoing, webtoon-series]
+  typical_genres: [humor, slice of life, school, all-ages]

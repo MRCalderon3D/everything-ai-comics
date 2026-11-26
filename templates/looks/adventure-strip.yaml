@@ -1,0 +1,54 @@
+# LOOK preset: adventure strip. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+
+id: LOOK_ADVENTURE_STRIP_V01
+name: Adventure strip
+intent: "Serial adventure, mystery, or romance told a few panels at a time. Realistic people and places, lit like a film, in black and white that survives cheap paper."
+status: draft
+
+line: "Flexible brush line on realistic figures: thick on the shadow side, tapering to a hairline on the lit side. Fine pen for distant detail and machinery."
+inking: "Feathered brush strokes model faces and cloth; spotted blacks shape the night and the folds of coats. Dry-brush texture on rock, wood, and hair."
+tone: "Mechanical dot tone laid on one or two planes per panel (sky, a wall, a dress), cut to shape with a clean edge. No grey wash."
+color_mode: monochrome
+palette: []
+rendering: "Naturalistic anatomy and specific, grown-up faces. Cinematic framing with silhouettes in the foreground and deep space behind. Costume, cars, and rooms drawn from reference and accurate to their period."
+lettering_style: "Hand-lettered upper case, small and even. Round balloons tucked into the corners, a rectangular caption at the top left that recaps the story so far."
+
+style_block: |
+  Black-and-white realistic adventure newspaper strip.
+  Line: flexible brush line on realistic figures, thick on the shadow side and tapering to a hairline on the lit side, fine pen for distant detail.
+  Blacks and shadow: feathered brush modelling on faces and cloth, spotted blacks for night and deep folds, dry-brush texture on rough surfaces.
+  Tone: mechanical dot tone on one or two flat planes per panel, cut with clean edges; no grey wash, no gradients.
+  Color: black ink on white newsprint.
+  Rendering: naturalistic anatomy, specific faces, cinematic framing with foreground silhouettes, accurate period costume and props.
+  Panels: one horizontal tier of three or four panels with thin black borders, white gutters.
+  Lettering: small even hand-lettered upper case in round balloons, rectangular recap caption at the top left.
+
+prompt_vocabulary:
+  - feathered brush inking
+  - realistic newspaper adventure strip
+  - mechanical dot tone
+  - dry-brush texture
+  - spotted blacks
+  - cinematic foreground silhouette
+  - accurate period detail
+
+negative_vocabulary:
+  - cartoon proportions
+  - oversized heads
+  - grey watercolor wash
+  - digital gradients
+  - color
+  - manga screentone patterns
+  - thick uniform outline
+
+drift_risks:
+  - "Feathering turns into cross-hatching or into soft grey shading."
+  - "Dot tone spreads over the whole panel or becomes a smooth gradient."
+  - "Faces drift towards glamour idealisation, and the character's age and features soften."
+  - "The single tier grows into a full multi-tier page."
+
+pairs_with:
+  comic_formats: [paged]
+  publications: [strip, ongoing]
+  typical_genres: [adventure, mystery, romance, crime, historical]

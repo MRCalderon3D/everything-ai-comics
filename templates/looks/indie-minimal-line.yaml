@@ -1,0 +1,57 @@
+# LOOK preset: minimal indie line. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+
+id: LOOK_INDIE_MINIMAL_LINE_V01
+name: Minimal indie line
+intent: "Quiet, wry, or introspective graphic novels where timing and small gestures carry the story. Use it when the drawing should step back and let rhythm and dialogue do the work."
+status: draft
+
+line: "Thin, uniform pen or fineliner line, the same weight everywhere. Simple geometric figures, dot eyes, a single line for a mouth."
+inking: "No spotted blacks except hair or a dark coat drawn as flat shape. No hatching."
+tone: "One flat pale tint (a light blue-grey or a warm sand) laid on large shapes for night, shadow, or emphasis. No gradients."
+color_mode: limited
+palette:
+  - "black line on warm white paper"
+  - "one flat pale tint, light blue-grey or warm sand, for shadow and night"
+  - "an optional second flat accent, muted brick red, used on one object per page"
+rendering: "Small, simple figures that act through posture and placement. Backgrounds drawn with the same thin line, sparse but exact: a chair, a window frame, a horizon. Lots of empty space."
+lettering_style: "Small neat hand lettering in sentence case. Plain round balloons with thin tails, captions without boxes, almost no sound effects."
+
+style_block: |
+  Minimal indie graphic novel page.
+  Line: thin uniform fineliner line of one weight everywhere, simple geometric figures, dot eyes, single-line mouths.
+  Blacks and shadow: no spotted blacks and no hatching; dark hair or coats as flat shapes only.
+  Tone: one flat pale tint on large shapes for shadow, night, or emphasis, no gradients.
+  Color: black line on warm white paper, one pale blue-grey or sand tint, an optional muted brick-red accent on a single object.
+  Rendering: small simple figures acting through posture, sparse exact backgrounds, generous empty space.
+  Panels: many small regular panels, often a grid of nine to twelve, thin even borders, white gutters, some silent panels.
+  Lettering: small neat sentence-case hand lettering in plain round balloons, unboxed captions.
+
+prompt_vocabulary:
+  - thin uniform fineliner line
+  - minimal cartoon figures
+  - dot eyes
+  - flat pale tint
+  - sparse exact background
+  - nine-panel grid
+  - generous empty space
+
+negative_vocabulary:
+  - line weight variation
+  - cross-hatching
+  - gradients
+  - detailed anatomy
+  - saturated color
+  - dramatic lighting
+  - cluttered backgrounds
+
+drift_risks:
+  - "The single line weight starts to vary and the drawing gains brush flourishes."
+  - "Shading and gradients appear on faces and clothes."
+  - "With so few marks, the recurring character loses the one or two features that identify them (hair shape, glasses, coat)."
+  - "The tint spreads into a full palette."
+
+pairs_with:
+  comic_formats: [paged, webtoon]
+  publications: [graphic-novel, one-shot, strip]
+  typical_genres: [slice of life, memoir, humor, literary drama]

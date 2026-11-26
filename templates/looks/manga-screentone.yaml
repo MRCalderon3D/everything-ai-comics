@@ -42,6 +42,12 @@ negative_vocabulary:
   - painterly rendering
   - western superhero anatomy
 
+drift_risks:
+  - "Screentone turns into a smooth grey gradient."
+  - "Dot size and density change from panel to panel."
+  - "Faces slide towards a generic anime face with larger eyes."
+  - "Hand-drawn sound effects become typed text or disappear."
+
 pairs_with:
   comic_formats: [paged, webtoon]
   publications: [ongoing, miniseries, webtoon-series]

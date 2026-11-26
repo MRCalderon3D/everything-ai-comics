@@ -1,0 +1,59 @@
+# LOOK preset: Franco-Belgian humor album. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+
+id: LOOK_FRANCO_BELGIAN_HUMOR_V01
+name: Franco-Belgian humor album
+intent: "Comic adventures and slapstick for all ages in the European album tradition. Use it when the cast is cartoony but the world is solid, and the jokes depend on movement and timing."
+status: draft
+
+line: "Lively brush line with clear thick-to-thin swells, rounded and springy. Big-nosed cartoon characters with elastic limbs and large feet."
+inking: "Solid black for hair, shoes, and small shadow shapes under feet. Motion lines, dust clouds, and impact stars drawn in ink."
+tone: "None in the line art. Flat color does the work, with an occasional darker flat for a cast shadow."
+color_mode: full_color
+palette:
+  - "bright flat primaries for clothes: red, blue, yellow"
+  - "apricot skin with a flat rose shadow"
+  - "soft ochre and sage for buildings and streets"
+  - "light warm blue for daytime skies"
+  - "a flat darker variant of each color for the rare cast shadow"
+rendering: "Cartoon figures with big noses, round eyes, rubbery poses, and wild takes, set in solid, well-observed streets, cars, and interiors drawn with the same springy line. Lots of business in the background."
+lettering_style: "Hand-lettered upper case with bold for stress. Oval balloons with a fine outline, joined balloons for a run of lines, big bouncy sound effects in color with a black outline."
+
+style_block: |
+  Full-color Franco-Belgian humor comic album page.
+  Line: lively springy brush line with thick-to-thin swells, big-nosed cartoon characters with elastic limbs and large feet.
+  Blacks and shadow: solid black for hair, shoes, and small shadows under feet, inked motion lines, dust clouds, and impact stars.
+  Tone: none in the line; flat color with an occasional darker flat for a cast shadow.
+  Color: bright flat primaries for clothes, apricot skin, soft ochre and sage streets, light warm blue skies, no gradients.
+  Rendering: rubbery cartoon figures with big noses and wild takes, set in solid well-observed streets, cars, and interiors full of background business.
+  Panels: four tiers of regular panels on an album page, thin black borders, narrow white gutters.
+  Lettering: hand-lettered upper case with bold stress, oval balloons with fine outlines, bouncy colored sound effects with a black outline.
+
+prompt_vocabulary:
+  - Franco-Belgian humor album
+  - springy brush line
+  - big-nosed cartoon characters
+  - elastic slapstick poses
+  - flat bright color
+  - motion lines and dust clouds
+  - solid detailed cartoon backgrounds
+
+negative_vocabulary:
+  - realistic anatomy
+  - gradient shading
+  - cross-hatching
+  - dark muted palette
+  - thin uniform line
+  - manga eyes
+  - empty backgrounds
+
+drift_risks:
+  - "The springy brush line flattens into the even line of ligne claire, or thickens into a modern digital cartoon."
+  - "Nose and head shapes of the recurring character change between panels, since exaggeration varies with each pose."
+  - "Flat color gains digital gradients."
+  - "Background detail drops away after the first tier."
+
+pairs_with:
+  comic_formats: [paged]
+  publications: [graphic-novel, ongoing, one-shot]
+  typical_genres: [humor, adventure, all-ages, children]

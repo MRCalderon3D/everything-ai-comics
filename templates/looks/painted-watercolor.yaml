@@ -45,6 +45,12 @@ negative_vocabulary:
   - glossy rendering
   - screentone
 
+drift_risks:
+  - "Black ink outlines appear around figures."
+  - "Transparent washes turn into flat digital fills or opaque paint."
+  - "The palette grows beyond three or four hues."
+  - "Paper grain and wet-into-wet blooms disappear."
+
 pairs_with:
   comic_formats: [paged, webtoon]
   publications: [one-shot, graphic-novel]

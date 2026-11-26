@@ -45,6 +45,12 @@ negative_vocabulary:
   - photographic rendering
   - screentone
 
+drift_risks:
+  - "Rendering slides into glossy airbrush that looks like a 3D render."
+  - "Ink hatching vanishes under heavy gradients."
+  - "Costume colors shift between pages."
+  - "Anatomy exaggerates past the recurring character's build."
+
 pairs_with:
   comic_formats: [paged]
   publications: [ongoing, miniseries, one-shot]

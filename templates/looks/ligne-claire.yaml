@@ -44,6 +44,12 @@ negative_vocabulary:
   - dramatic rim light
   - photorealistic rendering
 
+drift_risks:
+  - "Hatching or soft shading appears on faces and cloth folds."
+  - "Line weight starts to vary between figures and backgrounds."
+  - "Backgrounds simplify after the first panel."
+  - "Flat color picks up gradients and highlights."
+
 pairs_with:
   comic_formats: [paged]
   publications: [one-shot, miniseries, graphic-novel, ongoing]

@@ -1,0 +1,59 @@
+# LOOK preset: cyberpunk neon. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+
+id: LOOK_CYBERPUNK_NEON_V01
+name: Cyberpunk neon
+intent: "Near-future cities, crime, and characters wired into machines. Use it when night and artificial light should define the world and color should come from signs and screens, not the sun."
+status: draft
+
+line: "Sharp, precise ink line with tight detail on machinery, cables, and clothing. Hard angular edges in architecture."
+inking: "Deep black and near-black blue grounds take most of the panel. Figures separate from the dark only through colored rim light."
+tone: "Digital color in the dark ground, saturated neon rim lights on edges, glow and bloom around signs and screens, wet reflective surfaces."
+color_mode: limited
+palette:
+  - "near-black blue-violet for the ground"
+  - "hot magenta neon"
+  - "electric cyan neon"
+  - "one sodium-amber accent for street lamps or warnings"
+  - "skin lit by the nearest neon, never by neutral daylight"
+rendering: "Dense vertical cityscapes, rain-slick streets, signs and screens, cybernetic details on otherwise realistic figures. Faces half lit in two colors. Atmosphere from steam, haze, and reflections."
+lettering_style: "Upper case comic lettering, condensed. White balloons with a thin outline for speech, black balloons with cyan text for machine voices, captions as dark boxes with a colored edge."
+
+style_block: |
+  Cyberpunk comic page in a limited neon palette, dominated by night and artificial light.
+  Line: sharp precise ink line, tight detail on machinery, cables, and clothes, hard angular architecture.
+  Blacks and shadow: near-black blue-violet grounds cover most of each panel, figures separated from the dark by colored rim light.
+  Tone: saturated magenta and cyan neon rim lighting, glow and bloom around signs and screens, wet reflective surfaces.
+  Color: near-black blue-violet, hot magenta, electric cyan, one sodium-amber accent; skin lit only by the nearest neon.
+  Rendering: dense vertical cityscapes, rain-slick streets, glowing signs, cybernetic details on realistic figures, faces split-lit in two colors, haze and steam.
+  Panels: tall vertical and wide letterbox panels with thin black borders, black gutters.
+  Lettering: condensed upper-case lettering, white balloons for speech, black balloons with cyan text for machine voices, dark captions with a colored edge.
+
+prompt_vocabulary:
+  - cyberpunk neon night
+  - magenta and cyan rim light
+  - near-black blue-violet ground
+  - rain-slick reflective street
+  - glow and bloom
+  - split-lit face in two colors
+  - dense vertical cityscape
+
+negative_vocabulary:
+  - daylight
+  - warm natural sunlight
+  - pastel colors
+  - flat even lighting
+  - rural scenery
+  - halftone dots
+  - watercolor wash
+
+drift_risks:
+  - "Neon spreads into a full rainbow and the two-color discipline is lost."
+  - "Dark grounds lift towards mid-grey and the page loses contrast."
+  - "Faces disappear in the dark and stop identifying the recurring character."
+  - "Ink line dissolves into a fully painted digital render."
+
+pairs_with:
+  comic_formats: [paged, webtoon]
+  publications: [one-shot, miniseries, graphic-novel, webtoon-series]
+  typical_genres: [cyberpunk, science fiction, crime, thriller]

@@ -1,0 +1,60 @@
+# LOOK preset: retro pulp science fiction. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+
+id: LOOK_RETRO_PULP_SCIFI_V01
+name: Retro pulp science fiction
+intent: "Rocket-age adventure, alien worlds, and the future as people imagined it in the 1940s and 1950s. Use it when the story is bold, optimistic or lurid, and should look like a painted magazine cover come to life."
+status: draft
+
+line: "Painted forms with a thin dark contour where shapes need separating. Streamlined, rounded machinery."
+inking: "No ink line work. Deep shadows painted in saturated violet, blue, or red rather than black."
+tone: "Airbrushed and gouache modelling: smooth gradients on metal, hard specular highlights on chrome and glass, soft glow around engines and rays."
+color_mode: full_color
+palette:
+  - "chrome silver with sky reflections"
+  - "rocket red and signal orange"
+  - "electric teal and turquoise"
+  - "acid yellow-green for alien skies or rays"
+  - "deep violet and ultramarine shadows"
+  - "warm cream highlights"
+rendering: "Heroic figures in bubble helmets and fitted suits, streamlined rockets with fins, ray guns, alien landscapes of rock spires and ringed planets. Dramatic low angles and big skies."
+lettering_style: "Hand-lettered upper case, bold. White balloons with a black outline, captions in yellow boxes with breathless narration, sound effects in chunky outlined letters with speed lines."
+
+style_block: |
+  Full-color retro pulp science fiction comic page in the 1950s painted magazine tradition.
+  Line: painted forms with a thin dark contour only where shapes need separating, streamlined rounded machinery.
+  Blacks and shadow: no ink line work; deep shadows painted in saturated violet, blue, or red instead of black.
+  Tone: airbrush and gouache modelling, smooth gradients on metal, hard specular highlights on chrome and glass, soft glow on engines and rays.
+  Color: saturated chrome silver, rocket red, electric teal, acid yellow-green, violet shadows, cream highlights.
+  Rendering: heroic figures in bubble helmets and fitted suits, finned rockets, alien rock spires and ringed planets, dramatic low angles, big skies.
+  Panels: five or six panels with black borders and white gutters, one large panel per page for spectacle.
+  Lettering: bold hand-lettered upper case in white balloons, yellow caption boxes, chunky outlined sound effects.
+
+prompt_vocabulary:
+  - retro 1950s pulp science fiction
+  - airbrushed gouache painting
+  - chrome highlights
+  - streamlined finned rocket
+  - bubble helmet
+  - saturated colored shadows
+  - ringed planet in the sky
+
+negative_vocabulary:
+  - gritty realism
+  - muted desaturated palette
+  - flat cel color
+  - modern sleek minimal technology
+  - screentone
+  - rough sketchy line
+  - black ink hatching
+
+drift_risks:
+  - "Retro technology modernises into sleek contemporary science fiction design."
+  - "Painted airbrush turns into a glossy 3D render."
+  - "Every panel becomes a cover-style spectacle and the quieter story panels disappear."
+  - "Colored shadows go back to neutral grey and black."
+
+pairs_with:
+  comic_formats: [paged]
+  publications: [one-shot, miniseries, graphic-novel]
+  typical_genres: [science fiction, adventure, pulp, space opera]

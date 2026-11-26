@@ -1,0 +1,54 @@
+# LOOK preset: charcoal and graphite. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+
+id: LOOK_CHARCOAL_GRAPHITE_V01
+name: Charcoal and graphite
+intent: "Grief, memory, war, and stories set in fog, snow, or dust. Use it when soft darkness and smudged edges should make the reader lean in."
+status: draft
+
+line: "No line art. Forms come from tone; graphite marks define edges only where a form needs it, then fade."
+inking: "No ink. The deepest darks are compressed charcoal, velvety and matte, with fingerprints and smudge marks."
+tone: "Full range of greys from blended charcoal and graphite, smudged with a finger or stump, highlights lifted out with an eraser. Paper tooth visible in the mid-tones."
+color_mode: monochrome
+palette: []
+rendering: "Naturalistic figures emerging from and dissolving into tone. Light pulled out of darkness with eraser strokes. Faces carry the drawing; backgrounds stay suggestive."
+lettering_style: "Hand-lettered sentence case in graphite. Balloons left as erased paper with a soft smudged edge, captions written directly on the page."
+
+style_block: |
+  Black-and-white comic page drawn in charcoal and graphite.
+  Line: no outlines or inked line art; edges defined by tone, with graphite marks that fade where forms soften.
+  Blacks and shadow: velvety matte compressed charcoal for the darkest areas, smudges and finger marks.
+  Tone: full range of blended greys, smudged with a stump, highlights lifted with an eraser, paper tooth showing in mid-tones.
+  Color: charcoal and graphite on warm grey-white drawing paper.
+  Rendering: naturalistic figures emerging from and dissolving into tone, light lifted out of darkness, suggestive backgrounds.
+  Panels: soft-edged panels with smudged charcoal borders, wide paper gutters.
+  Lettering: hand-lettered sentence case in graphite, balloons as erased paper with soft edges.
+
+prompt_vocabulary:
+  - charcoal and graphite drawing
+  - smudged tonal rendering
+  - eraser-lifted highlights
+  - velvety matte blacks
+  - visible paper tooth
+  - no outlines
+  - figures emerging from darkness
+
+negative_vocabulary:
+  - ink outline
+  - clean line art
+  - flat digital fill
+  - screentone
+  - color
+  - hard vector edges
+  - glossy rendering
+
+drift_risks:
+  - "A clean outline appears around figures and the drawing turns into shaded line art."
+  - "Charcoal texture smooths into a digital grey airbrush."
+  - "Faces lose definition in dark panels, making the recurring character hard to recognise."
+  - "Balloons get hard black outlines that clash with the soft page."
+
+pairs_with:
+  comic_formats: [paged, webtoon]
+  publications: [graphic-novel, one-shot]
+  typical_genres: [memoir, war, literary drama, horror, historical]

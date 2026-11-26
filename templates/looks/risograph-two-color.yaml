@@ -1,0 +1,58 @@
+# LOOK preset: two-color risograph. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+
+id: LOOK_RISOGRAPH_TWO_COLOR_V01
+name: Two-color risograph
+intent: "Zines, small-press books, and indie stories that want a printed, handmade surface. Use it when two strong inks and a little imperfection suit the story better than full color."
+status: draft
+
+line: "Pencil, crayon, or brush line printed in the darker of the two inks. Lines have a grainy, slightly broken edge."
+inking: "No pure black unless it is one of the inks. Darks come from the darker ink at full strength or from the two inks overprinted."
+tone: "Grainy halftone and stochastic dot fields at 20 to 80 percent of each ink. A third color appears where the two inks overlap."
+color_mode: limited
+palette:
+  - "spot ink one, fluorescent pink"
+  - "spot ink two, medium blue"
+  - "overprint of the two, a deep violet, used for the darkest areas"
+  - "unprinted off-white paper for highlights"
+rendering: "Flat shapes and simplified forms that suit separation into two layers. Visible paper grain and ink texture everywhere, slight misregistration between the inks."
+lettering_style: "Hand lettering in the darker ink, upper or sentence case. Balloons left as unprinted paper with a thin outline, captions as tinted bands of the lighter ink."
+
+style_block: |
+  Two-color risograph printed comic page.
+  Line: grainy pencil or brush line printed in the darker ink, slightly broken edges.
+  Blacks and shadow: no pure black; darks from the darker ink at full strength or both inks overprinted.
+  Tone: grainy halftone and stochastic dot fields of each ink, a third color where the two inks overlap.
+  Color: only two spot inks, fluorescent pink and medium blue, their violet overprint, and unprinted off-white paper.
+  Rendering: flat simplified shapes, visible paper grain and ink texture, slight misregistration between the two inks.
+  Panels: simple rectangular panels with hand-drawn borders in the darker ink, off-white gutters.
+  Lettering: hand lettering in the darker ink, unprinted paper balloons with a thin outline, captions on bands of the lighter ink.
+
+prompt_vocabulary:
+  - two-color risograph print
+  - fluorescent pink and blue spot inks
+  - overprint violet
+  - grainy halftone texture
+  - slight misregistration
+  - off-white paper grain
+  - flat simplified shapes
+
+negative_vocabulary:
+  - full color
+  - pure black ink
+  - smooth digital gradients
+  - glossy rendering
+  - photographic detail
+  - more than two inks
+  - clean vector edges
+
+drift_risks:
+  - "A third or fourth color creeps in, often a black outline or a skin tone."
+  - "Grain and misregistration vanish and the page looks like clean digital flat color."
+  - "The two inks change hue between pages (pink drifts to red, blue to teal)."
+  - "Overprint areas render as an unrelated new color instead of the mix of the two inks."
+
+pairs_with:
+  comic_formats: [paged]
+  publications: [one-shot, graphic-novel, strip]
+  typical_genres: [slice of life, memoir, humor, poetry, science fiction]

@@ -1,0 +1,59 @@
+# LOOK preset: 1960s four-color. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+
+id: LOOK_FOUR_COLOR_SIXTIES_V01
+name: 1960s four-color
+intent: "Bright, earnest action and adventure with the feel of a cheap monthly from the 1960s. Use it when the story wants primary colors, clear heroics, and a little nostalgia."
+status: draft
+
+line: "Bold brush contour, a little heavier than modern inking, with simple interior lines. Anatomy is drawn, not rendered."
+inking: "Solid blacks fill the shadow side of figures and the spaces behind them. Short feathering on muscles and folds; no fine hatching."
+tone: "None in the line art. Mid-values come from printed dot screens of the process colors."
+color_mode: full_color
+palette:
+  - "process yellow, solid and as 50% dots"
+  - "process red (a warm magenta-red), solid and as 50% dots"
+  - "process cyan (sky blue), solid and as 50% dots"
+  - "flesh pink made of 25% red and 25% yellow dots"
+  - "black ink on yellowed off-white newsprint"
+rendering: "Square-jawed heroic figures, clear gestures, stage-like poses that open towards the reader. Backgrounds are simple and often dropped to a flat color field during action."
+lettering_style: "Hand-lettered upper case with bold for stress, most lines ending in an exclamation mark. Rounded balloons, yellow caption boxes, big outlined sound effects in primaries."
+
+style_block: |
+  Full-color 1960s American comic book page printed in four colors on newsprint.
+  Line: bold brush contours, simple interior lines, clear drawn anatomy.
+  Blacks and shadow: solid black shadow shapes, short feathering on folds and muscles, no fine hatching.
+  Tone: mid-values made only of visible halftone dot screens in the process colors, no gradients.
+  Color: a small set of flat process colors (yellow, red, cyan as solids and 50% dots), flesh as pink-orange dots, slight misregistration, yellowed off-white newsprint.
+  Rendering: heroic square-jawed figures, clear stage-like poses, simple backgrounds dropped to a flat color field in action.
+  Panels: regular grid of three tiers with black borders and white gutters.
+  Lettering: hand-lettered upper case with bold stress words, rounded balloons, yellow caption boxes, large outlined sound effects.
+
+prompt_vocabulary:
+  - 1960s four-color comic printing
+  - visible halftone dots
+  - flat process colors
+  - slight color misregistration
+  - yellowed newsprint paper
+  - bold brush contour
+  - flat color background field
+
+negative_vocabulary:
+  - digital gradient shading
+  - airbrush glow
+  - modern cel shading
+  - photorealistic rendering
+  - pastel palette
+  - bright white paper
+  - painterly texture
+
+drift_risks:
+  - "Dot screens grow too large and the page turns into a pop-art pastiche, or the dots vanish into smooth digital fill."
+  - "Modern gradients and glow effects come back on the second or third page."
+  - "The palette widens beyond the few process colors into full digital color."
+  - "Yellowed newsprint becomes clean white paper."
+
+pairs_with:
+  comic_formats: [paged]
+  publications: [one-shot, miniseries, ongoing]
+  typical_genres: [superhero, adventure, science fiction, all-ages]

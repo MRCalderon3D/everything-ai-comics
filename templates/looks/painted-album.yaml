@@ -1,0 +1,59 @@
+# LOOK preset: European painted album. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+
+id: LOOK_PAINTED_ALBUM_V01
+name: European painted album
+intent: "Epic, sensual, or brooding stories where every panel can hold like a canvas: historical saga, dark fantasy, adult science fiction. Use it when light and material matter more than speed."
+status: draft
+
+line: "No inked outline. Edges come from where one painted shape meets another; a dark umber underdrawing shows in places."
+inking: "No ink. The deepest darks are painted, warm umber and blue-black, never flat printed black."
+tone: "Opaque gouache or oil with visible brushstrokes, modelled light and shadow, lost and found edges. Canvas or board texture under the paint."
+color_mode: full_color
+palette:
+  - "warm umber and raw sienna for the underpainting"
+  - "naples yellow and warm ivory for lit skin and highlights"
+  - "deep ultramarine and blue-black for shadows"
+  - "muted viridian and olive for foliage and cloth"
+  - "one saturated accent per scene, such as vermilion or crimson"
+rendering: "Naturalistic figures under a single dramatic light source, atmospheric perspective, rich surface detail on stone, fabric, metal, and skin. Fewer, larger panels per page."
+lettering_style: "Hand-lettered upper and lower case, a little calligraphic. Pale cream balloons with a fine brown outline, captions in unbordered cream boxes, sound effects rare and painted."
+
+style_block: |
+  Fully painted European comic album page in opaque gouache and oil.
+  Line: no inked outlines; edges formed by painted shapes meeting, with a dark umber underdrawing visible in places.
+  Blacks and shadow: no flat black; the deepest darks painted in warm umber and blue-black.
+  Tone: opaque painted modelling with visible brushstrokes, lost and found edges, canvas texture under the paint.
+  Color: warm umber underpainting, ivory lights, ultramarine shadows, one saturated accent per scene.
+  Rendering: naturalistic figures under one dramatic light source, atmospheric perspective, rich material detail.
+  Panels: four to six large panels with thin dark borders and wide cream gutters.
+  Lettering: calligraphic hand-lettered upper and lower case in pale cream balloons with a fine brown outline.
+
+prompt_vocabulary:
+  - fully painted comic page
+  - opaque gouache and oil
+  - visible brushstrokes
+  - single dramatic light source
+  - atmospheric perspective
+  - warm umber underpainting
+  - lost and found edges
+
+negative_vocabulary:
+  - black ink outline
+  - flat digital color
+  - cel shading
+  - halftone dots
+  - cartoon proportions
+  - transparent watercolor wash
+  - glossy 3D render
+
+drift_risks:
+  - "Paint texture smooths into a glossy digital painting or a 3D render look."
+  - "Black ink outlines creep back around the figures."
+  - "Faces of the recurring character change more than in line-based looks, because painted features carry fewer fixed marks."
+  - "Panels grow into single illustrations and the page stops reading as a sequence."
+
+pairs_with:
+  comic_formats: [paged]
+  publications: [graphic-novel, one-shot, miniseries]
+  typical_genres: [historical, fantasy, science fiction, drama, mythology]

@@ -42,6 +42,12 @@ negative_vocabulary:
   - photorealistic rendering
   - thin uniform line
 
+drift_risks:
+  - "Grey gradients and soft airbrush shading creep into the shadows."
+  - "Spotted blacks shrink to outlines after a few pages, and panels stop reading as black shapes."
+  - "Rim light left as white paper fills in with mid-grey."
+  - "Faces gain modelled detail where the look wants flat planes of light and shadow."
+
 pairs_with:
   comic_formats: [paged, webtoon]
   publications: [one-shot, miniseries, graphic-novel]

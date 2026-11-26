@@ -1,0 +1,55 @@
+# LOOK preset: gekiga. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+# Reading direction is not part of a look: set reading_direction in project.yaml.
+
+id: LOOK_GEKIGA_V01
+name: Gekiga
+intent: "Adult drama, crime, and historical stories in the realistic Japanese tradition. Use it when the story is grim, physical, and paced like a film, and faces should look lived in."
+status: draft
+
+line: "Brush and pen, heavier and rougher than mainstream manga. Realistic proportions, creased faces, rough-edged contours."
+inking: "Large areas of brush black, dry-brush and scratch texture on skin, cloth, and walls. Rain, smoke, and grit drawn line by line."
+tone: "Coarse screentone and hatching used together; tone scratched and scraped for texture and highlights."
+color_mode: monochrome
+palette: []
+rendering: "Realistic adult anatomy and faces with age, sweat, and stubble. Cinematic sequences with long silent passages, close-ups on eyes and hands, detailed urban or period settings."
+lettering_style: "Sentence or upper case in plain oval balloons, few words per panel. Sound effects hand-brushed and rough, sometimes running through the whole panel."
+
+style_block: |
+  Black-and-white gekiga page, realistic Japanese adult comics.
+  Line: rough brush and pen line, heavier than mainstream manga, realistic proportions, creased faces.
+  Blacks and shadow: large brush blacks, dry-brush and scratch texture, rain and smoke drawn line by line.
+  Tone: coarse screentone combined with hatching, tone scraped back for texture and highlights.
+  Color: black ink and dot tone on off-white paper.
+  Rendering: realistic adult faces with age and sweat, cinematic silent sequences, close-ups on eyes and hands, detailed gritty settings.
+  Panels: rectangular panels of varied width, thin black borders, frequent wide letterbox panels.
+  Lettering: few words per panel in plain oval balloons, rough hand-brushed sound effects.
+
+prompt_vocabulary:
+  - gekiga realistic manga
+  - rough brush ink
+  - dry-brush and scratch texture
+  - coarse screentone with hatching
+  - weathered adult faces
+  - cinematic letterbox panels
+  - silent sequence
+
+negative_vocabulary:
+  - large sparkling eyes
+  - cute proportions
+  - clean thin line
+  - color
+  - smooth digital gradients
+  - decorative flower tones
+  - superhero anatomy
+
+drift_risks:
+  - "Faces slide towards mainstream manga with larger eyes and smoother skin."
+  - "Rough brush texture is cleaned up into a uniform digital line."
+  - "Coarse tone becomes a smooth grey gradient."
+  - "Silent panels gain added captions or sound effects."
+
+pairs_with:
+  comic_formats: [paged]
+  publications: [graphic-novel, miniseries, ongoing]
+  typical_genres: [crime, drama, historical, noir, thriller]

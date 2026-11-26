@@ -1,0 +1,59 @@
+# LOOK preset: Franco-Belgian realistic adventure. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+
+id: LOOK_FRANCO_BELGIAN_REALISTIC_V01
+name: Franco-Belgian realistic adventure
+intent: "Westerns, historical epics, aviation, and expedition stories in the large album format. Use it when the reader should believe every horse, uniform, and canyon."
+status: draft
+
+line: "Fine nib pen with controlled variation. Realistic contours, crisp detail on costume, weapons, vehicles, and terrain."
+inking: "Hatching and short parallel strokes for form and texture; spotted blacks for deep shadow, hat brims, and night. Detail stays readable."
+tone: "Carried by color: mostly flat local color with one darker step for shadow and a slight gradient in skies."
+color_mode: full_color
+palette:
+  - "ochre, burnt sienna, and dusty sand for land and leather"
+  - "cobalt fading to pale turquoise for skies"
+  - "olive and sage greens"
+  - "brick red and faded indigo for cloth"
+  - "one darker step of each local color for shadow"
+rendering: "Naturalistic anatomy and weathered faces, accurate period detail, wide landscapes with deep perspective. Dense pages of three or four tiers and ten to twelve panels."
+lettering_style: "Hand-lettered upper case, compact. Oval balloons with a thin outline, rectangular captions in a pale tint, sound effects drawn into the art in small block letters."
+
+style_block: |
+  Full-color Franco-Belgian realistic adventure album page.
+  Line: fine nib pen with controlled weight variation, realistic contours, crisp detail on costume, gear, vehicles, and terrain.
+  Blacks and shadow: hatching and short parallel strokes for form, spotted blacks for deep shadows and night.
+  Tone: flat local color with one darker shadow step, soft gradient only in skies.
+  Color: earthy ochres, siennas, and greens under cobalt skies, faded cloth colors.
+  Rendering: naturalistic anatomy, weathered specific faces, accurate period detail, wide landscapes with deep perspective.
+  Panels: dense album page of three or four tiers, ten to twelve panels, thin black borders, narrow white gutters.
+  Lettering: compact hand-lettered upper case in oval balloons, pale tinted rectangular captions.
+
+prompt_vocabulary:
+  - European realistic adventure album
+  - fine nib pen hatching
+  - flat local color with one shadow step
+  - wide landscape with deep perspective
+  - weathered realistic faces
+  - accurate period costume
+  - dense four-tier page
+
+negative_vocabulary:
+  - cartoon proportions
+  - superhero anatomy
+  - neon colors
+  - heavy airbrush gradients
+  - manga screentone
+  - empty backgrounds
+  - thick uniform outline
+
+drift_risks:
+  - "The panel count drops from ten or more to four or five large panels."
+  - "Hatching disappears and faces get modelled with digital gradients."
+  - "Backgrounds lose their detail after the establishing panel."
+  - "Color saturates towards a modern digital palette and the earth tones go."
+
+pairs_with:
+  comic_formats: [paged]
+  publications: [graphic-novel, miniseries, ongoing]
+  typical_genres: [western, historical, adventure, war, aviation]
