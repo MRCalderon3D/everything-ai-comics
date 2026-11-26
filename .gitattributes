@@ -1,0 +1,11 @@
+# Text files are stored with LF in the repository on every platform.
+* text=auto eol=lf
+
+# Images and archives are never touched.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.pdf  binary
+*.cbz  binary
+*.zip  binary
