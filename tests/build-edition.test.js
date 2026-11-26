@@ -150,6 +150,16 @@ try {
     assert.strictEqual(fs.readFileSync(pdfFile, 'latin1').slice(0, 8), '%PDF-1.4');
     assert.ok(!fs.existsSync(path.join(web, 'stale.txt')), 'a forced web export starts from an empty directory');
     assert.strictEqual(yaml.parse(fs.readFileSync(w.edition, 'utf8')).exports.length, 3);
+
+    // --force is refused once the edition is no longer a draft.
+    const draftText = fs.readFileSync(w.edition, 'utf8');
+    assert.ok(/^status: draft$/m.test(draftText), 'fixture edition starts as a draft');
+    fs.writeFileSync(w.edition, draftText.replace(/^status: draft$/m, 'status: published'));
+    const refused = buildEdition(w.edition, { force: true });
+    assert.strictEqual(refused.ok, false);
+    assert.deepStrictEqual(refused.errors.map((e) => e.code), ['force-not-draft']);
+    assert.strictEqual(fs.readFileSync(pdfFile, 'latin1').slice(0, 8), '%PDF-1.4', 'the published export is untouched');
+    fs.writeFileSync(w.edition, draftText);
   }
 
   // --- the review gate -----------------------------------------------------------------------

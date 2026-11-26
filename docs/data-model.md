@@ -503,6 +503,11 @@ created_at: "2026-11-26T10:00:00Z"     # required
 
 Never fill `model`, `cost.amount`, or `seed` with invented values.
 
+`generate-assets.js` writes a `GEN_*.request.json` next to each record. It is
+the handoff package (prompt, ordered references with their roles, target
+file) and it keeps the request as sent even after the prompt package is
+recompiled for a repair.
+
 ## issues/<ISS_ID>/pages/<PG_ID>/reviews/<RENDER_ID>.review.yaml (`visual-review`)
 
 ```yaml
@@ -610,7 +615,7 @@ pages:                                 # required, in reading order
     lettered_file: null                # overlay mode: the lettered output, else null
 exports:                               # required (may be empty before the first build)
   - format: cbz                        # required. pdf | cbz | web
-    file: editions/ED_001_01/exports/the-night-ferry-ed01.cbz   # required
+    file: editions/ED_001_01/exports/the-night-ferry-001-ed01.cbz   # required
     built_at: null
 created_at: "2026-11-26"
 ```
@@ -618,6 +623,16 @@ created_at: "2026-11-26"
 Edition rules (`build-edition.js` and `validate-workspace.js`):
 
 - Every listed render has a review with verdict `pass` or `fixed`. Otherwise
-  the build refuses, unless `--draft`, which marks every export as a draft.
-- Pages are listed once each, in page-number order, with no gaps.
-- An export file that already exists is never overwritten.
+  the build refuses, unless `--draft`, which marks every export as a draft
+  (`-DRAFT` in the file name, a stamp on every PDF page).
+- Pages are listed once each, in page-number order, starting at page 1, with
+  no gaps.
+- Export names are `<title-slug>-<issue number>-ed<edition number>[-DRAFT].<ext>`;
+  the web reader is a directory with the same base name and a `-web` suffix.
+- An export file that already exists is never overwritten. `--force` replaces
+  it only while the edition has status `draft`; a reviewed or published
+  edition is corrected with a new edition ID that sets `supersedes` and
+  `changes`.
+- `lettered_file`, when set, is a PNG or JPEG. The SVG overlay written by
+  `letter-pages.js` is exported to an image with a browser or a vector tool
+  first.

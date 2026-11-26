@@ -48,7 +48,7 @@ Options:
   --draft            Build even when a listed render has no passing review.
                      Every export gets -DRAFT in its name, the PDF is stamped
                      on every page, and the web reader shows a draft banner.
-  --force            Overwrite exports that already exist.
+  --force            Overwrite existing exports. Draft editions only.
   --help             Show this help.
 
 Checks before anything is written:
@@ -67,8 +67,9 @@ Output, under editions/<ED_ID>/exports/:
 "lettered_file" replaces "file" when it is set. It must be a PNG or JPEG: an
 overlay SVG from letter-pages.js has to be exported to an image first.
 
-An existing export is skipped, not overwritten; pass --force to replace it, or
-create a new edition with a new ID.
+An existing export is skipped, not overwritten. --force replaces it only while
+the edition has status "draft" (or the build is --draft); a reviewed or
+published edition is corrected with a new edition ID.
 
 After a successful build the "exports" list in edition.yaml is updated
 (format, file, built_at). Only the exports block is replaced, so comments and
@@ -499,6 +500,14 @@ function buildEdition(editionFile, options = {}) {
     return result;
   }
   result.formats = formats;
+
+  // --force may replace exports of a draft only. Once an edition is reviewed
+  // or published, its files are what readers hold: correct it with a new
+  // edition ID instead.
+  if (options.force && !options.draft && edition.status !== 'draft') {
+    error('force-not-draft', `${edition.id || 'this edition'} has status "${edition.status}"; --force only replaces exports of a draft edition. Create a new edition with "supersedes: ${edition.id}" and the list of changes.`);
+    return result;
+  }
 
   const pages = inspectEdition(root, edition, project, options, result);
   if (formats.includes('pdf')) {
