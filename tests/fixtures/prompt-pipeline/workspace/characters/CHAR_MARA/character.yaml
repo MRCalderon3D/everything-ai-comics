@@ -1,0 +1,20 @@
+id: CHAR_MARA
+name: Mara
+role: protagonist
+description:
+  summary: Ferry pilot in her fifties, weathered, economical in movement.
+  age: fifties
+  build: wiry, slightly stooped
+  hair: grey, cropped
+  face: long face, deep-set eyes, broken nose
+  distinguishing_features:
+    - broken nose
+    - grey cropped hair
+    - oilskin coat with a torn left cuff
+prompt_summary: Wiry woman in her fifties with cropped grey hair, a broken nose and an oilskin coat torn at the left cuff.
+visually_adjacent_to: [CHAR_OSKAR]
+default_wardrobe: WARD_MARA_OILSKIN
+wardrobe_file: wardrobe.yaml
+references:
+  - CHAR_MARA_TURN_MASTER_V01
+status: approved

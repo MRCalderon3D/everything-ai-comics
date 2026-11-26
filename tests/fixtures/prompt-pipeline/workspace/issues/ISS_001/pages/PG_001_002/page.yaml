@@ -1,0 +1,188 @@
+id: PG_001_002
+issue: ISS_001
+number: 2
+scene: SC_001_01
+side: left
+spread_with: null
+purpose: Mara finds the boy and reads the cut on his hand before she decides.
+page_turn: none
+layout:
+  grid: two tiers, 2 / 2
+  tiers: [2, 2]
+  reading_order: [1, 2, 3, 4]
+panels:
+  - id: PN_001_002_01
+    order: 1
+    tier: 1
+    size: medium
+    framing:
+      shot_size: full
+      angle: low_angle
+      view: three_quarter_back
+    moment: Mara climbs down the ladder with the flare gun in her right hand.
+    location: LOC_FERRY_DECK
+    transition_in: action
+    ellipsis: Mara takes the flare gun from its rack and leaves the wheelhouse.
+    background: Wheelhouse lamp above, wet deck below.
+    cast:
+      - character: CHAR_MARA
+        off_panel: false
+        position: { level: deck, side: right, landmark: ladder }
+        facing: left
+        action: Steps off the last rung, gun pointed at the deck.
+        acting: Weight low, head tilted to listen.
+        wardrobe: WARD_MARA_OILSKIN
+        state: []
+        holding: [PROP_FLARE_GUN]
+        moved: Climbed down the ladder.
+      - character: CHAR_OSKAR
+        off_panel: true
+        position: { level: deck, side: left, landmark: crates }
+        facing: right
+        action: Hides behind the crates.
+        wardrobe: WARD_OSKAR_HOODED
+        state: [cut_left_hand]
+        holding: []
+    props: []
+    transfers:
+      - prop: PROP_FLARE_GUN
+        from: null
+        to: CHAR_MARA
+        how: pickup
+    lettering: []
+  - id: PN_001_002_02
+    order: 2
+    tier: 1
+    size: medium
+    framing:
+      shot_size: medium_wide
+      angle: eye_level
+      view: profile
+    moment: Mara lifts the tarpaulin and finds the boy pressed against the crates.
+    location: LOC_FERRY_DECK
+    transition_in: action
+    ellipsis: null
+    background: Lashed crates, coiled mooring line.
+    cast:
+      - character: CHAR_MARA
+        off_panel: false
+        position: { level: deck, side: center, landmark: crates }
+        facing: left
+        action: Lifts the tarpaulin with her left hand.
+        acting: Arm stiff, gun held low and away.
+        wardrobe: WARD_MARA_OILSKIN
+        state: []
+        holding: [PROP_FLARE_GUN]
+      - character: CHAR_OSKAR
+        off_panel: false
+        position: { level: deck, side: left, landmark: crates }
+        facing: right
+        action: Presses his back against the crate, knees up.
+        acting: Chin down, eyes fixed on the gun.
+        wardrobe: WARD_OSKAR_HOODED
+        state: [cut_left_hand]
+        holding: []
+    props: []
+    transfers: []
+    lettering:
+      - id: L01
+        type: balloon
+        speaker: CHAR_MARA
+        text: Out. Slowly.
+        order: 1
+  - id: PN_001_002_03
+    order: 3
+    tier: 2
+    size: medium
+    framing:
+      shot_size: close_up
+      angle: high_angle
+      view: front
+    moment: Oskar looks up, his cut left hand held against his chest.
+    location: LOC_FERRY_DECK
+    transition_in: subject
+    ellipsis: null
+    background: Shadow of the tarpaulin.
+    cast:
+      - character: CHAR_OSKAR
+        off_panel: false
+        position: { level: deck, side: left, landmark: crates }
+        facing: toward_reader
+        action: Holds his cut left hand against his chest.
+        acting: Mouth pressed thin, not blinking.
+        wardrobe: WARD_OSKAR_HOODED
+        state: [cut_left_hand]
+        holding: []
+      - character: CHAR_MARA
+        off_panel: true
+        position: { level: deck, side: center, landmark: crates }
+        facing: left
+        action: Stands over him.
+        wardrobe: WARD_MARA_OILSKIN
+        state: []
+        holding: [PROP_FLARE_GUN]
+    props: []
+    transfers: []
+    lettering:
+      - id: L02
+        type: whisper
+        speaker: CHAR_OSKAR
+        text: Don't tell the patrol.
+        order: 2
+  - id: PN_001_002_04
+    order: 4
+    tier: 2
+    size: medium
+    framing:
+      shot_size: medium
+      angle: eye_level
+      view: three_quarter
+    moment: Mara lowers the flare gun and looks at the boy's hand.
+    location: LOC_FERRY_DECK
+    transition_in: action
+    ellipsis: null
+    background: Far bank, one searchlight sweeping.
+    cast:
+      - character: CHAR_MARA
+        off_panel: false
+        position: { level: deck, side: center, landmark: crates }
+        facing: left
+        action: Lowers the flare gun to her side.
+        acting: Shoulders drop, eyes on his hand.
+        wardrobe: WARD_MARA_OILSKIN
+        state: []
+        holding: [PROP_FLARE_GUN]
+      - character: CHAR_OSKAR
+        off_panel: false
+        position: { level: deck, side: left, landmark: crates }
+        facing: right
+        action: Stays crouched, hand still against his chest.
+        acting: Leans away from her.
+        wardrobe: WARD_OSKAR_HOODED
+        state: [cut_left_hand]
+        holding: []
+    props: []
+    transfers: []
+    lettering:
+      - id: L03
+        type: caption
+        speaker: null
+        text: The launch was four minutes out.
+        order: 3
+      - id: L04
+        type: balloon
+        speaker: CHAR_MARA
+        text: Who cut you?
+        order: 4
+references:
+  required: [LOOK_NOIR_INK_MASTER_V01, CHAR_MARA_TURN_MASTER_V01, CHAR_OSKAR_TURN_MASTER_V01]
+  optional: []
+continuity:
+  enters_from: PG_001_001
+  exits_to: null
+  attach_previous_render: true
+generation:
+  provider: harness-native
+  mode: full_page
+status: rendered
+current_render: PG_001_002_V01

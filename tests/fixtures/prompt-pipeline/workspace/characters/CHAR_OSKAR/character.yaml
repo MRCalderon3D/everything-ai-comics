@@ -1,0 +1,20 @@
+id: CHAR_OSKAR
+name: Oskar
+role: supporting
+description:
+  summary: Stowaway boy of about twelve, small for his age, watchful.
+  age: about twelve
+  build: slight
+  hair: dark, uneven fringe
+  face: round face, wide-set eyes
+  distinguishing_features:
+    - round face
+    - hooded jacket
+    - cut on his left hand
+prompt_summary: Boy of about twelve with a round face, a dark uneven fringe and a hooded jacket.
+visually_adjacent_to: []
+default_wardrobe: WARD_OSKAR_HOODED
+wardrobe_file: wardrobe.yaml
+references:
+  - CHAR_OSKAR_TURN_MASTER_V01
+status: approved

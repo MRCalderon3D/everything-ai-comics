@@ -1,0 +1,23 @@
+location: LOC_FERRY_DECK
+levels:
+  - id: deck
+    description: Car deck, at water level.
+  - id: wheelhouse
+    description: Raised cabin, reached by the ladder.
+sides:
+  convention: Bow is screen left, stern is screen right when facing port.
+  left: bow
+  right: stern
+landmarks:
+  - id: crates
+    level: deck
+    side: left
+    description: Two lashed crates near the bow.
+  - id: ladder
+    level: deck
+    side: right
+    description: Steel ladder to the wheelhouse.
+connections:
+  - from: deck
+    to: wheelhouse
+    via: ladder

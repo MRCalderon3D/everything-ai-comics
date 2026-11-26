@@ -1,0 +1,8 @@
+character: CHAR_MARA
+outfits:
+  - id: WARD_MARA_OILSKIN
+    description: Black oilskin coat torn at the left cuff, wool cap, rubber boots.
+    layers: [oilskin coat, wool jumper, wool cap, rubber boots]
+    hands: bare
+    references: [CHAR_MARA_OILSKIN_MASTER_V01]
+    used_in: [ISS_001]

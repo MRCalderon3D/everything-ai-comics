@@ -1,0 +1,151 @@
+id: PG_001_001
+issue: ISS_001
+number: 1
+scene: SC_001_01
+side: right
+spread_with: null
+purpose: Establish the ferry, Mara alone, and the sound that breaks the routine.
+page_turn: reveal
+layout:
+  grid: three tiers, 1 / 2 / 1
+  tiers: [1, 2, 1]
+  reading_order: [1, 2, 3, 4]
+panels:
+  - id: PN_001_001_01
+    order: 1
+    tier: 1
+    size: wide
+    framing:
+      shot_size: extreme_wide
+      angle: high_angle
+      view: three_quarter
+      composition: Ferry small in a wide black river.
+    moment: The ferry crosses dark water with one shielded lamp lit.
+    location: LOC_FERRY_DECK
+    transition_in: null
+    ellipsis: null
+    background: River, far bank without lights.
+    cast:
+      - character: CHAR_MARA
+        off_panel: false
+        position: { level: wheelhouse, side: right, landmark: null }
+        facing: left
+        action: Steers with one hand.
+        acting: Shoulders loose, eyes ahead.
+        wardrobe: WARD_MARA_OILSKIN
+        state: []
+        holding: []
+    props: []
+    transfers: []
+    lettering:
+      - id: L01
+        type: caption
+        speaker: null
+        text: Last crossing of the night.
+        order: 1
+  - id: PN_001_001_02
+    order: 2
+    tier: 2
+    size: medium
+    framing:
+      shot_size: medium
+      angle: eye_level
+      view: profile
+    moment: Mara at the wheel, the flare gun racked beside her.
+    location: LOC_FERRY_DECK
+    transition_in: aspect
+    ellipsis: null
+    background: Wheelhouse window, black water beyond.
+    cast:
+      - character: CHAR_MARA
+        off_panel: false
+        position: { level: wheelhouse, side: right, landmark: null }
+        facing: left
+        action: Holds the wheel with both hands.
+        acting: Jaw set, blinking slowly.
+        wardrobe: WARD_MARA_OILSKIN
+        state: []
+        holding: []
+    props:
+      - prop: PROP_FLARE_GUN
+        position: { level: wheelhouse, side: right, landmark: null }
+        state: []
+        visible: true
+    transfers: []
+    lettering: []
+  - id: PN_001_001_03
+    order: 3
+    tier: 2
+    size: small
+    framing:
+      shot_size: insert
+      angle: eye_level
+    moment: A crate strap on the deck below slides a hand's width.
+    location: LOC_FERRY_DECK
+    transition_in: subject
+    ellipsis: null
+    background: Wet steel deck.
+    cast: []
+    props: []
+    transfers: []
+    lettering:
+      - id: L02
+        type: sfx
+        speaker: null
+        text: SKRRT
+        order: 2
+  - id: PN_001_001_04
+    order: 4
+    tier: 3
+    size: wide
+    framing:
+      shot_size: medium_close_up
+      angle: low_angle
+      view: three_quarter
+    moment: Mara turns her head toward the sound.
+    location: LOC_FERRY_DECK
+    transition_in: action
+    ellipsis: null
+    background: Wheelhouse lamp behind her head.
+    cast:
+      - character: CHAR_MARA
+        off_panel: false
+        position: { level: wheelhouse, side: right, landmark: null }
+        facing: left
+        action: Turns her head, one hand still on the wheel.
+        acting: Eyes narrowed, mouth shut.
+        wardrobe: WARD_MARA_OILSKIN
+        state: []
+        holding: []
+      - character: CHAR_OSKAR
+        off_panel: true
+        position: { level: deck, side: left, landmark: crates }
+        facing: right
+        action: Hides behind the crates.
+        wardrobe: WARD_OSKAR_HOODED
+        state: [cut_left_hand]
+        holding: []
+    props:
+      - prop: PROP_FLARE_GUN
+        position: { level: wheelhouse, side: right, landmark: null }
+        state: []
+        visible: false
+    transfers: []
+    lettering:
+      - id: L03
+        type: thought
+        speaker: CHAR_MARA
+        text: Nothing on this deck moves by itself.
+        order: 3
+references:
+  required: [LOOK_NOIR_INK_MASTER_V01, CHAR_MARA_TURN_MASTER_V01]
+  optional: [LOC_FERRY_DECK_PLATE_MASTER_V01]
+continuity:
+  enters_from: null
+  exits_to: PG_001_002
+  attach_previous_render: true
+generation:
+  provider: harness-native
+  mode: full_page
+status: reviewed
+current_render: PG_001_001_V01

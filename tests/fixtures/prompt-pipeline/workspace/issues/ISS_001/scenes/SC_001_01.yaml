@@ -1,0 +1,17 @@
+id: SC_001_01
+issue: ISS_001
+location: LOC_FERRY_DECK
+time_of_day: night
+cast: [CHAR_MARA, CHAR_OSKAR]
+summary: Mara hears the crates shift and finds the boy.
+geography:
+  travel_direction: left_to_right
+  threat_direction: right_to_left
+beats:
+  - id: BT_001_01_01
+    summary: Mara notices the sound.
+    pages: [PG_001_001]
+  - id: BT_001_01_02
+    summary: Mara finds Oskar behind the crates.
+    pages: [PG_001_002]
+pages: [PG_001_001, PG_001_002]

@@ -1,0 +1,30 @@
+page: PG_001_001
+render: PG_001_001_V01
+supersedes: null
+reviewer: visual-reviewer
+independent: true
+compared_against:
+  references: [LOOK_NOIR_INK_MASTER_V01, CHAR_MARA_TURN_MASTER_V01]
+  neighbors: []
+checks:
+  identity: { result: pass, evidence: "Broken nose and cropped grey hair in panels 1, 2 and 4." }
+  cast_count: { result: pass, evidence: "One Mara in panels 1, 2 and 4; nobody in panel 3." }
+  position: { result: pass, evidence: "Mara stays in the wheelhouse, screen right." }
+  movement: { result: not_applicable, evidence: "Nobody changes level on this page." }
+  role_causality: { result: pass, evidence: "Mara steers; the strap moves with nobody near it." }
+  object_identity: { result: pass, evidence: "Flare gun has the wide stubby barrel in panel 2." }
+  object_custody: { result: pass, evidence: "Flare gun stays on its rack." }
+  physical_state: { result: not_applicable, evidence: "No state tags on drawn characters." }
+  wardrobe: { result: pass, evidence: "Torn left cuff visible in panels 2 and 4." }
+  spatial_logic: { result: pass, evidence: "Bow stays screen left." }
+  drawing_clarity: { result: pass, evidence: "Both hands readable on the wheel." }
+  lettering: { result: pass, evidence: "Three strings exact; thought balloon points to Mara." }
+  page_structure: { result: pass, evidence: "Four panels in the 1 / 2 / 1 grid." }
+  style_fidelity: { result: pass, evidence: "Solid blacks and brush line match the look master." }
+findings: []
+gates:
+  style_fidelity: pass
+  narrative_continuity: pass
+verdict: pass
+repair_cycle: 0
+reviewed_at: "2026-11-26"

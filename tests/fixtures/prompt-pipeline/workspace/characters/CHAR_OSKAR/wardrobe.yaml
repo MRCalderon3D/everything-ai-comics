@@ -1,0 +1,8 @@
+character: CHAR_OSKAR
+outfits:
+  - id: WARD_OSKAR_HOODED
+    description: Grey hooded jacket two sizes too big, canvas trousers, wet plimsolls.
+    layers: [hooded jacket, canvas trousers, plimsolls]
+    hands: bare
+    references: [CHAR_OSKAR_TURN_MASTER_V01]
+    used_in: [ISS_001]

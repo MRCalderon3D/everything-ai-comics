@@ -1,0 +1,46 @@
+page: PG_001_002
+render: PG_001_002_V01
+supersedes: null
+reviewer: visual-reviewer
+independent: true
+compared_against:
+  references: [LOOK_NOIR_INK_MASTER_V01, CHAR_MARA_TURN_MASTER_V01, CHAR_OSKAR_TURN_MASTER_V01]
+  neighbors: [PG_001_001_V01]
+checks:
+  identity: { result: fail, evidence: "The boy in panel 3 has a long face and cropped grey hair." }
+  cast_count: { result: pass, evidence: "One Mara and one boy in panels 2 and 4." }
+  position: { result: pass, evidence: "Mara on deck at the crates in panels 2 and 4." }
+  movement: { result: pass, evidence: "Ladder descent shown in panel 1." }
+  role_causality: { result: pass, evidence: "Mara lifts the tarpaulin." }
+  object_identity: { result: pass, evidence: "Flare gun keeps its wide barrel." }
+  object_custody: { result: pass, evidence: "Gun in Mara's right hand from panel 1." }
+  physical_state: { result: pass, evidence: "Cut left hand visible in panels 2 to 4." }
+  wardrobe: { result: fail, evidence: "Mara's left cuff is whole in panel 4." }
+  spatial_logic: { result: pass, evidence: "Bow stays screen left." }
+  drawing_clarity: { result: pass, evidence: "Hands separate and readable." }
+  lettering: { result: pass, evidence: "All four strings exact." }
+  page_structure: { result: pass, evidence: "Four panels in the 2 / 2 grid." }
+  style_fidelity: { result: pass, evidence: "Line weight matches the look master." }
+findings:
+  - id: F01
+    panel: PN_001_002_03
+    check: identity
+    expected: Oskar has a round face, a dark uneven fringe and a hooded jacket.
+    visible: The boy has Mara's long face, broken nose and cropped grey hair.
+    severity: blocking
+    repair: Redraw the boy's head and jacket from Oskar's sheet
+    status: open
+  - id: F02
+    panel: PN_001_002_04
+    check: wardrobe
+    expected: Mara's oilskin coat is torn at the left cuff.
+    visible: The left cuff is whole.
+    severity: minor
+    repair: Tear the left cuff of Mara's coat.
+    status: open
+gates:
+  style_fidelity: pass
+  narrative_continuity: fail
+verdict: flagged
+repair_cycle: 0
+reviewed_at: "2026-11-26"

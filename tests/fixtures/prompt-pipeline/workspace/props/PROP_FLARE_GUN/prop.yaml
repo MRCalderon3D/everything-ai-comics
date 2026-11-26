@@ -1,0 +1,10 @@
+id: PROP_FLARE_GUN
+name: Flare gun
+description:
+  summary: Orange single-shot flare pistol with a wide barrel.
+  distinguishing_features: [wide stubby barrel, lanyard ring]
+prompt_summary: Orange single-shot flare pistol with a wide stubby barrel.
+hands_required: 1
+plot_relevant: true
+references: [PROP_FLARE_GUN_REF_MASTER_V01]
+status: approved

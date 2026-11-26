@@ -1,0 +1,138 @@
+{
+  "version": 1,
+  "providers": [
+    {
+      "id": "fal",
+      "file": "providers/image/fal.js",
+      "label": "fal.ai",
+      "env": [
+        "FAL_KEY"
+      ],
+      "capabilities": {
+        "referenceImages": 4,
+        "aspectRatios": [
+          "2:3",
+          "3:4",
+          "9:16",
+          "1:1",
+          "3:2",
+          "4:3",
+          "16:9"
+        ],
+        "imageEditing": true,
+        "textRendering": "unreliable"
+      }
+    },
+    {
+      "id": "replicate",
+      "file": "providers/image/replicate.js",
+      "label": "Replicate (FLUX)",
+      "env": [
+        "REPLICATE_API_TOKEN"
+      ],
+      "capabilities": {
+        "referenceImages": 1,
+        "aspectRatios": [
+          "2:3",
+          "3:4",
+          "9:16",
+          "1:1",
+          "3:2",
+          "4:3",
+          "16:9"
+        ],
+        "imageEditing": false,
+        "textRendering": "unreliable"
+      }
+    },
+    {
+      "id": "comfyui",
+      "file": "providers/image/comfyui.js",
+      "label": "ComfyUI (self-hosted)",
+      "env": [
+        "COMFYUI_HOST"
+      ],
+      "capabilities": {
+        "referenceImages": 8,
+        "aspectRatios": [
+          "2:3",
+          "3:4",
+          "9:16",
+          "1:1",
+          "3:2",
+          "4:3",
+          "16:9"
+        ],
+        "imageEditing": false,
+        "textRendering": "none"
+      }
+    },
+    {
+      "id": "gemini",
+      "file": "providers/image/gemini.js",
+      "label": "Google Gemini",
+      "env": [
+        "GOOGLE_API_KEY"
+      ],
+      "capabilities": {
+        "referenceImages": 3,
+        "aspectRatios": [
+          "2:3",
+          "3:4",
+          "9:16",
+          "1:1",
+          "4:5",
+          "3:2",
+          "4:3",
+          "5:4",
+          "16:9",
+          "21:9"
+        ],
+        "imageEditing": true,
+        "textRendering": "unreliable"
+      }
+    },
+    {
+      "id": "harness-native",
+      "file": "providers/image/harness-native.js",
+      "label": "Harness-native image generation (Codex gpt-image or an MCP image tool)",
+      "env": [],
+      "capabilities": {
+        "referenceImages": 4,
+        "aspectRatios": [
+          "2:3",
+          "3:4",
+          "9:16",
+          "1:1",
+          "4:5",
+          "3:2",
+          "4:3",
+          "16:9"
+        ],
+        "imageEditing": true,
+        "textRendering": "unreliable"
+      }
+    },
+    {
+      "id": "manual",
+      "file": "providers/image/manual.js",
+      "label": "Manual image generation (any web UI or desktop tool)",
+      "env": [],
+      "capabilities": {
+        "referenceImages": 4,
+        "aspectRatios": [
+          "2:3",
+          "3:4",
+          "9:16",
+          "1:1",
+          "4:5",
+          "3:2",
+          "4:3",
+          "16:9"
+        ],
+        "imageEditing": true,
+        "textRendering": "unreliable"
+      }
+    }
+  ]
+}
