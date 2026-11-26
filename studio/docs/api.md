@@ -23,7 +23,8 @@ long string ends with `…`, and local paths are replaced by `<studio home>` and
 - [Uploads](#uploads)
 - [Operations and jobs](#operations-and-jobs)
 - [Events](#events)
-- [Chat](#chat)
+- [Conversation](#conversation)
+- [Story proposals](#story-proposals)
 - [History](#history)
 - [Approvals](#approvals)
 - [Overlay lettering](#overlay-lettering)
@@ -78,16 +79,21 @@ as it is, or write its own wording from the code.
 {
   "operations": [
     {
-      "name": "pages.plan",
-      "title": "Planificar páginas",
-      "title_code": "op.pages.plan.title",
+      "name": "character.update",
+      "title": "Cambiar un personaje",
+      "title_code": "op.character.update.title",
       "title_params": {},
-      "summary": "Convierte un texto de lo que pasa en páginas planificadas (guion, composición, continuidad) y las revisa.",
-      "summary_code": "op.pages.plan.summary",
+      "summary": "Aplica un cambio a un personaje, con fotos nuevas si las hay, y puede dibujar una hoja de giro nueva.",
+      "summary_code": "op.character.update.summary",
       "summary_params": {},
       "params": [
-        { "name": "text", "type": "string", "required": true, "description": "What happens on these pages." },
-        "... 2 more"
+        {
+          "name": "character",
+          "type": "string",
+          "required": true,
+          "description": "Character ID, for example CHAR_MARTA."
+        },
+        "... 3 more"
       ]
     }
   ]
@@ -172,7 +178,7 @@ present only where a route documents it.
 | 403 | The `Host` or `Origin` check failed (`bad_host`, `bad_origin`). |
 | 404 | The project, page, job, file, upload or other thing named in the request does not exist. |
 | 405 | The method is not allowed on this route. |
-| 409 | The request is well formed and the current state does not allow it. The code says why: `plan_not_approved`, `style_frozen`, `no_draw_tool`, `look_not_approved`, `review_flagged`, `job_finished`, `project_busy`, `file_changed`, `history_unavailable`, `nothing_to_do`, and the refusal codes of the scaffold scripts such as `master_exists`. |
+| 409 | The request is well formed and the current state does not allow it. The code says why: `plan_not_approved`, `style_frozen`, `no_draw_tool`, `look_not_approved`, `review_flagged`, `job_finished`, `project_busy`, `file_changed`, `history_unavailable`, `nothing_to_do`, `no_story_text`, `proposal_closed`, `part_decided`, and the refusal codes of the scaffold scripts such as `master_exists`. |
 | 413 | The body is larger than the route allows (`too_large`). |
 | 415 | The body is of a type the route does not take (`unsupported_media_type`, `unsupported_file`, `not_an_image`, `not_text`). |
 | 422 | A YAML text does not parse (`yaml_parse`, `yaml_empty`, with `details.line`), or a workspace file read by a screen does not parse (`workspace_yaml`). |
@@ -337,9 +343,11 @@ A review that passes with one note:
 
 ### `GET /api/health`
 
-Which tools are installed and what the server can do. `?refresh=1` looks for
-the tools again instead of using the cached answer (the cache lasts one
-minute).
+Which tools are installed, which models each one offers, and what the server
+can do. `?refresh=1` looks for the tools and their models again instead of
+using the cached answer (the answer about the tools is kept one minute; the
+model lists are looked up once when the server starts and then only on
+request).
 
 | Field | Meaning |
 |---|---|
@@ -347,10 +355,75 @@ minute).
 | `fake` | `true` in fake mode: no AI tool is called. |
 | `home` | The studio home, where projects live. |
 | `git` | `{ installed, version }`. Without git, history is recorded and cannot be restored. |
-| `tools.claude`, `tools.codex` | `{ installed, version }`. In fake mode `version` is `"fake"` and `fake` is `true`. |
+| `tools.claude`, `tools.codex` | `{ installed, version, jobs, models, models_source, models_detected_at }`. In fake mode `version` is `"fake"` and `fake` is `true`. |
+| `tools.*.jobs` | What the tool can do in the studio: `["plan", "look"]` for Claude Code, `["plan", "look", "draw"]` for Codex. |
+| `tools.*.models` | The models the tool offers, in its own order. Empty when the tool is not installed. Fields below. |
+| `tools.*.models_source` | Where the list came from: `{ kind, where, note }`. `kind` is `cli`, `documented`, `config`, `fake`, `none` (the tool reports nothing) or `detecting` (the first lookup has not finished). `where` names the file or the command, with the home directory written as `~`, or `null`. `note` is a sentence for the person, with its code. Codex adds `default_from`, the configuration file its default comes from. |
+| `tools.*.models_detected_at` | When the list was looked up, or `null` while it is being looked up. |
 | `draw.available` | `true` when Codex is installed and the scaffold has its `codex-cli` provider. `draw.manual` says the manual handoff exists. |
 | `formats` | Export formats `publish.build` accepts. |
 | `languages` | Interface languages the settings accept. |
+
+A model:
+
+| Field | Meaning |
+|---|---|
+| `id` | What goes into the settings (`settings.models.<tool>.<job>`) and reaches the CLI as `--model` or `-m`. |
+| `label` | The name the tool gives it. |
+| `default` | `true` on the model the tool uses when the setting is `null`. At most one per tool; none when the tool does not say. |
+| `source` | `cli` (a list the tool keeps or prints), `config` (the tool's configuration file), `documented` (named in the tool's own help) or `fake`. |
+| `note` | The tool's own description, as it wrote it (English), or a sentence of the studio with `note_code`. `null` when there is neither. |
+| `alias_of` | For an alias such as `opus`, the model id it points at today. Otherwise `null`. |
+
+#### Where the model lists come from
+
+Neither CLI has a command that lists its models in plain words, so the server
+reads what each tool keeps on disk, and only falls back to its help when
+nothing is there. Nothing here starts a session or spends anything. Measured
+with Claude Code 2.1.314 and codex-cli 0.167.1.
+
+Claude Code:
+
+1. `~/.claude/cache/model-catalog/*.json` (or under `CLAUDE_CONFIG_DIR`): the
+   model catalog Claude Code downloads and caches for its model picker.
+   `catalog.config.models` lists the models with a name and a short
+   description, `section: "main"` for the current ones and `"overflow"` for
+   earlier ones. `catalog.config.provider_alias_targets` maps each alias
+   (`fable`, `opus`, `sonnet`, `haiku`) to a model id, and
+   `catalog.state.model` is the account's default. The aliases come first in
+   the list, marked `source: "cli"`, followed by the models no alias points
+   at. The file name carries an account id, so `where` names only the folder.
+2. When there is no catalog, `claude --help`: its `--model` option names
+   aliases (`'fable'`, `'opus'`, `'sonnet'`). They are listed with
+   `source: "documented"` and no default.
+
+The studio runs Claude Code with `--setting-sources project`, so a `model`
+set in the person's own `~/.claude/settings.json` does not apply to studio
+runs, and the server does not report it as the default. `claude` has no
+subcommand that lists models.
+
+Codex:
+
+1. `~/.codex/models_cache.json` (or under `CODEX_HOME`): the catalog Codex
+   fetches and caches. Entries with `visibility: "list"` are the ones its own
+   picker shows, in `priority` order; hidden ones are left out.
+   `source: "cli"`.
+2. When there is no cache, `codex debug models --bundled`: the catalog built
+   into the binary, printed without going to the network. `source: "cli"`.
+   (Without `--bundled` the command refreshes the list from the network, so
+   the server never runs it.)
+3. The default is `model = "..."` in `~/.codex/config.toml`, or the `model`
+   of the profile a top-level `profile = "..."` selects. When that model is
+   not in the list it is added first with `source: "config"`.
+
+Codex's help names no model (its only mention is `-c model="o3"`, an example
+of the configuration syntax), so there is no documented fallback: with no
+cache, no bundled list and no configured model, the list is empty and the
+person can type a name.
+
+A name typed by hand is always accepted in the settings (see
+[`PUT .../settings`](#put-apiprojectsidsettings)); `model_status` says when a
+setting is not in the list.
 
 <!-- example:health -->
 ```json
@@ -364,8 +437,60 @@ minute).
   "home": "<studio home>",
   "git": { "installed": true, "version": "2.45.1.windows.1" },
   "tools": {
-    "claude": { "installed": true, "version": "fake", "fake": true },
-    "codex": { "installed": true, "version": "fake", "fake": true }
+    "claude": {
+      "installed": true,
+      "version": "fake",
+      "fake": true,
+      "jobs": ["plan", "look"],
+      "models": [
+        {
+          "id": "fake-large",
+          "label": "Fake large model",
+          "default": true,
+          "source": "fake",
+          "note": "Fake mode: a placeholder, not a real model.",
+          "note_code": "model.note.fake",
+          "note_params": {},
+          "alias_of": null
+        },
+        "... 1 more"
+      ],
+      "models_source": {
+        "kind": "fake",
+        "where": null,
+        "note": "Fake mode: a fixed list of placeholder models.",
+        "note_code": "model.source.fake",
+        "note_params": {}
+      },
+      "models_detected_at": "2026-11-26T20:28:52Z"
+    },
+    "codex": {
+      "installed": true,
+      "version": "fake",
+      "fake": true,
+      "jobs": ["plan", "look", "draw"],
+      "models": [
+        {
+          "id": "fake-codex",
+          "label": "Fake Codex model",
+          "default": true,
+          "source": "fake",
+          "note": "Fake mode: a placeholder, not a real model.",
+          "note_code": "model.note.fake",
+          "note_params": {},
+          "alias_of": null
+        },
+        "... 1 more"
+      ],
+      "models_source": {
+        "kind": "fake",
+        "where": null,
+        "note": "Fake mode: a fixed list of placeholder models.",
+        "note_code": "model.source.fake",
+        "note_params": {}
+      },
+      "models_detected_at": "2026-11-26T20:28:52Z"
+    }
   },
   "draw": { "available": true, "provider": "codex-cli", "manual": true },
   "formats": ["pdf", "cbz", "web", "images", "epub"],
@@ -373,6 +498,95 @@ minute).
 }
 ```
 <!-- /example:health -->
+
+### `POST /api/tools/refresh`
+
+Looks for the tools and their models again, now, and answers with the result
+as `tools` (the shape of `tools` in `GET /api/health`). For a Settings screen
+after the person installs a tool or signs in. The body is ignored; send `{}`.
+It reads files and may run `claude --help` or `codex debug models --bundled`;
+it starts no session.
+
+<!-- example:tools-refresh -->
+```json
+{
+  "tools": {
+    "claude": {
+      "installed": true,
+      "version": "fake",
+      "fake": true,
+      "jobs": ["plan", "look"],
+      "models": [
+        {
+          "id": "fake-large",
+          "label": "Fake large model",
+          "default": true,
+          "source": "fake",
+          "note": "Fake mode: a placeholder, not a real model.",
+          "note_code": "model.note.fake",
+          "note_params": {},
+          "alias_of": null
+        },
+        {
+          "id": "fake-fast",
+          "label": "Fake fast model",
+          "default": false,
+          "source": "fake",
+          "note": "Fake mode: a placeholder, not a real model.",
+          "note_code": "model.note.fake",
+          "note_params": {},
+          "alias_of": null
+        }
+      ],
+      "models_source": {
+        "kind": "fake",
+        "where": null,
+        "note": "Fake mode: a fixed list of placeholder models.",
+        "note_code": "model.source.fake",
+        "note_params": {}
+      },
+      "models_detected_at": "2026-11-26T20:28:52Z"
+    },
+    "codex": {
+      "installed": true,
+      "version": "fake",
+      "fake": true,
+      "jobs": ["plan", "look", "... 1 more"],
+      "models": [
+        {
+          "id": "fake-codex",
+          "label": "Fake Codex model",
+          "default": true,
+          "source": "fake",
+          "note": "Fake mode: a placeholder, not a real model.",
+          "note_code": "model.note.fake",
+          "note_params": {},
+          "alias_of": null
+        },
+        {
+          "id": "fake-codex-mini",
+          "label": "Fake small Codex model",
+          "default": false,
+          "source": "fake",
+          "note": "Fake mode: a placeholder, not a real model.",
+          "note_code": "model.note.fake",
+          "note_params": {},
+          "alias_of": null
+        }
+      ],
+      "models_source": {
+        "kind": "fake",
+        "where": null,
+        "note": "Fake mode: a fixed list of placeholder models.",
+        "note_code": "model.source.fake",
+        "note_params": {}
+      },
+      "models_detected_at": "2026-11-26T20:28:52Z"
+    }
+  }
+}
+```
+<!-- /example:tools-refresh -->
 
 ### `GET /api/ops`
 
@@ -391,7 +605,7 @@ and `summary` are in the language of the request (`?lang=` or
       "title": "Set up the project",
       "title_code": "op.project.setup.title",
       "title_params": {},
-      "summary": "Fills the project metadata and writes the story bible and the series plan from a description.",
+      "summary": "Deprecated: use Draft the story bible. Saves the description as your text and asks the AI for a draft of the story bible, as a proposal you decide on.",
       "summary_code": "op.project.setup.summary",
       "summary_params": {},
       "params": [
@@ -432,7 +646,7 @@ and `summary` are in the language of the request (`?lang=` or
         }
       ]
     },
-    "... 16 more"
+    "... 19 more"
   ]
 }
 ```
@@ -506,42 +720,57 @@ The look presets (`templates/looks/*.yaml`) and the choices of the project
 options, for the screen that creates a project. Each preset has `key` (what
 `style.define` takes as `preset`), `look_id`, `name`, `intent`, `color_mode`,
 the drawing in words (`line`, `inking`, `tone`, `rendering`,
-`lettering_style`, `palette`) and its `style_block`. `name` and `intent` are
-in the language of the request, with their codes; the drawing in words and
-the style block are the preset file's own English text, which is also what
-goes into the prompts. The labels of the page sizes are in the language of
-the request too; the other choices are plain ids.
+`lettering_style`, `palette`), `drift_risks`, its `style_block` and
+`preview`. `name` and `intent` are in the language of the request, with
+their codes; the drawing in words, `drift_risks` and the style block are the
+preset file's own English text, which is also what goes into the prompts.
+The labels of the page sizes are in the language of the request too; the
+other choices are plain ids.
+
+| Field | Meaning |
+|---|---|
+| `drift_risks` | What tends to drift from page to page with this look, as the preset records it: a list of English sentences, written for the model. An empty list when the preset has none. |
+| `preview` | The sample page of the preset, `{ url, width, height }`, or `null` when none has been drawn. The samples live in `templates/looks/previews/<key>.png` (`.jpg` and `.webp` are read too), all drawn from the same small scene so the looks can be compared; `templates/looks/previews/README.md` says how they were made. `url` carries a version (`?v=`) that changes with the file. |
+
+A style described in words or taken from uploaded images is not a preset and
+has no sample until its look page is drawn (`style.look`).
 
 <!-- example:presets -->
 ```json
 {
   "presets": [
     {
-      "key": "ligne-claire",
-      "file": "templates/looks/ligne-claire.yaml",
-      "id": "LOOK_LIGNE_CLAIRE_V01",
-      "look_id": "LOOK_LIGNE_CLAIRE",
-      "name": "Ligne claire",
-      "name_code": "preset.ligne-claire.name",
+      "key": "adventure-strip",
+      "file": "templates/looks/adventure-strip.yaml",
+      "id": "LOOK_ADVENTURE_STRIP_V01",
+      "look_id": "LOOK_ADVENTURE_STRIP",
+      "name": "Adventure strip",
+      "name_code": "preset.adventure-strip.name",
       "name_params": {},
-      "intent": "Adventure and travel stories where the setting matters as much as the cast. Everything is drawn with the same …",
-      "intent_code": "preset.ligne-claire.intent",
+      "intent": "Serial adventure, mystery, or romance told a few panels at a time. Realistic people and places, lit like a fil…",
+      "intent_code": "preset.adventure-strip.intent",
       "intent_params": {},
-      "color_mode": "full_color",
-      "line": "One even line weight for figures and backgrounds alike. Contours always close. No line variation for depth.",
-      "inking": "No hatching and almost no solid black. Black appears as flat local color (hair, a coat), never as shadow.",
-      "tone": "None. Form comes from contour and flat color.",
-      "rendering": "Cartoon-simplified faces on correctly proportioned bodies, set against detailed and accurate architecture, veh…",
-      "lettering_style": "Upper case in rectangular balloons with slightly rounded corners and a thin outline. Captions in pale yellow b…",
-      "palette": ["local colors, slightly muted, one flat value per object", "... 1 more"],
+      "color_mode": "monochrome",
+      "line": "Flexible brush line on realistic figures: thick on the shadow side, tapering to a hairline on the lit side. Fi…",
+      "inking": "Feathered brush strokes model faces and cloth; spotted blacks shape the night and the folds of coats. Dry-brus…",
+      "tone": "Mechanical dot tone laid on one or two planes per panel (sky, a wall, a dress), cut to shape with a clean edge…",
+      "rendering": "Naturalistic anatomy and specific, grown-up faces. Cinematic framing with silhouettes in the foreground and de…",
+      "lettering_style": "Hand-lettered upper case, small and even. Round balloons tucked into the corners, a rectangular caption at the…",
+      "palette": [],
       "pairs_with": {
         "comic_formats": ["paged"],
-        "publications": ["one-shot", "... 3 more"],
-        "typical_genres": ["adventure", "... 3 more"]
+        "publications": ["strip", "... 1 more"],
+        "typical_genres": ["adventure", "... 4 more"]
       },
-      "style_block": "Full-color comic book page in a ligne claire style.\nLine: a single even line weight for figures and background…"
+      "drift_risks": [
+        "Feathering turns into cross-hatching or into soft grey shading.",
+        "Dot tone spreads over the whole panel or becomes a smooth gradient.",
+        "... 2 more"
+      ],
+      "style_block": "Black-and-white realistic adventure newspaper strip.\nLine: flexible brush line on realistic figures, thick on …",
+      "preview": { "url": "/api/presets/adventure-strip/preview?v=mwxzqhq02mmk9", "width": 1024, "height": 1536 }
     },
-    "... 5 more"
+    "... 25 more"
   ],
   "choices": {
     "comic_format": ["paged", "webtoon"],
@@ -597,6 +826,17 @@ the request too; the other choices are plain ids.
 ```
 <!-- /example:presets -->
 
+### `GET /api/presets/:key/preview`
+
+The sample page of a preset: the image bytes, with its own content type
+(`image/png`, `image/jpeg` or `image/webp`), `X-Content-Type-Options:
+nosniff` and `Cache-Control: public, max-age=31536000, immutable`. Use the
+`preview.url` of `GET /api/presets`, whose `?v=` changes when the file does.
+`:key` must be the key of a preset (lowercase letters, digits and hyphens);
+anything else, a preset with no sample, or a file that is not an image is
+404 `preview_not_found`. Only files directly inside the previews folder are
+served.
+
 ## Projects
 
 A project is a directory under the studio home that holds
@@ -616,12 +856,12 @@ job is queued or running.
     {
       "id": "the-night-ferry",
       "title": "The Night Ferry",
-      "logline": "A ferry pilot finds a stowaway the harbour patrol is hunting.",
+      "logline": "",
       "description": "A ferry pilot finds a stowaway the harbour patrol is hunting. She decides not to hand him over.",
       "comic_format": "paged",
       "language": "en",
       "created_at": "2026-11-26",
-      "updated_at": "2026-11-26T19:01:27.703Z",
+      "updated_at": "2026-11-26T20:28:52.632Z",
       "image": null,
       "counts": { "pages": 0, "rendered": 0, "passed": 0 },
       "busy": false
@@ -634,21 +874,36 @@ job is queued or running.
 ### `POST /api/projects`
 
 Creates a project: the workspace (through `create-project.js`), the options,
-a git repository in the project directory, and, when a description is given,
-a `project.setup` job.
+the person's story files, and a git repository in the project directory. No
+AI job starts: the AI writes story text only when the person asks
+([Story proposals](#story-proposals)).
+
+The story files are written by the server, from what the person typed:
+
+- `story/source/description.md`: the description, as the person's own source
+  text (only when a description is given).
+- `story/story-bible.yaml`: empty but valid. `premise` is the description (the
+  title when there is none), `tone` is `""`, and `world_rules`, `facts`,
+  `characters`, `timeline` and `open_questions` are empty lists. The comment
+  block of the scaffold's template stays at the top.
+  `validate-workspace.js` passes on it.
+- `story/series-plan.yaml`: one issue, `ISS_001`, titled like the project,
+  with the page budget of `pages`, status `planning`, and
+  `source_span: story/source/description.md` when there is a description.
 
 | Body field | Type | Meaning |
 |---|---|---|
 | `title` | string, required | At most 120 characters. The project id is its slug; a second project with the same title gets `-2`. |
-| `description` | string | What the comic is about. With it, `project.setup` starts at once. |
+| `description` | string | What the comic is about, in the person's words. It becomes the source text and the premise. |
 | `format` | `paged` (default) or `webtoon` | Sets `comic_format`. A webtoon gets a 9:16 scroll segment. |
 | `language` | string | Language of the comic, such as `en` or `es`. |
 | `pages` | integer 1 to 200 | Page budget of the first issue. Default 4. |
 | `options` | object | Any field of [`PUT .../options`](#put-apiprojectsidoptions) except `title` and `comic_format`. |
 | `interface_language` | `en` or `es` | Language of the interface for this project. Default: the comic's language when it is one of the two, else `en`. |
-| `setup` | boolean | `false` creates the project without starting `project.setup`. |
+| `setup` | boolean | Deprecated. Default `false`. `true` (with a description) queues the deprecated [`project.setup`](#projectsetup), which now asks for a draft of the story bible as a proposal and writes no story. |
 
-Answers 201 with the project card and the job (or `job: null`).
+Answers 201 with the project card, `job` (`null` unless `setup` is `true`)
+and `written`, the workspace paths of the story files.
 
 <!-- example:project-create-request -->
 ```json
@@ -674,80 +929,13 @@ Answers 201 with the project card and the job (or `job: null`).
     "comic_format": "paged",
     "language": "en",
     "created_at": "2026-11-26",
-    "updated_at": "2026-11-26T19:01:27.368Z",
+    "updated_at": "2026-11-26T20:28:52.632Z",
     "image": null,
     "counts": { "pages": 0, "rendered": 0, "passed": 0 },
-    "busy": true
+    "busy": false
   },
-  "job": {
-    "id": "job_2026112619012736902_bbcc",
-    "project": "the-night-ferry",
-    "op": "project.setup",
-    "title": "Set up the project",
-    "title_code": "op.project.setup.title",
-    "title_params": {},
-    "params": {
-      "description": "A ferry pilot finds a stowaway the harbour patrol is hunting. She decides not to hand him over.",
-      "pages": 3
-    },
-    "status": "queued",
-    "created_at": "2026-11-26T19:01:27Z",
-    "started_at": null,
-    "ended_at": null,
-    "current_step": null,
-    "steps": [
-      {
-        "id": "source",
-        "label": "Save the description",
-        "label_code": "step.project.setup.source",
-        "label_params": {},
-        "status": "pending",
-        "started_at": null,
-        "ended_at": null,
-        "tool": null,
-        "commit": null,
-        "files": 0,
-        "note": null,
-        "changed": []
-      },
-      {
-        "id": "story",
-        "label": "Write the story bible and the series plan",
-        "label_code": "step.project.setup.story",
-        "label_params": {},
-        "status": "pending",
-        "started_at": null,
-        "ended_at": null,
-        "tool": null,
-        "commit": null,
-        "files": 0,
-        "note": null,
-        "changed": []
-      },
-      {
-        "id": "check",
-        "label": "Check the files",
-        "label_code": "step.check.files",
-        "label_params": {},
-        "status": "pending",
-        "started_at": null,
-        "ended_at": null,
-        "tool": null,
-        "commit": null,
-        "files": 0,
-        "note": null,
-        "changed": []
-      }
-    ],
-    "questions": [],
-    "answers": {},
-    "result": null,
-    "error": null,
-    "tools": {},
-    "commits": [],
-    "position": 1,
-    "cost_usd": null
-  }
+  "job": null,
+  "written": ["story/source/description.md", "story/story-bible.yaml", "... 1 more"]
 }
 ```
 <!-- /example:project-create -->
@@ -780,19 +968,19 @@ The project home: per-screen status, the next thing to do, what blocks it.
   "project": {
     "id": "the-night-ferry",
     "title": "The Night Ferry",
-    "logline": "A ferry pilot finds a stowaway the harbour patrol is hunting.",
+    "logline": "",
     "description": "A ferry pilot finds a stowaway the harbour patrol is hunting. She decides not to hand him over.",
     "comic_format": "paged",
     "language": "en",
     "created_at": "2026-11-26",
-    "updated_at": "2026-11-26T19:01:41.484Z",
+    "updated_at": "2026-11-26T20:29:06.282Z",
     "image": {
       "path": "issues/ISS_001/cover/renders/CV_001_V03.png",
-      "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/cover/renders/CV_001_V03.png?v=6tsmwxx57bs",
+      "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/cover/renders/CV_001_V03.png?v=6tsmwy09m6q",
       "width": 600,
       "height": 900,
       "bytes": 8848,
-      "mtime": "2026-11-26T19:01:38.776Z"
+      "mtime": "2026-11-26T20:29:03.506Z"
     },
     "counts": { "pages": 3, "rendered": 3, "passed": 3 },
     "busy": false,
@@ -852,7 +1040,7 @@ The project home: per-screen status, the next thing to do, what blocks it.
       "summary_code": "screen.story.done",
       "summary_params": {},
       "blockers": [],
-      "counts": { "facts": 3 }
+      "counts": { "facts": 3, "proposals_open": 3 }
     },
     {
       "key": "style",
@@ -885,11 +1073,11 @@ The project home: per-screen status, the next thing to do, what blocks it.
         "current_render": "CV_001_V03",
         "image": {
           "path": "issues/ISS_001/cover/renders/CV_001_V03.png",
-          "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/cover/renders/CV_001_V03.png?v=6tsmwxx57bs",
+          "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/cover/renders/CV_001_V03.png?v=6tsmwy09m6q",
           "width": 600,
           "height": 900,
           "bytes": 8848,
-          "mtime": "2026-11-26T19:01:38.776Z"
+          "mtime": "2026-11-26T20:29:03.506Z"
         },
         "verdict": "fixed",
         "outcome": "pass",
@@ -923,7 +1111,7 @@ erased. While a job is queued or running the answer is 409 `project_busy`;
 ```json
 {
   "deleted": "overlay-letters",
-  "trash": ".trash/overlay-letters-20261126190147",
+  "trash": ".trash/overlay-letters-20261126202911",
   "note": "The project was moved to the trash folder of the studio home. Nothing was erased.",
   "note_code": "note.trashed",
   "note_params": {}
@@ -942,11 +1130,81 @@ are fields of `production/project.yaml`.
 |---|---|
 | `settings.language` | Interface language, `en` or `es`. |
 | `settings.drivers` | Which tool does each verb: `plan` and `look` take `claude` or `codex`; `draw` takes `codex` or `manual`. |
-| `settings.models` | Model per driver and verb, or `null` for the tool's default: `claude.plan`, `claude.look`, `codex.plan`, `codex.look`, `codex.draw`. |
+| `settings.models` | Model per driver and verb, or `null` for the tool's default: `claude.plan`, `claude.look`, `codex.plan`, `codex.look`, `codex.draw`. A model `id` from `installed.<tool>.models`, or any name the person types (letters, digits, `.`, `_`, `:`, `-`, `[`, `]`, at most 80 characters). |
 | `settings.repair_limit` | `null`, or a number from 0 to 10 that stops the automatic repairs earlier than the project's own limit. It never raises that limit. |
 | `tools` | The resulting assignment, as in the project home. |
-| `installed` | `{ claude, codex }` as in `GET /api/health`. |
+| `installed` | `{ claude, codex }` as in `GET /api/health`, with `jobs`, `models` and `models_source`. Show a tool only when `installed` is `true`, and per job only the tools whose `jobs` include it. |
+| `model_status` | Per tool and verb: `default` (the setting is `null`), `listed` (it names a model of the list, or the model an alias points at) or `custom` (a name typed by hand). |
+| `timings` | How long AI calls took in this project, per tool, model and job (below). Empty until something ran. |
 | `choices`, `languages` | What each field accepts. |
+
+`timings` comes from `.studio/timings.jsonl` in the project, one line per AI
+call: planning and writing (`plan`), reading an image (`look`) and drawing
+(`draw`), with its duration and whether it succeeded. Each entry of
+`timings`:
+
+| Field | Meaning |
+|---|---|
+| `tool`, `model`, `job` | The group. `model` is the setting the calls ran with; `null` is the tool's default. |
+| `runs`, `failed` | Calls that succeeded and calls that failed. Failed calls are not in the averages. |
+| `average_ms` | Average duration of a call that succeeded. |
+| `per_page_ms` | Average time per page, over the calls that worked on pages (planning pages, checking a page, drawing a page), or `null`. This is the "about 3 minutes per page" figure. |
+| `last_at` | When the last call of the group ran. |
+| `kinds` | The same per kind of call: a prompt name (`pages.plan`, `pages.breakdown`, `review`, `chat`, `story.propose`...) or, for drawing, `page`, `cover` or `sheet`. Each `{ runs, average_ms, per_page_ms }`. |
+
+After a few pages were drawn:
+
+<!-- example:settings-timings -->
+```json
+{
+  "timings": [
+    {
+      "tool": "claude",
+      "model": "sonnet",
+      "job": "look",
+      "runs": 4,
+      "failed": 0,
+      "average_ms": 12,
+      "per_page_ms": 12,
+      "last_at": "2026-11-26T20:28:58Z",
+      "kinds": { "review": { "runs": 4, "average_ms": 12, "per_page_ms": 12 } }
+    },
+    {
+      "tool": "claude",
+      "model": null,
+      "job": "plan",
+      "runs": 9,
+      "failed": 0,
+      "average_ms": 13,
+      "per_page_ms": 8,
+      "last_at": "2026-11-26T20:28:56Z",
+      "kinds": {
+        "story.propose": { "runs": 3, "average_ms": 8, "per_page_ms": null },
+        "style.define": { "runs": 1, "average_ms": 12, "per_page_ms": null },
+        "character.write": { "runs": 2, "average_ms": 12, "per_page_ms": null },
+        "pages.breakdown": { "runs": 1, "average_ms": 15, "per_page_ms": 5 },
+        "pages.plan": { "runs": 1, "average_ms": 33, "per_page_ms": 11 },
+        "entities.derive": { "runs": 1, "average_ms": 10, "per_page_ms": null }
+      }
+    },
+    {
+      "tool": "codex",
+      "model": null,
+      "job": "draw",
+      "runs": 7,
+      "failed": 0,
+      "average_ms": 108,
+      "per_page_ms": 106,
+      "last_at": "2026-11-26T20:28:58Z",
+      "kinds": {
+        "sheet": { "runs": 3, "average_ms": 110, "per_page_ms": null },
+        "page": { "runs": 4, "average_ms": 106, "per_page_ms": 106 }
+      }
+    }
+  ]
+}
+```
+<!-- /example:settings-timings -->
 
 <!-- example:settings -->
 ```json
@@ -984,9 +1242,96 @@ are fields of `production/project.yaml`.
     }
   },
   "installed": {
-    "claude": { "installed": true, "version": "fake", "fake": true },
-    "codex": { "installed": true, "version": "fake", "fake": true }
+    "claude": {
+      "installed": true,
+      "version": "fake",
+      "fake": true,
+      "jobs": ["plan", "look"],
+      "models": [
+        {
+          "id": "fake-large",
+          "label": "Fake large model",
+          "default": true,
+          "source": "fake",
+          "note": "Fake mode: a placeholder, not a real model.",
+          "note_code": "model.note.fake",
+          "note_params": {},
+          "alias_of": null
+        },
+        {
+          "id": "fake-fast",
+          "label": "Fake fast model",
+          "default": false,
+          "source": "fake",
+          "note": "Fake mode: a placeholder, not a real model.",
+          "note_code": "model.note.fake",
+          "note_params": {},
+          "alias_of": null
+        }
+      ],
+      "models_source": {
+        "kind": "fake",
+        "where": null,
+        "note": "Fake mode: a fixed list of placeholder models.",
+        "note_code": "model.source.fake",
+        "note_params": {}
+      },
+      "models_detected_at": "2026-11-26T20:28:52Z"
+    },
+    "codex": {
+      "installed": true,
+      "version": "fake",
+      "fake": true,
+      "jobs": ["plan", "look", "draw"],
+      "models": [
+        {
+          "id": "fake-codex",
+          "label": "Fake Codex model",
+          "default": true,
+          "source": "fake",
+          "note": "Fake mode: a placeholder, not a real model.",
+          "note_code": "model.note.fake",
+          "note_params": {},
+          "alias_of": null
+        },
+        {
+          "id": "fake-codex-mini",
+          "label": "Fake small Codex model",
+          "default": false,
+          "source": "fake",
+          "note": "Fake mode: a placeholder, not a real model.",
+          "note_code": "model.note.fake",
+          "note_params": {},
+          "alias_of": null
+        }
+      ],
+      "models_source": {
+        "kind": "fake",
+        "where": null,
+        "note": "Fake mode: a fixed list of placeholder models.",
+        "note_code": "model.source.fake",
+        "note_params": {}
+      },
+      "models_detected_at": "2026-11-26T20:28:52Z"
+    }
   },
+  "model_status": {
+    "claude": { "plan": "default", "look": "custom" },
+    "codex": { "plan": "default", "look": "default", "draw": "default" }
+  },
+  "timings": [
+    {
+      "tool": "claude",
+      "model": null,
+      "job": "plan",
+      "runs": 3,
+      "failed": 0,
+      "average_ms": 8,
+      "per_page_ms": null,
+      "last_at": "2026-11-26T20:28:52Z",
+      "kinds": { "story.propose": { "runs": 3, "average_ms": 8, "per_page_ms": null } }
+    }
+  ],
   "choices": { "plan": ["claude", "codex"], "look": ["claude", "codex"], "draw": ["codex", "manual"] },
   "languages": ["en", "es"]
 }
@@ -997,6 +1342,9 @@ are fields of `production/project.yaml`.
 
 Body: any subset of `language`, `drivers`, `models`, `repair_limit`. Fields
 left out keep their value. 400 `bad_settings` names the first invalid field.
+A model name that is not in the tool's list is accepted (the person may know
+one the tool does not report); the answer's `model_status` marks it
+`custom`.
 
 <!-- example:settings-put -->
 ```json
@@ -1032,6 +1380,10 @@ left out keep their value. 400 `bad_settings` names the first invalid field.
       "model": null,
       "reason": null
     }
+  },
+  "model_status": {
+    "claude": { "plan": "default", "look": "custom" },
+    "codex": { "plan": "default", "look": "default", "draw": "default" }
   }
 }
 ```
@@ -1047,7 +1399,7 @@ The general options of the project as a flat form, the choices for each, and
 {
   "options": {
     "title": "The Night Ferry",
-    "logline": "A ferry pilot finds a stowaway the harbour patrol is hunting.",
+    "logline": "TODO: one sentence. Who wants what, and what stands in the way.",
     "genre": "drama",
     "language": "en",
     "comic_format": "paged",
@@ -1110,8 +1462,8 @@ The general options of the project as a flat form, the choices for each, and
     "text": "# production/project.yaml: workspace configuration\n# Schema: schemas/project.schema.json\n# Project: THE_NIGHT_FERRY\n# Ev…",
     "parse_error": null,
     "findings": [],
-    "etag": "a7d-1a2193bee3f",
-    "mtime": "2026-11-26T19:01:27.743Z",
+    "etag": "aa5-1a2198bf745",
+    "mtime": "2026-11-26T20:28:52.933Z",
     "url": "/api/projects/the-night-ferry/raw/project.yaml"
   }
 }
@@ -1143,7 +1495,7 @@ after the change.
 {
   "options": {
     "title": "The Night Ferry",
-    "logline": "A ferry pilot finds a stowaway the harbour patrol is hunting.",
+    "logline": "TODO: one sentence. Who wants what, and what stands in the way.",
     "genre": "drama",
     "language": "en",
     "comic_format": "paged",
@@ -1158,53 +1510,68 @@ after the change.
     "image_provider": "codex-cli"
   },
   "findings": [],
-  "commit": "7e6090f3f7b5b5c8ef28b09a5dd38d36e6fd27aa"
+  "commit": "40cd2dd1ed95ea33f9ed802996e2e4788e51a6dd"
 }
 ```
 <!-- /example:options-put -->
 
 ## Screens
 
-One call per screen. Every screen response ends with `chat_key`, the key of
-that screen's conversation (see [Chat](#chat)).
+One call per screen. Every screen response ends with `chat_key`, the screen
+key, and `screen`: `{ key, label, route }`, what a message sent from that
+screen carries (see [Conversation](#conversation)). `label` is a name for
+the person in the language of the request, with `label_code` and
+`label_params`; `route` is the path of the browser app that shows the
+screen.
 
 ### `GET /api/projects/:id/story`
 
 | Field | Meaning |
 |---|---|
 | `written` | `true` once the story bible has a premise and facts. |
+| `has_text` | `true` when the person's own text is there: a description or a file under `story/source/`. The project home counts the story screen as done with it, so the person can go on to the style with only their text. |
 | `description` | What the person wrote when creating the project. |
 | `bible` | `story/story-bible.yaml` as a text document. |
 | `series_plan` | `story/series-plan.yaml` as a text document. |
 | `sources` | Files under `story/source/`: `[{ name, path, bytes, mtime, url }]`. |
 | `blocking_questions` | Open questions marked blocking, which have to be answered before pages are drawn. |
 | `characters_named` | Characters the bible lists: `[{ id, has_file }]`. |
+| `proposals` | Open proposals, as in [`GET .../proposals`](#get-apiprojectsidproposals). |
 
-<!-- example:story -->
+Facts the person writes in the story bible directly, through
+[`PUT .../file`](#put-apiprojectsidfile), keep the provenance they write:
+by the schema, `source` with a `source_ref` for what their text states, and
+`user_change` with `replaces` when they change an existing fact. The server
+does not rewrite them.
+
+A new project, before anything else:
+
+<!-- example:story-new -->
 ```json
 {
-  "written": true,
+  "written": false,
+  "has_text": true,
   "description": "A ferry pilot finds a stowaway the harbour patrol is hunting. She decides not to hand him over.",
   "bible": {
     "path": "story/story-bible.yaml",
     "exists": true,
     "kind": "yaml",
     "schema": "story-bible",
-    "text": "# Schema: schemas/story-bible.schema.json\n\ntitle: The Night Ferry\npremise: A ferry pilot finds a stowaway the harbour pa…",
+    "text": "# production/story/story-bible.yaml: the canon\n# Schema: schemas/story-bible.schema.json\n# Written by /source-analyze an…",
     "data": {
       "title": "The Night Ferry",
       "premise": "A ferry pilot finds a stowaway the harbour patrol is hunting. She decides not to hand him over.",
-      "tone": "Plain and direct.",
+      "tone": "",
       "world_rules": [],
-      "facts": ["{…}", "... 1 more"],
+      "facts": [],
       "characters": [],
-      "timeline": ["{…}"],
+      "timeline": [],
       "open_questions": []
     },
     "parse_error": null,
     "findings": [],
-    "etag": "2af-1a2193bed7e",
-    "mtime": "2026-11-26T19:01:27.550Z",
+    "etag": "17e-1a2198bf540",
+    "mtime": "2026-11-26T20:28:52.416Z",
     "url": "/api/projects/the-night-ferry/raw/story/story-bible.yaml"
   },
   "series_plan": {
@@ -1212,12 +1579,12 @@ that screen's conversation (see [Chat](#chat)).
     "exists": true,
     "kind": "yaml",
     "schema": "series-plan",
-    "text": "# Schema: schemas/series-plan.schema.json\n\ntitle: The Night Ferry\nissues:\n  - id: ISS_001\n    number: 1\n    title: Issue…",
+    "text": "# production/story/series-plan.yaml: the story divided into issues\n# Schema: schemas/series-plan.schema.json\n# Written b…",
     "data": { "title": "The Night Ferry", "issues": ["{…}"] },
     "parse_error": null,
     "findings": [],
-    "etag": "ee-1a2193bed7e",
-    "mtime": "2026-11-26T19:01:27.550Z",
+    "etag": "178-1a2198bf540",
+    "mtime": "2026-11-26T20:28:52.416Z",
     "url": "/api/projects/the-night-ferry/raw/story/series-plan.yaml"
   },
   "sources": [
@@ -1225,13 +1592,105 @@ that screen's conversation (see [Chat](#chat)).
       "name": "description.md",
       "path": "story/source/description.md",
       "bytes": 115,
-      "mtime": "2026-11-26T19:01:27.381Z",
+      "mtime": "2026-11-26T20:28:52.415Z",
       "url": "/api/projects/the-night-ferry/raw/story/source/description.md"
     }
   ],
   "blocking_questions": [],
   "characters_named": [],
-  "chat_key": "story"
+  "chat_key": "story",
+  "proposals": [],
+  "screen": {
+    "key": "story",
+    "label": "Story",
+    "label_code": "screen_label.story",
+    "label_params": {},
+    "route": "/p/the-night-ferry/story"
+  }
+}
+```
+<!-- /example:story-new -->
+
+After a draft was decided on:
+
+<!-- example:story -->
+```json
+{
+  "written": true,
+  "has_text": true,
+  "description": "A ferry pilot finds a stowaway the harbour patrol is hunting. She decides not to hand him over.",
+  "bible": {
+    "path": "story/story-bible.yaml",
+    "exists": true,
+    "kind": "yaml",
+    "schema": "story-bible",
+    "text": "# production/story/story-bible.yaml: the canon\n# Schema: schemas/story-bible.schema.json\n# Written by /source-analyze an…",
+    "data": {
+      "title": "The Night Ferry",
+      "premise": "A ferry pilot finds a stowaway the harbour patrol is hunting.",
+      "tone": "Quiet and tense, with dry humour.",
+      "world_rules": [],
+      "facts": ["{…}", "... 1 more"],
+      "characters": [],
+      "timeline": ["{…}"],
+      "open_questions": ["{…}"]
+    },
+    "parse_error": null,
+    "findings": [],
+    "etag": "3d0-1a2198bf65c",
+    "mtime": "2026-11-26T20:28:52.700Z",
+    "url": "/api/projects/the-night-ferry/raw/story/story-bible.yaml"
+  },
+  "series_plan": {
+    "path": "story/series-plan.yaml",
+    "exists": true,
+    "kind": "yaml",
+    "schema": "series-plan",
+    "text": "# production/story/series-plan.yaml: the story divided into issues\n# Schema: schemas/series-plan.schema.json\n# Written b…",
+    "data": { "title": "The Night Ferry", "issues": ["{…}"] },
+    "parse_error": null,
+    "findings": [],
+    "etag": "178-1a2198bf540",
+    "mtime": "2026-11-26T20:28:52.416Z",
+    "url": "/api/projects/the-night-ferry/raw/story/series-plan.yaml"
+  },
+  "sources": [
+    {
+      "name": "description.md",
+      "path": "story/source/description.md",
+      "bytes": 115,
+      "mtime": "2026-11-26T20:28:52.415Z",
+      "url": "/api/projects/the-night-ferry/raw/story/source/description.md"
+    }
+  ],
+  "blocking_questions": [],
+  "characters_named": [],
+  "chat_key": "story",
+  "proposals": [
+    {
+      "id": "prop_2026112620285289808_e296",
+      "kind": "suggest",
+      "status": "open",
+      "title": "Suggestion",
+      "title_code": "proposal.title.suggest",
+      "title_params": {},
+      "instruction": "Suggest an ending.",
+      "summary": "This is the fake assistant. It proposes 3 kind(s) of story text for you to accept or reject.",
+      "created_at": "2026-11-26T20:28:52Z",
+      "updated_at": "2026-11-26T20:28:52Z",
+      "job": "job_2026112620285288107_2d73",
+      "tool": "claude",
+      "counts": { "parts": 3, "pending": 3, "accepted": 0, "edited": 0, "rejected": 0 }
+    },
+    "... 1 more"
+  ],
+  "screen": {
+    "key": "story",
+    "label": "Story",
+    "label_code": "screen_label.story",
+    "label_params": {},
+    "route": "/p/the-night-ferry/story"
+  }
 }
 ```
 <!-- /example:story -->
@@ -1267,7 +1726,7 @@ Asset fields, used for looks, characters, locations and props:
 <!-- example:style -->
 ```json
 {
-  "presets": "[6 items]",
+  "presets": "[26 items]",
   "look": {
     "id": "LOOK_NOIR_INK",
     "frozen": true,
@@ -1279,11 +1738,11 @@ Asset fields, used for looks, characters, locations and props:
       "path": "references/style/LOOK_NOIR_INK_MASTER_V01.png",
       "image": {
         "path": "references/style/LOOK_NOIR_INK_MASTER_V01.png",
-        "url": "/api/projects/the-night-ferry/raw/references/style/LOOK_NOIR_INK_MASTER_V01.png?v=665mwxx500k",
+        "url": "/api/projects/the-night-ferry/raw/references/style/LOOK_NOIR_INK_MASTER_V01.png?v=665mwy09f5m",
         "width": 600,
         "height": 900,
         "bytes": 7997,
-        "mtime": "2026-11-26T19:01:29.300Z"
+        "mtime": "2026-11-26T20:28:54.394Z"
       },
       "status": "approved",
       "role": "style",
@@ -1303,11 +1762,11 @@ Asset fields, used for looks, characters, locations and props:
         "path": "references/style/LOOK_NOIR_INK_V01.png",
         "image": {
           "path": "references/style/LOOK_NOIR_INK_V01.png",
-          "url": "/api/projects/the-night-ferry/raw/references/style/LOOK_NOIR_INK_V01.png?v=665mwxx500k",
+          "url": "/api/projects/the-night-ferry/raw/references/style/LOOK_NOIR_INK_V01.png?v=665mwy09f5m",
           "width": 600,
           "height": 900,
           "bytes": 7997,
-          "mtime": "2026-11-26T19:01:29.300Z"
+          "mtime": "2026-11-26T20:28:54.394Z"
         },
         "status": "candidate",
         "role": null,
@@ -1321,7 +1780,7 @@ Asset fields, used for looks, characters, locations and props:
           "provider": "codex-cli",
           "model": "unreported",
           "status": "succeeded",
-          "created_at": "2026-11-26T19:01:29.202Z",
+          "created_at": "2026-11-26T20:28:54.298Z",
           "prompt_package": "PP_LOOK_NOIR_INK_CODEX-CLI-LOOK",
           "supplied_by_person": false,
           "summary": "Codex saved one 600x900 PNG in 1 s; 1 reference image(s) passed to the image tool, as Codex reports.",
@@ -1338,11 +1797,11 @@ Asset fields, used for looks, characters, locations and props:
         "path": "references/style/LOOK_NOIR_INK_REF_V01.png",
         "image": {
           "path": "references/style/LOOK_NOIR_INK_REF_V01.png",
-          "url": "/api/projects/the-night-ferry/raw/references/style/LOOK_NOIR_INK_REF_V01.png?v=11dmwxx4zh7",
+          "url": "/api/projects/the-night-ferry/raw/references/style/LOOK_NOIR_INK_REF_V01.png?v=11dmwy09ep4",
           "width": 200,
           "height": 300,
           "bytes": 1345,
-          "mtime": "2026-11-26T19:01:28.603Z"
+          "mtime": "2026-11-26T20:28:53.800Z"
         },
         "status": "approved",
         "role": "style",
@@ -1378,8 +1837,8 @@ Asset fields, used for looks, characters, locations and props:
     "data": null,
     "parse_error": null,
     "findings": [],
-    "etag": "384-1a2193bf28d",
-    "mtime": "2026-11-26T19:01:28.845Z",
+    "etag": "384-1a2198bfb46",
+    "mtime": "2026-11-26T20:28:53.958Z",
     "url": "/api/projects/the-night-ferry/raw/style/style-bible.md"
   },
   "style_block": {
@@ -1391,8 +1850,8 @@ Asset fields, used for looks, characters, locations and props:
     "data": null,
     "parse_error": null,
     "findings": [],
-    "etag": "2dd-1a2193bf28d",
-    "mtime": "2026-11-26T19:01:28.845Z",
+    "etag": "2dd-1a2198bfb46",
+    "mtime": "2026-11-26T20:28:53.958Z",
     "url": "/api/projects/the-night-ferry/raw/style/style-block.txt",
     "template": false,
     "frozen": true
@@ -1406,13 +1865,20 @@ Asset fields, used for looks, characters, locations and props:
     "data": null,
     "parse_error": null,
     "findings": [],
-    "etag": "47-1a2193bf28e",
-    "mtime": "2026-11-26T19:01:28.846Z",
+    "etag": "47-1a2198bfb46",
+    "mtime": "2026-11-26T20:28:53.958Z",
     "url": "/api/projects/the-night-ferry/raw/style/color-script.md"
   },
   "options": "{…}",
   "choices": "{…}",
-  "chat_key": "style"
+  "chat_key": "style",
+  "screen": {
+    "key": "style",
+    "label": "Style",
+    "label_code": "screen_label.style",
+    "label_params": {},
+    "route": "/p/the-night-ferry/style"
+  }
 }
 ```
 <!-- /example:style -->
@@ -1437,11 +1903,11 @@ waiting for a decision.
       "file": "characters/CHAR_MARA/character.yaml",
       "image": {
         "path": "characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V01.png",
-        "url": "/api/projects/the-night-ferry/raw/characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V01.png?v=8bpmwxx50qt",
+        "url": "/api/projects/the-night-ferry/raw/characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V01.png?v=8bpmwy09fvl",
         "width": 900,
         "height": 900,
         "bytes": 10789,
-        "mtime": "2026-11-26T19:01:30.245Z"
+        "mtime": "2026-11-26T20:28:55.329Z"
       },
       "has_master": true,
       "has_identity": true,
@@ -1451,7 +1917,14 @@ waiting for a decision.
     }
   ],
   "look_approved": true,
-  "chat_key": "characters"
+  "chat_key": "characters",
+  "screen": {
+    "key": "characters",
+    "label": "Characters",
+    "label_code": "screen_label.characters",
+    "label_params": {},
+    "route": "/p/the-night-ferry/characters"
+  }
 }
 ```
 <!-- /example:characters -->
@@ -1475,11 +1948,11 @@ character appears) and `look_approved`.
   "file": "characters/CHAR_MARA/character.yaml",
   "image": {
     "path": "characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V01.png",
-    "url": "/api/projects/the-night-ferry/raw/characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V01.png?v=8bpmwxx5…",
+    "url": "/api/projects/the-night-ferry/raw/characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V01.png?v=8bpmwy09…",
     "width": 900,
     "height": 900,
     "bytes": 10789,
-    "mtime": "2026-11-26T19:01:30.245Z"
+    "mtime": "2026-11-26T20:28:55.329Z"
   },
   "has_master": true,
   "has_identity": true,
@@ -1505,8 +1978,8 @@ character appears) and `look_approved`.
     },
     "parse_error": null,
     "findings": [],
-    "etag": "219-1a2193bf96e",
-    "mtime": "2026-11-26T19:01:30.606Z",
+    "etag": "219-1a2198c0205",
+    "mtime": "2026-11-26T20:28:55.685Z",
     "url": "/api/projects/the-night-ferry/raw/characters/CHAR_MARA/character.yaml"
   },
   "wardrobe": {
@@ -1518,8 +1991,8 @@ character appears) and `look_approved`.
     "data": { "character": "CHAR_MARA", "outfits": ["{…}"] },
     "parse_error": null,
     "findings": [],
-    "etag": "149-1a2193bf657",
-    "mtime": "2026-11-26T19:01:29.815Z",
+    "etag": "149-1a2198bff15",
+    "mtime": "2026-11-26T20:28:54.933Z",
     "url": "/api/projects/the-night-ferry/raw/characters/CHAR_MARA/wardrobe.yaml"
   },
   "assets": {
@@ -1599,7 +2072,14 @@ character appears) and `look_approved`.
     "... 1 more"
   ],
   "used_on": [],
-  "look_approved": true
+  "look_approved": true,
+  "screen": {
+    "key": "character:CHAR_MARA",
+    "label": "Character: Mara",
+    "label_code": "screen_label.character",
+    "label_params": { "name": "Mara" },
+    "route": "/p/the-night-ferry/characters/CHAR_MARA"
+  }
 }
 ```
 <!-- /example:character -->
@@ -1626,7 +2106,14 @@ Locations and props. They are written when pages are planned.
     }
   ],
   "props": [],
-  "chat_key": "places"
+  "chat_key": "places",
+  "screen": {
+    "key": "places",
+    "label": "Places and objects",
+    "label_code": "screen_label.places",
+    "label_params": {},
+    "route": "/p/the-night-ferry/places"
+  }
 }
 ```
 <!-- /example:entities -->
@@ -1673,8 +2160,8 @@ One location: the summary plus `location` and `map` (text documents),
     },
     "parse_error": null,
     "findings": [],
-    "etag": "1db-1a2193bfb69",
-    "mtime": "2026-11-26T19:01:31.113Z",
+    "etag": "1db-1a2198c03f8",
+    "mtime": "2026-11-26T20:28:56.184Z",
     "url": "/api/projects/the-night-ferry/raw/locations/LOC_MAIN_ROOM/location.yaml"
   },
   "map": {
@@ -1693,9 +2180,16 @@ One location: the summary plus `location` and `map` (text documents),
     },
     "parse_error": null,
     "findings": [],
-    "etag": "230-1a2193bfb6a",
-    "mtime": "2026-11-26T19:01:31.114Z",
+    "etag": "230-1a2198c03f8",
+    "mtime": "2026-11-26T20:28:56.184Z",
     "url": "/api/projects/the-night-ferry/raw/locations/LOC_MAIN_ROOM/map.yaml"
+  },
+  "screen": {
+    "key": "location:LOC_MAIN_ROOM",
+    "label": "Place: Main room",
+    "label_code": "screen_label.location",
+    "label_params": { "name": "Main room" },
+    "route": "/p/the-night-ferry/places/location/LOC_MAIN_ROOM"
   }
 }
 ```
@@ -1803,8 +2297,8 @@ Page summary fields:
     },
     "parse_error": null,
     "findings": [],
-    "etag": "d1-1a2193bfc21",
-    "mtime": "2026-11-26T19:01:31.297Z",
+    "etag": "d1-1a2198c04b6",
+    "mtime": "2026-11-26T20:28:56.374Z",
     "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/issue.yaml"
   },
   "planned": { "id": "ISS_001", "number": 1, "title": "Crossing", "page_budget": 3, "status": "planning" },
@@ -1831,11 +2325,11 @@ Page summary fields:
       "renders": 1,
       "image": {
         "path": "issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V01.png",
-        "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V01.png?v=73tmwxx521n",
+        "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V01.png?v=73tmwy09h51",
         "width": 600,
         "height": 900,
         "bytes": 9209,
-        "mtime": "2026-11-26T19:01:31.931Z"
+        "mtime": "2026-11-26T20:28:56.965Z"
       },
       "verdict": "pass",
       "outcome": "pass",
@@ -1891,7 +2385,14 @@ Page summary fields:
     "human_approval": null,
     "passes": false
   },
-  "chat_key": "pages:ISS_001"
+  "chat_key": "pages:ISS_001",
+  "screen": {
+    "key": "pages:ISS_001",
+    "label": "Pages of issue 1",
+    "label_code": "screen_label.pages",
+    "label_params": { "n": 1 },
+    "route": "/p/the-night-ferry/pages"
+  }
 }
 ```
 <!-- /example:issue -->
@@ -1913,6 +2414,7 @@ Everything about one page.
 | `lettering` | `mode` (`in_image` or `overlay`), `geometry` (`lettering.yaml` as a text document) and `needs_placement`. |
 | `draw` | `{ available, tool, reason }`. |
 | `neighbors` | `{ previous, next }` page IDs. |
+| `assumptions` | What the planner filled in that the person's text did not say, so the page could be drawn: `[{ panel, text, job, at }]`. `panel` is a panel id or `null` for the whole page; `text` is in the interface language. Show them to the person: each one can be changed in the plan (the page file, a chat message, or a correction). Planning the page again replaces the list. Empty for a page planned before this existed. |
 
 Panels have no `rect`. A page plan says how many tiers the page has and how
 many panels sit in each (`layout.tiers`), and a size word per panel
@@ -1965,8 +2467,8 @@ Render fields:
     },
     "parse_error": null,
     "findings": [],
-    "etag": "ea7-1a2193c03be",
-    "mtime": "2026-11-26T19:01:33.246Z",
+    "etag": "ea7-1a2198c0c6c",
+    "mtime": "2026-11-26T20:28:58.348Z",
     "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_002/page.yaml"
   },
   "plan": {
@@ -2013,7 +2515,7 @@ Render fields:
       "body": "1. The place where this happens: FLAG She hears the crates shift and goes down to the deck. (Mara)\n   [caption…"
     }
   },
-  "plan_approval": { "approved": true, "at": "2026-11-26T19:01:31Z", "stale": false },
+  "plan_approval": { "approved": true, "at": "2026-11-26T20:28:56Z", "stale": false },
   "renders": [
     {
       "id": "PG_001_002_V01",
@@ -2021,11 +2523,11 @@ Render fields:
       "current": false,
       "image": {
         "path": "issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V01.png",
-        "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V01.png?v=74gmwxx52jn",
+        "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V01.png?v=74gmwy09hp5",
         "width": 600,
         "height": 900,
         "bytes": 9232,
-        "mtime": "2026-11-26T19:01:32.579Z"
+        "mtime": "2026-11-26T20:28:57.689Z"
       },
       "lettered": null,
       "overlay": null,
@@ -2085,7 +2587,7 @@ Render fields:
         "provider": "codex-cli",
         "model": "unreported",
         "status": "rejected",
-        "created_at": "2026-11-26T19:01:32.483Z",
+        "created_at": "2026-11-26T20:28:57.589Z",
         "prompt_package": "PP_PG_001_002_CODEX-CLI",
         "supplied_by_person": false,
         "summary": "Codex saved one 600x900 PNG in 1 s; 3 reference image(s) passed to the image tool, as Codex reports.",
@@ -2098,11 +2600,11 @@ Render fields:
       "current": true,
       "image": {
         "path": "issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V02.png",
-        "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V02.png?v=6wjmwxx52ww",
+        "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V02.png?v=6wjmwy09i1r",
         "width": 600,
         "height": 900,
         "bytes": 8947,
-        "mtime": "2026-11-26T19:01:33.056Z"
+        "mtime": "2026-11-26T20:28:58.143Z"
       },
       "lettered": null,
       "overlay": null,
@@ -2166,7 +2668,7 @@ Render fields:
         "provider": "codex-cli",
         "model": "unreported",
         "status": "succeeded",
-        "created_at": "2026-11-26T19:01:32.955Z",
+        "created_at": "2026-11-26T20:28:58.046Z",
         "prompt_package": "PP_PG_001_002_CODEX-CLI",
         "supplied_by_person": false,
         "summary": "Codex saved one 600x900 PNG in 1 s; 4 reference image(s) passed to the image tool, as Codex reports.",
@@ -2208,8 +2710,8 @@ Render fields:
     },
     "parse_error": null,
     "findings": [],
-    "etag": "353-1a2193c0009",
-    "mtime": "2026-11-26T19:01:32.297Z",
+    "etag": "353-1a2198c08c0",
+    "mtime": "2026-11-26T20:28:57.408Z",
     "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_002/reference-plan.yaml",
     "entries": [
       {
@@ -2222,11 +2724,11 @@ Render fields:
         "required": true,
         "image": {
           "path": "references/style/LOOK_NOIR_INK_MASTER_V01.png",
-          "url": "/api/projects/the-night-ferry/raw/references/style/LOOK_NOIR_INK_MASTER_V01.png?v=665mwxx500k",
+          "url": "/api/projects/the-night-ferry/raw/references/style/LOOK_NOIR_INK_MASTER_V01.png?v=665mwy09f5m",
           "width": 600,
           "height": 900,
           "bytes": 7997,
-          "mtime": "2026-11-26T19:01:29.300Z"
+          "mtime": "2026-11-26T20:28:54.394Z"
         }
       },
       "... 2 more"
@@ -2261,7 +2763,22 @@ Render fields:
   "draw": { "available": true, "tool": "codex", "reason": null },
   "repair_limit": 1,
   "neighbors": { "previous": "PG_001_001", "next": "PG_001_003" },
-  "chat_key": "page:PG_001_002"
+  "assumptions": [
+    {
+      "panel": "PN_001_002_01",
+      "text": "Placeholder: the figures stand left and right of the room and hold nothing, because the text does not say.",
+      "job": "job_202611262028561640w_e11d",
+      "at": "2026-11-26T20:28:56Z"
+    }
+  ],
+  "chat_key": "page:PG_001_002",
+  "screen": {
+    "key": "page:PG_001_002",
+    "label": "Page 2",
+    "label_code": "screen_label.page",
+    "label_params": { "n": 2 },
+    "route": "/p/the-night-ferry/pages/PG_001_002"
+  }
 }
 ```
 <!-- /example:page -->
@@ -2288,11 +2805,11 @@ the current render are at the top level, as in a page summary: `verdict`,
       "current": false,
       "image": {
         "path": "issues/ISS_001/cover/renders/CV_001_V01.png",
-        "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/cover/renders/CV_001_V01.png?v=6dwmwxx568z",
+        "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/cover/renders/CV_001_V01.png?v=6dwmwy09l5t",
         "width": 600,
         "height": 900,
         "bytes": 8276,
-        "mtime": "2026-11-26T19:01:37.379Z"
+        "mtime": "2026-11-26T20:29:02.177Z"
       },
       "lettered": null,
       "overlay": null,
@@ -2338,7 +2855,7 @@ the current render are at the top level, as in a page summary: `verdict`,
         "provider": "codex-cli",
         "model": "unreported",
         "status": "succeeded",
-        "created_at": "2026-11-26T19:01:37.285Z",
+        "created_at": "2026-11-26T20:29:02.086Z",
         "prompt_package": "PP_CV_001_CODEX-CLI",
         "supplied_by_person": false,
         "summary": "Codex saved one 600x900 PNG in 1 s; 2 reference image(s) passed to the image tool, as Codex reports.",
@@ -2350,11 +2867,11 @@ the current render are at the top level, as in a page summary: `verdict`,
   "current_render": "CV_001_V03",
   "image": {
     "path": "issues/ISS_001/cover/renders/CV_001_V03.png",
-    "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/cover/renders/CV_001_V03.png?v=6tsmwxx57bs",
+    "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/cover/renders/CV_001_V03.png?v=6tsmwy09m6q",
     "width": 600,
     "height": 900,
     "bytes": 8848,
-    "mtime": "2026-11-26T19:01:38.776Z"
+    "mtime": "2026-11-26T20:29:03.506Z"
   },
   "verdict": "fixed",
   "outcome": "pass",
@@ -2387,14 +2904,21 @@ the current render are at the top level, as in a page summary: `verdict`,
     },
     "parse_error": null,
     "findings": [],
-    "etag": "260-1a2193c1ae6",
-    "mtime": "2026-11-26T19:01:39.174Z",
+    "etag": "260-1a2198c2210",
+    "mtime": "2026-11-26T20:29:03.888Z",
     "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/cover/cover.yaml"
   },
   "render_count": 3,
   "prompts": "[1 item]",
   "look_approved": true,
-  "chat_key": "cover:ISS_001"
+  "chat_key": "cover:ISS_001",
+  "screen": {
+    "key": "cover:ISS_001",
+    "label": "Cover of issue 1",
+    "label_code": "screen_label.cover",
+    "label_params": { "n": 1 },
+    "route": "/p/the-night-ferry/cover"
+  }
 }
 ```
 <!-- /example:cover -->
@@ -2442,11 +2966,11 @@ the current render are at the top level, as in a page summary: `verdict`,
         "lettered_file": null,
         "image": {
           "path": "issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V02.png",
-          "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V02.png?v=6vqmwxx54ef",
+          "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V02.png?v=6vqmwy09jf7",
           "width": 600,
           "height": 900,
           "bytes": 8918,
-          "mtime": "2026-11-26T19:01:34.983Z"
+          "mtime": "2026-11-26T20:28:59.923Z"
         }
       },
       {
@@ -2456,11 +2980,11 @@ the current render are at the top level, as in a page summary: `verdict`,
         "lettered_file": null,
         "image": {
           "path": "issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V03.png",
-          "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V03.png?v=7kwmwxx5580",
+          "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V03.png?v=7kwmwy09k6p",
           "width": 600,
           "height": 900,
           "bytes": 9824,
-          "mtime": "2026-11-26T19:01:36.048Z"
+          "mtime": "2026-11-26T20:29:00.913Z"
         }
       },
       "... 1 more"
@@ -2471,11 +2995,11 @@ the current render are at the top level, as in a page summary: `verdict`,
       "lettered_file": null,
       "image": {
         "path": "issues/ISS_001/cover/renders/CV_001_V03.png",
-        "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/cover/renders/CV_001_V03.png?v=6tsmwxx57bs",
+        "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/cover/renders/CV_001_V03.png?v=6tsmwy09m6q",
         "width": 600,
         "height": 900,
         "bytes": 8848,
-        "mtime": "2026-11-26T19:01:38.776Z"
+        "mtime": "2026-11-26T20:29:03.506Z"
       }
     },
     "supersedes": "ED_001_01",
@@ -2499,7 +3023,7 @@ the current render are at the top level, as in a page summary: `verdict`,
         {
           "format": "pdf",
           "file": "editions/ED_001_01/exports/the-night-ferry-001-ed01.pdf",
-          "built_at": "2026-11-26T19:01:39Z",
+          "built_at": "2026-11-26T20:29:04Z",
           "exists": true,
           "bytes": 24459,
           "draft": false,
@@ -2510,7 +3034,7 @@ the current render are at the top level, as in a page summary: `verdict`,
         {
           "format": "cbz",
           "file": "editions/ED_001_01/exports/the-night-ferry-001-ed01.cbz",
-          "built_at": "2026-11-26T19:01:39Z",
+          "built_at": "2026-11-26T20:29:04Z",
           "exists": true,
           "bytes": 37725,
           "draft": false,
@@ -2521,7 +3045,7 @@ the current render are at the top level, as in a page summary: `verdict`,
         {
           "format": "web",
           "file": "editions/ED_001_01/exports/the-night-ferry-001-ed01-web/index.html",
-          "built_at": "2026-11-26T19:01:39Z",
+          "built_at": "2026-11-26T20:29:04Z",
           "exists": true,
           "bytes": 4254,
           "draft": false,
@@ -2533,7 +3057,14 @@ the current render are at the top level, as in a page summary: `verdict`,
       ]
     }
   ],
-  "chat_key": "publish:ISS_001"
+  "chat_key": "publish:ISS_001",
+  "screen": {
+    "key": "publish:ISS_001",
+    "label": "Publish issue 1",
+    "label_code": "screen_label.publish",
+    "label_params": { "n": 1 },
+    "route": "/p/the-night-ferry/publish"
+  }
 }
 ```
 <!-- /example:publish -->
@@ -2554,12 +3085,12 @@ can be read this way; anything else is 415 `not_text`.
     "exists": true,
     "kind": "yaml",
     "schema": "series-plan",
-    "text": "# Schema: schemas/series-plan.schema.json\n\ntitle: The Night Ferry\nissues:\n  - id: ISS_001\n    number: 1\n    title: Issue 1\n    summary: A ferry pilot finds a stowaway the harbour patrol is hunting.\n  …",
+    "text": "# production/story/series-plan.yaml: the story divided into issues\n# Schema: schemas/series-plan.schema.json\n# Written by /series-plan. An issue is the publication unit: a chapter or a webtoon episode…",
     "data": { "title": "The Night Ferry", "issues": ["{…}"] },
     "parse_error": null,
     "findings": [],
-    "etag": "ee-1a2193bed7e",
-    "mtime": "2026-11-26T19:01:27.550Z",
+    "etag": "178-1a2198bf540",
+    "mtime": "2026-11-26T20:28:52.416Z",
     "url": "/api/projects/the-night-ferry/raw/story/series-plan.yaml"
   }
 }
@@ -2597,17 +3128,17 @@ Answer:
     "exists": true,
     "kind": "yaml",
     "schema": "series-plan",
-    "text": "# Schema: schemas/series-plan.schema.json\n\ntitle: The Night Ferry\nissues:\n  - id: ISS_001\n    number: 1\n    title: Cross…",
-    "data": { "title": "The Night Ferry", "issues": ["{…}"] },
+    "text": "# production/story/series-plan.yaml: the story divided into issues\n# Schema: schemas/series-plan.schema.json\n# Written b…",
+    "data": { "title": "Crossing", "issues": ["{…}"] },
     "parse_error": null,
     "findings": [],
-    "etag": "ef-1a2193beed5",
-    "mtime": "2026-11-26T19:01:27.893Z",
+    "etag": "171-1a2198bf7e4",
+    "mtime": "2026-11-26T20:28:53.092Z",
     "url": "/api/projects/the-night-ferry/raw/story/series-plan.yaml"
   },
   "findings": [],
   "continuity": [],
-  "commit": "28f72e35b33e84854df482c8217138ad24f9c55e",
+  "commit": "6cec5c1324bd526ffcf69583e3f732aab05bf270",
   "created": false
 }
 ```
@@ -2694,14 +3225,14 @@ await fetch(`/api/projects/${id}/uploads?name=${encodeURIComponent(file.name)}`,
 ```json
 {
   "upload": {
-    "id": "up_2026112619012788406_cadd",
+    "id": "up_202611262028530820a_bf70",
     "name": "style-reference.png",
     "kind": "image",
     "bytes": 1345,
     "width": 200,
     "height": 300,
-    "at": "2026-11-26T19:01:27Z",
-    "url": "/api/projects/the-night-ferry/uploads/up_2026112619012788406_cadd"
+    "at": "2026-11-26T20:28:53Z",
+    "url": "/api/projects/the-night-ferry/uploads/up_202611262028530820a_bf70"
   }
 }
 ```
@@ -2716,14 +3247,14 @@ The staged uploads, newest first.
 {
   "uploads": [
     {
-      "id": "up_2026112619012788406_cadd",
+      "id": "up_202611262028530820a_bf70",
       "name": "style-reference.png",
       "kind": "image",
       "bytes": 1345,
       "width": 200,
       "height": 300,
-      "at": "2026-11-26T19:01:27Z",
-      "url": "/api/projects/the-night-ferry/uploads/up_2026112619012788406_cadd"
+      "at": "2026-11-26T20:28:53Z",
+      "url": "/api/projects/the-night-ferry/uploads/up_202611262028530820a_bf70"
     }
   ]
 }
@@ -2749,13 +3280,13 @@ as a job. A project runs one job at a time; the others wait in order.
 Body: `{ "op": "<name>", "params": { ... } }`. The parameters are checked
 before the job is created, so a 400 or a 409 comes back at once and no job
 exists. Answers 202 with the queued job, whose `steps` are already listed.
-Chat messages do not go through this route (see [Chat](#chat)).
+Chat messages do not go through this route (see [Conversation](#conversation)).
 
 <!-- example:op-start -->
 ```json
 {
   "job": {
-    "id": "job_202611261901290300d_3b6d",
+    "id": "job_202611262028541250h_71bb",
     "project": "the-night-ferry",
     "op": "style.look",
     "title": "Draw a look page",
@@ -2763,7 +3294,7 @@ Chat messages do not go through this route (see [Chat](#chat)).
     "title_params": {},
     "params": {},
     "status": "queued",
-    "created_at": "2026-11-26T19:01:29Z",
+    "created_at": "2026-11-26T20:28:54Z",
     "started_at": null,
     "ended_at": null,
     "current_step": null,
@@ -2856,7 +3387,7 @@ are not approved:
 ```json
 {
   "job": {
-    "id": "job_202611261901316280x_32b8",
+    "id": "job_2026112620285668411_6a8f",
     "project": "the-night-ferry",
     "op": "pages.generate",
     "title": "Draw pages",
@@ -2864,9 +3395,9 @@ are not approved:
     "title_params": {},
     "params": { "pages": ["PG_001_001", "... 2 more"], "approve_plans": false, "regenerate": false },
     "status": "done",
-    "created_at": "2026-11-26T19:01:31Z",
-    "started_at": "2026-11-26T19:01:31Z",
-    "ended_at": "2026-11-26T19:01:34Z",
+    "created_at": "2026-11-26T20:28:56Z",
+    "started_at": "2026-11-26T20:28:56Z",
+    "ended_at": "2026-11-26T20:28:59Z",
     "current_step": null,
     "steps": [
       {
@@ -2875,10 +3406,10 @@ are not approved:
         "label_code": "step.page.prepare",
         "label_params": { "n": 1 },
         "status": "done",
-        "started_at": "2026-11-26T19:01:31Z",
-        "ended_at": "2026-11-26T19:01:31Z",
+        "started_at": "2026-11-26T20:28:56Z",
+        "ended_at": "2026-11-26T20:28:56Z",
         "tool": null,
-        "commit": "a987e3355253069b90fb76163d95f68ac612c9df",
+        "commit": "cd90564acc2be1b2319d2474c519b2af6f627c6d",
         "files": 3,
         "note": "2 reference images",
         "note_code": "note.references",
@@ -2895,10 +3426,10 @@ are not approved:
         "label_code": "step.page.draw",
         "label_params": { "n": 1 },
         "status": "done",
-        "started_at": "2026-11-26T19:01:31Z",
-        "ended_at": "2026-11-26T19:01:32Z",
+        "started_at": "2026-11-26T20:28:56Z",
+        "ended_at": "2026-11-26T20:28:57Z",
         "tool": "codex",
-        "commit": "0e9f63f33c64d22d734fc20681a871c08bd64d41",
+        "commit": "c893da242b778fcd7a9b39ac974d75e99d4820e1",
         "files": 4,
         "note": "PG_001_001_V01",
         "changed": [
@@ -2914,10 +3445,10 @@ are not approved:
         "label_code": "step.page.review",
         "label_params": { "n": 1 },
         "status": "done",
-        "started_at": "2026-11-26T19:01:32Z",
-        "ended_at": "2026-11-26T19:01:32Z",
+        "started_at": "2026-11-26T20:28:57Z",
+        "ended_at": "2026-11-26T20:28:57Z",
         "tool": "claude",
-        "commit": "70fc84b1f577d2e0d3f462e04aca99edb7a64ba3",
+        "commit": "819df75a954ac1adbac07d51d895c94b2d9f387c",
         "files": 2,
         "note": null,
         "changed": [
@@ -2931,10 +3462,10 @@ are not approved:
         "label_code": "step.page.prepare",
         "label_params": { "n": 2 },
         "status": "done",
-        "started_at": "2026-11-26T19:01:32Z",
-        "ended_at": "2026-11-26T19:01:32Z",
+        "started_at": "2026-11-26T20:28:57Z",
+        "ended_at": "2026-11-26T20:28:57Z",
         "tool": null,
-        "commit": "127c70f9ead4acd8612750e88a27ce5f4f40f0ac",
+        "commit": "5f32442f36c3f78187fd51b289675a14912591fe",
         "files": 3,
         "note": "3 reference images",
         "note_code": "note.references",
@@ -2974,10 +3505,10 @@ are not approved:
     "error": null,
     "tools": { "draw": "codex", "look": "claude" },
     "commits": [
-      "a987e3355253069b90fb76163d95f68ac612c9df",
-      "0e9f63f33c64d22d734fc20681a871c08bd64d41",
-      "70fc84b1f577d2e0d3f462e04aca99edb7a64ba3",
-      "127c70f9ead4acd8612750e88a27ce5f4f40f0ac",
+      "cd90564acc2be1b2319d2474c519b2af6f627c6d",
+      "c893da242b778fcd7a9b39ac974d75e99d4820e1",
+      "819df75a954ac1adbac07d51d895c94b2d9f387c",
+      "5f32442f36c3f78187fd51b289675a14912591fe",
       "... 7 more"
     ],
     "position": null,
@@ -2998,7 +3529,7 @@ queued, running and waiting jobs). `running` is the job that runs now, or
 {
   "jobs": [
     {
-      "id": "job_202611261901316280x_32b8",
+      "id": "job_2026112620285668411_6a8f",
       "project": "the-night-ferry",
       "op": "pages.generate",
       "title": "Draw pages",
@@ -3006,9 +3537,9 @@ queued, running and waiting jobs). `running` is the job that runs now, or
       "title_params": {},
       "params": { "pages": ["PG_001_001", "... 2 more"], "approve_plans": false, "regenerate": false },
       "status": "done",
-      "created_at": "2026-11-26T19:01:31Z",
-      "started_at": "2026-11-26T19:01:31Z",
-      "ended_at": "2026-11-26T19:01:34Z",
+      "created_at": "2026-11-26T20:28:56Z",
+      "started_at": "2026-11-26T20:28:56Z",
+      "ended_at": "2026-11-26T20:28:59Z",
       "current_step": null,
       "steps": [
         {
@@ -3017,10 +3548,10 @@ queued, running and waiting jobs). `running` is the job that runs now, or
           "label_code": "step.page.prepare",
           "label_params": { "n": 1 },
           "status": "done",
-          "started_at": "2026-11-26T19:01:31Z",
-          "ended_at": "2026-11-26T19:01:31Z",
+          "started_at": "2026-11-26T20:28:56Z",
+          "ended_at": "2026-11-26T20:28:56Z",
           "tool": null,
-          "commit": "a987e3355253069b90fb76163d95f68ac612c9df",
+          "commit": "cd90564acc2be1b2319d2474c519b2af6f627c6d",
           "files": 3,
           "note": "2 reference images",
           "note_code": "note.references",
@@ -3055,7 +3586,7 @@ queued, running and waiting jobs). `running` is the job that runs now, or
       },
       "error": null,
       "tools": { "draw": "codex", "look": "claude" },
-      "commits": ["a987e3355253069b90fb76163d95f68ac612c9df", "... 10 more"],
+      "commits": ["cd90564acc2be1b2319d2474c519b2af6f627c6d", "... 10 more"],
       "position": null,
       "cost_usd": null
     },
@@ -3079,14 +3610,14 @@ last `n`. Live lines arrive as `log` events.
 <!-- example:job-log -->
 ```json
 {
-  "job": "job_202611261901316280x_32b8",
+  "job": "job_2026112620285668411_6a8f",
   "lines": [
-    "2026-11-26T19:01:33Z PG_001_003:review Page 3: check",
-    "2026-11-26T19:01:33Z PG_001_003:review Claude Code started (sonnet)",
-    "2026-11-26T19:01:33Z PG_001_003:review reading commands for review",
-    "2026-11-26T19:01:33Z PG_001_003:review Claude Code finished in 1 s: The image matches the plan.",
-    "2026-11-26T19:01:33Z PG_001_003:review review of PG_001_003_V01: fixed, 1 open finding(s), 0 blocking",
-    "2026-11-26T19:01:34Z - Draw pages finished"
+    "2026-11-26T20:28:58Z PG_001_003:review Page 3: check",
+    "2026-11-26T20:28:58Z PG_001_003:review Claude Code started (sonnet)",
+    "2026-11-26T20:28:58Z PG_001_003:review reading commands for review",
+    "2026-11-26T20:28:58Z PG_001_003:review Claude Code finished in 1 s: The image matches the plan.",
+    "2026-11-26T20:28:58Z PG_001_003:review review of PG_001_003_V01: fixed, 1 open finding(s), 0 blocking",
+    "2026-11-26T20:28:59Z - Draw pages finished"
   ]
 }
 ```
@@ -3103,7 +3634,7 @@ after; files written before the cancel stay and are committed. 409
 ```json
 {
   "job": {
-    "id": "job_202611261901369161p_f8a2",
+    "id": "job_202611262029016971t_f279",
     "project": "the-night-ferry",
     "op": "story.update",
     "title": "Update the story",
@@ -3111,9 +3642,9 @@ after; files written before the cancel stay and are committed. 409
     "title_params": {},
     "params": { "instruction": "SLOW change that will be cancelled.", "source_upload": null },
     "status": "cancelled",
-    "created_at": "2026-11-26T19:01:36Z",
-    "started_at": "2026-11-26T19:01:36Z",
-    "ended_at": "2026-11-26T19:01:36Z",
+    "created_at": "2026-11-26T20:29:01Z",
+    "started_at": "2026-11-26T20:29:01Z",
+    "ended_at": "2026-11-26T20:29:01Z",
     "current_step": null,
     "steps": [
       {
@@ -3122,8 +3653,8 @@ after; files written before the cancel stay and are committed. 409
         "label_code": "step.story.update.update",
         "label_params": {},
         "status": "cancelled",
-        "started_at": "2026-11-26T19:01:36Z",
-        "ended_at": "2026-11-26T19:01:36Z",
+        "started_at": "2026-11-26T20:29:01Z",
+        "ended_at": "2026-11-26T20:29:01Z",
         "tool": "claude",
         "commit": null,
         "files": 0,
@@ -3172,7 +3703,7 @@ A job waiting for a decision:
 ```json
 {
   "job": {
-    "id": "job_202611261901366391n_03d8",
+    "id": "job_202611262029014391r_03a6",
     "project": "the-night-ferry",
     "op": "story.update",
     "title": "Update the story",
@@ -3180,8 +3711,8 @@ A job waiting for a decision:
     "title_params": {},
     "params": { "instruction": "DECIDE whether the patrol knows the boy by name.", "source_upload": null },
     "status": "needs_decision",
-    "created_at": "2026-11-26T19:01:36Z",
-    "started_at": "2026-11-26T19:01:36Z",
+    "created_at": "2026-11-26T20:29:01Z",
+    "started_at": "2026-11-26T20:29:01Z",
     "ended_at": null,
     "current_step": null,
     "steps": [
@@ -3191,8 +3722,8 @@ A job waiting for a decision:
         "label_code": "step.story.update.update",
         "label_params": {},
         "status": "waiting",
-        "started_at": "2026-11-26T19:01:36Z",
-        "ended_at": "2026-11-26T19:01:36Z",
+        "started_at": "2026-11-26T20:29:01Z",
+        "ended_at": "2026-11-26T20:29:01Z",
         "tool": "claude",
         "commit": null,
         "files": 0,
@@ -3239,7 +3770,7 @@ The answer to `POST .../answer`:
 ```json
 {
   "job": {
-    "id": "job_202611261901366391n_03d8",
+    "id": "job_202611262029014391r_03a6",
     "project": "the-night-ferry",
     "op": "story.update",
     "title": "Update the story",
@@ -3247,8 +3778,8 @@ The answer to `POST .../answer`:
     "title_params": {},
     "params": { "instruction": "DECIDE whether the patrol knows the boy by name.", "source_upload": null },
     "status": "queued",
-    "created_at": "2026-11-26T19:01:36Z",
-    "started_at": "2026-11-26T19:01:36Z",
+    "created_at": "2026-11-26T20:29:01Z",
+    "started_at": "2026-11-26T20:29:01Z",
     "ended_at": null,
     "current_step": null,
     "steps": [
@@ -3258,8 +3789,8 @@ The answer to `POST .../answer`:
         "label_code": "step.story.update.update",
         "label_params": {},
         "status": "pending",
-        "started_at": "2026-11-26T19:01:36Z",
-        "ended_at": "2026-11-26T19:01:36Z",
+        "started_at": "2026-11-26T20:29:01Z",
+        "ended_at": "2026-11-26T20:29:01Z",
         "tool": "claude",
         "commit": null,
         "files": 0,
@@ -3317,59 +3848,12 @@ the time of the event. Codes and params come with it as in any response.
 | `log` | A progress line of the running job. | `{ job, step, at, line }`. Tool use arrives as short lines such as `reading docs/data-model.md` or `writing story/story-bible.yaml`. |
 | `activity` | A history entry was added. | `{ entry }`, as in [History](#history) (image paths, not image objects). |
 | `files` | Files of the workspace changed. | `{ paths, job, commit }`. `job` is `null` for a save or an approval by the person. Reload the screens that show those paths. |
-| `chat` | A chat message was added. | `{ key, message }`. |
+| `chat` | A message was added to the project conversation. | `{ conversation, key, message }`: the conversation id, the screen key the message belongs to, and the message (see [Conversation](#conversation)). |
 | `heartbeat` | Every 15 seconds. | `{ at }`. |
 
 <!-- example:event-hello -->
 ```json
-{
-  "project": "the-night-ferry",
-  "at": "2026-11-26T19:01:27Z",
-  "jobs": [
-    {
-      "id": "job_2026112619012736902_bbcc",
-      "project": "the-night-ferry",
-      "op": "project.setup",
-      "title": "Set up the project",
-      "title_code": "op.project.setup.title",
-      "title_params": {},
-      "params": {
-        "description": "A ferry pilot finds a stowaway the harbour patrol is hunting. She decides not to hand him over.",
-        "pages": 3
-      },
-      "status": "running",
-      "created_at": "2026-11-26T19:01:27Z",
-      "started_at": "2026-11-26T19:01:27Z",
-      "ended_at": null,
-      "current_step": "source",
-      "steps": [
-        {
-          "id": "source",
-          "label": "Save the description",
-          "label_code": "step.project.setup.source",
-          "label_params": {},
-          "status": "running",
-          "started_at": "2026-11-26T19:01:27Z",
-          "ended_at": null,
-          "tool": null,
-          "commit": null,
-          "files": 0,
-          "note": null,
-          "changed": []
-        },
-        "... 2 more"
-      ],
-      "questions": [],
-      "answers": {},
-      "result": null,
-      "error": null,
-      "tools": {},
-      "commits": [],
-      "position": null,
-      "cost_usd": null
-    }
-  ]
-}
+{ "project": "the-night-ferry", "at": "2026-11-26T20:28:52Z", "jobs": [] }
 ```
 <!-- /example:event-hello -->
 
@@ -3377,7 +3861,7 @@ the time of the event. Codes and params come with it as in any response.
 ```json
 {
   "job": {
-    "id": "job_202611261901316280x_32b8",
+    "id": "job_2026112620285668411_6a8f",
     "project": "the-night-ferry",
     "op": "pages.generate",
     "title": "Draw pages",
@@ -3385,8 +3869,8 @@ the time of the event. Codes and params come with it as in any response.
     "title_params": {},
     "params": { "pages": ["PG_001_001", "PG_001_002", "PG_001_003"], "approve_plans": false, "regenerate": false },
     "status": "running",
-    "created_at": "2026-11-26T19:01:31Z",
-    "started_at": "2026-11-26T19:01:31Z",
+    "created_at": "2026-11-26T20:28:56Z",
+    "started_at": "2026-11-26T20:28:56Z",
     "ended_at": null,
     "current_step": "PG_001_001:prepare",
     "steps": [
@@ -3396,7 +3880,7 @@ the time of the event. Codes and params come with it as in any response.
         "label_code": "step.page.prepare",
         "label_params": { "n": 1 },
         "status": "running",
-        "started_at": "2026-11-26T19:01:31Z",
+        "started_at": "2026-11-26T20:28:56Z",
         "ended_at": null,
         "tool": null,
         "commit": null,
@@ -3450,10 +3934,10 @@ the time of the event. Codes and params come with it as in any response.
 <!-- example:event-log -->
 ```json
 {
-  "job": "job_2026112619012736902_bbcc",
-  "step": "story",
-  "at": "2026-11-26T19:01:27Z",
-  "line": "writing project.yaml"
+  "job": "job_202611262028537760e_0ad3",
+  "step": "bible",
+  "at": "2026-11-26T20:28:53Z",
+  "line": "writing style/style-block.txt"
 }
 ```
 <!-- /example:event-log -->
@@ -3462,14 +3946,14 @@ the time of the event. Codes and params come with it as in any response.
 ```json
 {
   "entry": {
-    "id": "act_202611261901320960z_8393",
-    "at": "2026-11-26T19:01:32Z",
+    "id": "act_2026112620285715313_4814",
+    "at": "2026-11-26T20:28:57Z",
     "kind": "step",
     "title": "Draw pages: Page 1: draw",
     "title_code": "activity.step",
     "title_params": { "title": "Draw pages", "label": "Page 1: draw" },
     "actor": "codex",
-    "job": "job_202611261901316280x_32b8",
+    "job": "job_2026112620285668411_6a8f",
     "op": "pages.generate",
     "step": "PG_001_001:draw",
     "files": [
@@ -3478,7 +3962,7 @@ the time of the event. Codes and params come with it as in any response.
       "... 2 more"
     ],
     "images": ["issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V01.png"],
-    "commit": "0e9f63f33c64d22d734fc20681a871c08bd64d41"
+    "commit": "c893da242b778fcd7a9b39ac974d75e99d4820e1"
   }
 }
 ```
@@ -3492,8 +3976,8 @@ the time of the event. Codes and params come with it as in any response.
     "issues/ISS_001/pages/PG_001_001/prompts/codex-cli.yaml",
     "... 1 more"
   ],
-  "job": "job_202611261901316280x_32b8",
-  "commit": "a987e3355253069b90fb76163d95f68ac612c9df"
+  "job": "job_2026112620285668411_6a8f",
+  "commit": "cd90564acc2be1b2319d2474c519b2af6f627c6d"
 }
 ```
 <!-- /example:event-files -->
@@ -3501,19 +3985,25 @@ the time of the event. Codes and params come with it as in any response.
 <!-- example:event-chat -->
 ```json
 {
+  "conversation": "conv_202611262029045562c_48f6",
   "key": "page:PG_001_003",
   "message": {
-    "id": "msg_202611261901400922b_267c",
-    "at": "2026-11-26T19:01:40Z",
-    "key": "page:PG_001_003",
+    "id": "msg_202611262029047492g_ca32",
+    "at": "2026-11-26T20:29:04Z",
+    "conversation": "conv_202611262029045562c_48f6",
     "role": "assistant",
     "text": "This is the fake assistant. You wrote: \"EDIT bring the last panel closer\". With a real tool installed, the answer comes from Claude Code or Codex. I a…",
-    "job": "job_2026112619013988029_8e3e",
+    "job": "job_202611262029045602e_2852",
     "tool": "claude",
-    "reply_to": "msg_2026112619013987828_a49d",
+    "reply_to": "msg_202611262029045572d_fd86",
+    "screen": { "key": "page:PG_001_003", "label": "Page 3", "route": "/p/the-night-ferry/pages/PG_001_003" },
+    "key": "page:PG_001_003",
     "files": ["issues/ISS_001/pages/PG_001_003/page.yaml"],
-    "commit": "b9997c60a2edd4e6a85a99919990c03b7d92c7c8",
-    "decisions": []
+    "commit": "1863372dd85d0f58f823304167924a987b29b23b",
+    "decisions": [],
+    "links": [],
+    "proposal": null,
+    "reverted": []
   }
 }
 ```
@@ -3521,17 +4011,25 @@ the time of the event. Codes and params come with it as in any response.
 
 <!-- example:event-heartbeat -->
 ```json
-{ "at": "2026-11-26T19:01:27.427Z" }
+{ "at": "2026-11-26T20:28:52.683Z" }
 ```
 <!-- /example:event-heartbeat -->
 
-## Chat
+## Conversation
 
-One conversation per screen. The AI is given the files of that screen and may
-change them. A turn runs as a job (`chat.turn`), so it waits its turn behind a
+One conversation per project, open on every screen. It keeps its messages
+when the person moves between screens, and every message carries the screen
+it was sent from: `screen: { key, label, route }`. The AI is given the files
+of that screen, so "change this" means the thing in front of the person, and
+it may change them. Show the screen with each message ("from Style", "from
+Page 2"). A turn runs as a job (`chat.turn`), so it waits its turn behind a
 running job and can be cancelled like one.
 
-Screen keys:
+Conversations live in `.studio/conversations/` of the project: `index.json`
+and one `<conversation id>.jsonl` per conversation. The person can start a
+fresh one at any time; the earlier ones stay readable.
+
+Screen keys, and the files the AI gets for each:
 
 | Key | Files in context |
 |---|---|
@@ -3548,28 +4046,381 @@ Screen keys:
 | `publish:<ISS_ID>` | The issue file and the latest edition. |
 
 A malformed key is 400 `bad_chat_key`; a key that names something missing is
-404 `chat_target_not_found`.
+404 `chat_target_not_found`. `label` and `route` are optional in a message:
+the server fills in its own when they are missing. Links in replies may also
+point at `home`, `check`, `corrections`, `history` and `settings`, screens
+with no files of their own, which cannot send a message.
+
+The routes of the browser app the server uses for `route` (the ones
+`studio/web/` has today):
+
+| Key | Route |
+|---|---|
+| `home` | `/p/:id` |
+| `story`, `style`, `characters`, `places`, `check`, `corrections`, `history` | `/p/:id/<key>` |
+| `options`, `settings` | `/p/:id/settings` |
+| `character:<CHAR_ID>` | `/p/:id/characters/<CHAR_ID>` |
+| `location:<LOC_ID>`, `prop:<PROP_ID>` | `/p/:id/places/location/<LOC_ID>`, `/p/:id/places/prop/<PROP_ID>` |
+| `pages:<ISS_ID>`, `page:<PAGE_ID>` | `/p/:id/pages`, `/p/:id/pages/<PAGE_ID>` |
+| `cover:<ISS_ID>`, `publish:<ISS_ID>` | `/p/:id/cover`, `/p/:id/publish` |
+
+Message fields:
+
+| Field | Meaning |
+|---|---|
+| `id`, `at`, `conversation` | Message id, time, and the conversation it belongs to. |
+| `role` | `user`, `assistant`, or `event` for something that happened in the conversation (below). |
+| `screen`, `key` | The screen the message was sent from (an assistant message repeats the screen of the message it answers), and its key. |
+| `text` | What was said. For an assistant message, the tool's own words; for an event, a sentence of the studio with `text_code` and `text_params`. |
+| `job` | The `chat.turn` job, on assistant and event messages. |
+| `tool`, `reply_to` | Which tool answered, and the id of the message it answers. |
+| `files`, `commit` | The paths the reply changed and the commit of those changes, or `[]` and `null`. |
+| `decisions` | What the tool decided on its own. |
+| `links` | Screens the reply suggests going to: `[{ key, route, label, screen_label }]`. `label` is the tool's words, else the screen's name; `screen_label` is always the screen's name, with its code. Every link was checked against the real screens of the project; the ones that named no screen were dropped. A link only opens a screen. |
+| `proposal` | When the person asked for story text: `{ id, parts }` of the [proposal](#story-proposals) the reply made, else `null`. The story bible itself is never written by a chat. |
+| `reverted` | Files the reply wrote that the studio undid: `["story/story-bible.yaml"]` when a reply wrote the story bible directly. Usually empty. |
+| `error` | When the turn failed: what went wrong, with an empty `text`. |
+| `folded_from` | On a message brought in from the conversations per screen of earlier versions: the screen key it came from. |
+
+Event messages (`role: "event"`) say what happened between turns:
+
+| `event` | Meaning |
+|---|---|
+| `folded` | The conversations per screen of an earlier version were brought into this one (`keys` lists them). |
+| `tool_changed` | Another tool answers from here on (`from_tool`, `tool`). It started a session of its own and was given a summary of the conversation so far. |
+| `session_restarted` | The same tool could not continue its earlier session, so it started a new one with the summary. |
+
+How the conversation continues: while the same tool answers, each turn
+resumes that tool's own session (`--resume <session id>` for Claude Code,
+`codex exec resume <session id>` for Codex), so it remembers everything
+said. When the plan tool changes in the settings, or falls back to the other
+tool, the next turn starts a new session of the new tool and gives it a
+summary of the last twelve messages, each with its screen, and the
+transcript gets a `tool_changed` event. A fresh conversation starts with no
+session and no summary.
+
+The conversations per screen of earlier versions (`.studio/chats/`) are
+folded into the first project conversation the first time it is read, in
+time order, each message tagged with its screen. Their files stay where
+they are.
+
+### `GET /api/projects/:id/conversation`
+
+The current conversation, oldest message first, and the list of
+conversations. `conversation.session` is `{ tool }` of the session the next
+turn resumes, or `null`; `pending` holds the ids of turns that have not
+finished.
+
+<!-- example:conversation -->
+```json
+{
+  "conversation": {
+    "id": "conv_202611262029045562c_48f6",
+    "started_at": "2026-11-26T20:29:04Z",
+    "current": true,
+    "session": { "tool": "codex" },
+    "folded": [],
+    "messages": [
+      {
+        "id": "msg_202611262029045572d_fd86",
+        "at": "2026-11-26T20:29:04Z",
+        "conversation": "conv_202611262029045562c_48f6",
+        "role": "user",
+        "text": "EDIT bring the last panel closer",
+        "job": null,
+        "screen": { "key": "page:PG_001_003", "label": "Page 3", "route": "/p/the-night-ferry/pages/PG_001_003" },
+        "key": "page:PG_001_003"
+      },
+      {
+        "id": "msg_202611262029047492g_ca32",
+        "at": "2026-11-26T20:29:04Z",
+        "conversation": "conv_202611262029045562c_48f6",
+        "role": "assistant",
+        "text": "This is the fake assistant. You wrote: \"EDIT bring the last panel closer\". With a real tool installed, the answer comes from Claude Code or Codex. I also added …",
+        "job": "job_202611262029045602e_2852",
+        "tool": "claude",
+        "reply_to": "msg_202611262029045572d_fd86",
+        "screen": { "key": "page:PG_001_003", "label": "Page 3", "route": "/p/the-night-ferry/pages/PG_001_003" },
+        "key": "page:PG_001_003",
+        "files": ["issues/ISS_001/pages/PG_001_003/page.yaml"],
+        "commit": "1863372dd85d0f58f823304167924a987b29b23b",
+        "decisions": [],
+        "links": [],
+        "proposal": null,
+        "reverted": []
+      },
+      {
+        "id": "msg_202611262029047952k_db4c",
+        "at": "2026-11-26T20:29:04Z",
+        "conversation": "conv_202611262029045562c_48f6",
+        "role": "assistant",
+        "text": "This is the fake assistant. You wrote: \"LINK PROPOSE Where do I add the boy? He is twelve.\". With a real tool installed, the answer comes from Claude Code or Co…",
+        "job": "job_202611262029047582i_4e23",
+        "tool": "claude",
+        "reply_to": "msg_202611262029047562h_3892",
+        "screen": { "key": "style", "label": "Style", "route": "/p/the-night-ferry/style" },
+        "key": "style",
+        "files": [],
+        "commit": null,
+        "decisions": [],
+        "links": [
+          {
+            "key": "characters",
+            "route": "/p/the-night-ferry/characters",
+            "label": "Characters",
+            "screen_label": "Characters",
+            "screen_label_code": "screen_label.characters",
+            "screen_label_params": {}
+          }
+        ],
+        "proposal": { "id": "prop_202611262029047932j_cb2d", "parts": 2 },
+        "reverted": []
+      },
+      {
+        "id": "msg_202611262029048142n_89d1",
+        "at": "2026-11-26T20:29:04Z",
+        "conversation": "conv_202611262029045562c_48f6",
+        "role": "event",
+        "text": "Codex answers from here on instead of Claude Code. It started a new session and was given a summary of the conversation so far.",
+        "text_code": "conversation.tool_changed",
+        "text_params": { "from": "Claude Code", "to": "Codex" },
+        "job": "job_202611262029048052m_2533",
+        "event": "tool_changed",
+        "tool": "codex",
+        "from_tool": "claude"
+      }
+    ],
+    "pending": []
+  },
+  "conversations": [
+    {
+      "id": "conv_202611262029045562c_48f6",
+      "started_at": "2026-11-26T20:29:04Z",
+      "current": true,
+      "messages": 6,
+      "last_at": "2026-11-26T20:29:04Z",
+      "folded": []
+    }
+  ]
+}
+```
+<!-- /example:conversation -->
+
+### `POST /api/projects/:id/conversation`
+
+Sends a message to the current conversation. Body: `text` (at most 8000
+characters) and `screen` (`{ key, label?, route? }`, or the key alone).
+Answers 202 with the stored message, the `chat.turn` job and the
+conversation id. The reply arrives as a `chat` event and in the
+transcript. 400 `bad_params` without text or screen, 400 `bad_chat_key` for a
+key that is malformed or has no files (`home`, `check`...), 404
+`chat_target_not_found` for a screen that is not there.
+
+<!-- example:conversation-post-request -->
+```json
+{
+  "text": "EDIT bring the last panel closer",
+  "screen": { "key": "page:PG_001_003", "label": "Page 3", "route": "/p/the-night-ferry/pages/PG_001_003" }
+}
+```
+<!-- /example:conversation-post-request -->
+
+<!-- example:conversation-post -->
+```json
+{
+  "conversation": "conv_202611262029045562c_48f6",
+  "message": {
+    "id": "msg_202611262029045572d_fd86",
+    "at": "2026-11-26T20:29:04Z",
+    "conversation": "conv_202611262029045562c_48f6",
+    "role": "user",
+    "text": "EDIT bring the last panel closer",
+    "job": null,
+    "screen": { "key": "page:PG_001_003", "label": "Page 3", "route": "/p/the-night-ferry/pages/PG_001_003" },
+    "key": "page:PG_001_003"
+  },
+  "job": {
+    "id": "job_202611262029045602e_2852",
+    "project": "the-night-ferry",
+    "op": "chat.turn",
+    "title": "Chat",
+    "title_code": "op.chat.turn.title",
+    "title_params": {},
+    "params": {
+      "key": "page:PG_001_003",
+      "screen": { "key": "page:PG_001_003", "label": "Page 3", "route": "/p/the-night-ferry/pages/PG_001_003" },
+      "conversation": "conv_202611262029045562c_48f6",
+      "text": "EDIT bring the last panel closer",
+      "message": "msg_202611262029045572d_fd86"
+    },
+    "status": "queued",
+    "created_at": "2026-11-26T20:29:04Z",
+    "started_at": null,
+    "ended_at": null,
+    "current_step": null,
+    "questions": [],
+    "answers": {},
+    "result": null,
+    "error": null,
+    "tools": {},
+    "commits": [],
+    "position": 1,
+    "cost_usd": null
+  }
+}
+```
+<!-- /example:conversation-post -->
+
+### `POST /api/projects/:id/conversation/new`
+
+Starts a fresh conversation, which becomes the current one. The earlier one
+stays readable through `GET .../conversations/:conversation`. The body is
+ignored; send `{}`. Answers 201 with the new conversation and the list.
+
+<!-- example:conversation-new -->
+```json
+{
+  "conversation": {
+    "id": "conv_202611262029049212t_eb52",
+    "started_at": "2026-11-26T20:29:04Z",
+    "current": true,
+    "session": null,
+    "folded": [],
+    "messages": [],
+    "pending": []
+  },
+  "conversations": [
+    {
+      "id": "conv_202611262029049212t_eb52",
+      "started_at": "2026-11-26T20:29:04Z",
+      "current": true,
+      "messages": 0,
+      "last_at": null,
+      "folded": []
+    },
+    {
+      "id": "conv_202611262029045562c_48f6",
+      "started_at": "2026-11-26T20:29:04Z",
+      "current": false,
+      "messages": 8,
+      "last_at": "2026-11-26T20:29:04Z",
+      "folded": []
+    }
+  ]
+}
+```
+<!-- /example:conversation-new -->
+
+### `GET /api/projects/:id/conversations`
+
+Every conversation of the project, newest first:
+`[{ id, started_at, current, messages, last_at, folded }]`. `messages` counts
+what the person and the tools said, not the events.
+
+<!-- example:conversations -->
+```json
+{
+  "conversations": [
+    {
+      "id": "conv_202611262029049212t_eb52",
+      "started_at": "2026-11-26T20:29:04Z",
+      "current": true,
+      "messages": 0,
+      "last_at": null,
+      "folded": []
+    },
+    {
+      "id": "conv_202611262029045562c_48f6",
+      "started_at": "2026-11-26T20:29:04Z",
+      "current": false,
+      "messages": 8,
+      "last_at": "2026-11-26T20:29:04Z",
+      "folded": []
+    }
+  ]
+}
+```
+<!-- /example:conversations -->
+
+### `GET /api/projects/:id/conversations/:conversation`
+
+One conversation, current or earlier, with the fields of
+`GET .../conversation`. 404 `conversation_not_found` for an unknown id.
+
+<!-- example:conversation-old -->
+```json
+{
+  "conversation": {
+    "id": "conv_202611262029045562c_48f6",
+    "started_at": "2026-11-26T20:29:04Z",
+    "current": false,
+    "session": { "tool": "claude" },
+    "folded": [],
+    "messages": [
+      {
+        "id": "msg_202611262029045572d_fd86",
+        "at": "2026-11-26T20:29:04Z",
+        "conversation": "conv_202611262029045562c_48f6",
+        "role": "user",
+        "text": "EDIT bring the last panel closer",
+        "job": null,
+        "screen": { "key": "page:PG_001_003", "label": "Page 3", "route": "/p/the-night-ferry/pages/PG_001_003" },
+        "key": "page:PG_001_003"
+      },
+      {
+        "id": "msg_202611262029047492g_ca32",
+        "at": "2026-11-26T20:29:04Z",
+        "conversation": "conv_202611262029045562c_48f6",
+        "role": "assistant",
+        "text": "This is the fake assistant. You wrote: \"EDIT bring the last panel closer\". With a real tool installed, the answer comes …",
+        "job": "job_202611262029045602e_2852",
+        "tool": "claude",
+        "reply_to": "msg_202611262029045572d_fd86",
+        "screen": { "key": "page:PG_001_003", "label": "Page 3", "route": "/p/the-night-ferry/pages/PG_001_003" },
+        "key": "page:PG_001_003",
+        "files": ["issues/ISS_001/pages/PG_001_003/page.yaml"],
+        "commit": "1863372dd85d0f58f823304167924a987b29b23b",
+        "decisions": [],
+        "links": [],
+        "proposal": null,
+        "reverted": []
+      },
+      "... 8 more"
+    ],
+    "pending": []
+  }
+}
+```
+<!-- /example:conversation-old -->
+
+### Conversations per screen (deprecated)
+
+Earlier versions had one conversation per screen. Their three routes still
+answer, on top of the project conversation, so an older interface keeps
+working. New code uses the routes above.
 
 ### `GET /api/projects/:id/chats`
 
-The conversations that exist: `[{ key, messages, last_at }]`.
+Deprecated. The screens that have messages in the current conversation:
+`[{ key, messages, last_at }]`.
 
 <!-- example:chats -->
 ```json
-{ "chats": [{ "key": "page:PG_001_003", "messages": 2, "last_at": "2026-11-26T19:01:40Z" }] }
+{
+  "chats": [
+    { "key": "cover:ISS_001", "messages": 2, "last_at": "2026-11-26T20:29:04Z" },
+    { "key": "page:PG_001_003", "messages": 2, "last_at": "2026-11-26T20:29:04Z" },
+    "... 1 more"
+  ]
+}
 ```
 <!-- /example:chats -->
 
 ### `GET /api/projects/:id/chats/:key`
 
-The transcript, oldest first, with the `files` in context and `pending`, the
-ids of chat jobs for this key that have not finished.
-
-Message fields: `id`, `at`, `key`, `role` (`user` or `assistant`), `text`,
-`job`. An assistant message also has `tool` (which tool answered),
-`reply_to` (id of the message it answers), `files` (paths it changed),
-`commit` (commit of those changes, or `null`) and `decisions`. When the turn
-failed, the assistant message has `error` and an empty `text`.
+Deprecated. The messages of the current conversation sent from one screen,
+with the `files` the AI gets for that screen, the `conversation` id and
+`pending`, the ids of turns for this screen that have not finished.
 
 <!-- example:chat -->
 ```json
@@ -3581,27 +4432,35 @@ failed, the assistant message has `error` and an empty `text`.
     "issues/ISS_001/pages/PG_001_003/reviews/PG_001_003_V01.review.yaml",
     "... 1 more"
   ],
+  "conversation": "conv_202611262029045562c_48f6",
   "messages": [
     {
-      "id": "msg_2026112619013987828_a49d",
-      "at": "2026-11-26T19:01:39Z",
-      "key": "page:PG_001_003",
+      "id": "msg_202611262029045572d_fd86",
+      "at": "2026-11-26T20:29:04Z",
+      "conversation": "conv_202611262029045562c_48f6",
       "role": "user",
       "text": "EDIT bring the last panel closer",
-      "job": null
+      "job": null,
+      "screen": { "key": "page:PG_001_003", "label": "Page 3", "route": "/p/the-night-ferry/pages/PG_001_003" },
+      "key": "page:PG_001_003"
     },
     {
-      "id": "msg_202611261901400922b_267c",
-      "at": "2026-11-26T19:01:40Z",
-      "key": "page:PG_001_003",
+      "id": "msg_202611262029047492g_ca32",
+      "at": "2026-11-26T20:29:04Z",
+      "conversation": "conv_202611262029045562c_48f6",
       "role": "assistant",
       "text": "This is the fake assistant. You wrote: \"EDIT bring the last panel closer\". With a real tool installed, the answer comes from Claude Code or Codex. I a…",
-      "job": "job_2026112619013988029_8e3e",
+      "job": "job_202611262029045602e_2852",
       "tool": "claude",
-      "reply_to": "msg_2026112619013987828_a49d",
+      "reply_to": "msg_202611262029045572d_fd86",
+      "screen": { "key": "page:PG_001_003", "label": "Page 3", "route": "/p/the-night-ferry/pages/PG_001_003" },
+      "key": "page:PG_001_003",
       "files": ["issues/ISS_001/pages/PG_001_003/page.yaml"],
-      "commit": "b9997c60a2edd4e6a85a99919990c03b7d92c7c8",
-      "decisions": []
+      "commit": "1863372dd85d0f58f823304167924a987b29b23b",
+      "decisions": [],
+      "links": [],
+      "proposal": null,
+      "reverted": []
     }
   ],
   "pending": []
@@ -3611,35 +4470,51 @@ failed, the assistant message has `error` and an empty `text`.
 
 ### `POST /api/projects/:id/chats/:key`
 
-Body: `{ "text": "<message>" }`, at most 8000 characters. Answers 202 with
-the stored user message and the job. The reply arrives as a `chat` event and
-in the transcript.
+Deprecated. Body: `{ "text": "<message>" }`. The same as
+`POST .../conversation` with the screen given by the key. Answers 202 with
+the stored message and the job.
 
 <!-- example:chat-post -->
 ```json
 {
   "message": {
-    "id": "msg_2026112619013987828_a49d",
-    "at": "2026-11-26T19:01:39Z",
-    "key": "page:PG_001_003",
+    "id": "msg_202611262029048672p_edcd",
+    "at": "2026-11-26T20:29:04Z",
+    "conversation": "conv_202611262029045562c_48f6",
     "role": "user",
-    "text": "EDIT bring the last panel closer",
-    "job": null
+    "text": "Sent the old way.",
+    "job": null,
+    "screen": {
+      "key": "style",
+      "label": "Style",
+      "label_code": "screen_label.style",
+      "label_params": {},
+      "route": "/p/the-night-ferry/style"
+    },
+    "key": "style"
   },
   "job": {
-    "id": "job_2026112619013988029_8e3e",
+    "id": "job_202611262029048692q_9dd1",
     "project": "the-night-ferry",
     "op": "chat.turn",
     "title": "Chat",
     "title_code": "op.chat.turn.title",
     "title_params": {},
     "params": {
-      "key": "page:PG_001_003",
-      "text": "EDIT bring the last panel closer",
-      "message": "msg_2026112619013987828_a49d"
+      "key": "style",
+      "screen": {
+        "key": "style",
+        "label": "Style",
+        "label_code": "screen_label.style",
+        "label_params": {},
+        "route": "/p/the-night-ferry/style"
+      },
+      "conversation": "conv_202611262029045562c_48f6",
+      "text": "Sent the old way.",
+      "message": "msg_202611262029048672p_edcd"
     },
     "status": "queued",
-    "created_at": "2026-11-26T19:01:39Z",
+    "created_at": "2026-11-26T20:29:04Z",
     "started_at": null,
     "ended_at": null,
     "current_step": null,
@@ -3656,9 +4531,336 @@ in the transcript.
 ```
 <!-- /example:chat-post -->
 
+## Story proposals
+
+The AI writes story text only when the person asks, and what it writes
+arrives as a proposal: parts the person accepts, edits or rejects one by one
+before any of it becomes canon. Proposals come from
+[`story.draft`](#storydraft), [`story.complete`](#storycomplete),
+[`story.suggest`](#storysuggest), the deprecated
+[`project.setup`](#projectsetup), and chat messages that ask for story text.
+They are stored in `.studio/proposals/<proposal id>.json` of the project.
+
+Where the person's text leaves open something the story needs (how a mystery
+is explained, how it ends, who holds what), the AI asks instead of deciding:
+as a `question` part of the proposal, or, when it cannot go on without the
+answer, by pausing the job with `needs_decision`.
+
+A proposal:
+
+| Field | Meaning |
+|---|---|
+| `id` | `prop_...`. |
+| `kind` | `draft`, `complete`, `suggest` or `chat`. |
+| `title` | What it is, for the person, with its code. |
+| `instruction` | The person's request (`story.suggest`, a chat message), else `null`. |
+| `status` | `open` while a part is pending, `closed` once every part is decided, `discarded`. |
+| `summary`, `decisions`, `tool`, `job` | What the tool said about it, and the job that made it. |
+| `conversation`, `message` | For a proposal made by a chat message, the conversation and the person's message. |
+| `parts` | The parts, below. |
+| `counts` | `{ parts, pending, accepted, edited, rejected }`. |
+| `commits` | The commits that wrote accepted parts. |
+
+A part:
+
+| Field | Meaning |
+|---|---|
+| `id` | `P01`, `P02`... in order. |
+| `type` | `premise`, `tone`, `world_rule`, `fact`, `arc`, `timeline` or `question`. |
+| `text` | What the AI proposes, in the project's language. |
+| `provenance`, `source_ref`, `affects` | For a fact. `provenance` is `source` (the person's text says it; `source_ref` points into `story/source/`, and a claim without an existing source file becomes `addition`), `user_change` (what the person asked for in a chat message) or `addition` (invented). `affects` lists entity ids. |
+| `character`, `role` | For an arc: the character id, and its role or `null`. |
+| `issue` | For a timeline event: the issue that shows it, or `null`. |
+| `blocking`, `options`, `answer` | For a question: whether it blocks drawing, the options the AI offers, and the person's answer once given. |
+| `status` | `pending`, `accepted`, `edited` (accepted with the person's text) or `rejected`. |
+| `decided_at`, `final_text` | When it was decided, and the words written (`null` for a rejected part). |
+| `written` | What accepting wrote, such as `{ "fact": "FACT_004", "provenance": "source" }`, `{ "order": 3 }` for a timeline event, `{ "character": "CHAR_MARA" }` for an arc, `{ "resolved": true }` for an answered question. `dropped_affects` lists entity ids of a fact that do not exist in the workspace and were left out. |
+
+What accepting writes into `story/story-bible.yaml`:
+
+| Part | Written as |
+|---|---|
+| `premise`, `tone` | The new value of the field. |
+| `world_rule` | Appended to `world_rules`. |
+| `fact` | A new fact, `FACT_###` after the highest one, `replaces: null`, `affects` kept to entities that exist. Accepted as proposed it keeps the part's provenance (`source` with its `source_ref`, `user_change`, or `addition`, the schema's provenance for invented facts). Accepted with edited text it is `user_change`: the words are the person's. |
+| `arc` | The `arc` of that character's row in `characters`; a row is added when the character is not listed. |
+| `timeline` | Appended to `timeline` with the next `order`. |
+| `question` | Appended to `open_questions` with its `blocking`; the person's `answer`, when given, becomes its `resolution`. |
+
+The file is changed through the scaffold's comment-keeping helpers
+(`scripts/lib/yaml-edit.js`): values are set where they are and list items
+are added at the end of their list, so the person's comments stay. When an
+edit cannot be placed that way, the file is written from the document and
+only its top comment block stays; the answer's `comments_kept` says which
+happened. Every decision that writes is one history entry (kind
+`proposal`) and one commit.
+
+### `GET /api/projects/:id/proposals`
+
+Every proposal, newest first, without its parts: `id`, `kind`, `status`,
+`title`, `instruction`, `summary`, `created_at`, `updated_at`, `job`, `tool`,
+`counts`. `?status=open` (or `closed`, `discarded`) filters.
+
+<!-- example:proposals -->
+```json
+{
+  "proposals": [
+    {
+      "id": "prop_2026112620285289808_e296",
+      "kind": "suggest",
+      "status": "open",
+      "title": "Suggestion",
+      "title_code": "proposal.title.suggest",
+      "title_params": {},
+      "instruction": "Suggest an ending.",
+      "summary": "This is the fake assistant. It proposes 3 kind(s) of story text for you to accept or reject.",
+      "created_at": "2026-11-26T20:28:52Z",
+      "updated_at": "2026-11-26T20:28:52Z",
+      "job": "job_2026112620285288107_2d73",
+      "tool": "claude",
+      "counts": { "parts": 3, "pending": 3, "accepted": 0, "edited": 0, "rejected": 0 }
+    },
+    {
+      "id": "prop_2026112620285285506_7bd6",
+      "kind": "complete",
+      "status": "discarded",
+      "title": "What the story bible lacks",
+      "title_code": "proposal.title.complete",
+      "title_params": {},
+      "instruction": null,
+      "summary": "This is the fake assistant. It proposes 2 kind(s) of story text for you to accept or reject.",
+      "created_at": "2026-11-26T20:28:52Z",
+      "updated_at": "2026-11-26T20:28:52Z",
+      "job": "job_2026112620285283705_2bf3",
+      "tool": "claude",
+      "counts": { "parts": 2, "pending": 2, "accepted": 0, "edited": 0, "rejected": 0 }
+    },
+    {
+      "id": "prop_2026112620285268003_7fc2",
+      "kind": "draft",
+      "status": "open",
+      "title": "Draft of the story bible",
+      "title_code": "proposal.title.draft",
+      "title_params": {},
+      "instruction": null,
+      "summary": "This is the fake assistant. It proposes 6 kind(s) of story text for you to accept or reject.",
+      "created_at": "2026-11-26T20:28:52Z",
+      "updated_at": "2026-11-26T20:28:52Z",
+      "job": "job_2026112620285265602_77d6",
+      "tool": "claude",
+      "counts": { "parts": 9, "pending": 2, "accepted": 5, "edited": 1, "rejected": 1 }
+    }
+  ]
+}
+```
+<!-- /example:proposals -->
+
+### `GET /api/projects/:id/proposals/:proposal`
+
+One proposal with its parts. 404 `proposal_not_found`.
+
+<!-- example:proposal -->
+```json
+{
+  "proposal": {
+    "id": "prop_2026112620285268003_7fc2",
+    "kind": "draft",
+    "title": "Draft of the story bible",
+    "title_code": "proposal.title.draft",
+    "title_params": {},
+    "instruction": null,
+    "status": "open",
+    "created_at": "2026-11-26T20:28:52Z",
+    "updated_at": "2026-11-26T20:28:52Z",
+    "job": "job_2026112620285265602_77d6",
+    "tool": "claude",
+    "summary": "This is the fake assistant. It proposes 6 kind(s) of story text for you to accept or reject.",
+    "decisions": [],
+    "conversation": null,
+    "message": null,
+    "parts": [
+      {
+        "id": "P01",
+        "type": "premise",
+        "text": "A ferry pilot finds a stowaway the harbour patrol is hunting.",
+        "status": "pending",
+        "decided_at": null,
+        "final_text": null,
+        "written": null
+      },
+      {
+        "id": "P02",
+        "type": "tone",
+        "text": "Plain and direct.",
+        "status": "pending",
+        "decided_at": null,
+        "final_text": null,
+        "written": null
+      },
+      {
+        "id": "P03",
+        "type": "world_rule",
+        "text": "Placeholder rule from the fake assistant: nothing happens that the text does not say.",
+        "status": "pending",
+        "decided_at": null,
+        "final_text": null,
+        "written": null
+      },
+      {
+        "id": "P04",
+        "type": "fact",
+        "text": "A ferry pilot finds a stowaway the harbour patrol is hunting.",
+        "provenance": "source",
+        "source_ref": "story/source/description.md#p1",
+        "affects": [],
+        "status": "pending",
+        "decided_at": null,
+        "final_text": null,
+        "written": null
+      },
+      "... 5 more"
+    ],
+    "commits": [],
+    "counts": { "parts": 9, "pending": 9, "accepted": 0, "edited": 0, "rejected": 0 }
+  }
+}
+```
+<!-- /example:proposal -->
+
+### `POST /api/projects/:id/proposals/:proposal/decide`
+
+Decides parts. Body: `decisions`, a list of
+`{ part, decision, text?, answer? }`:
+
+| Field | Meaning |
+|---|---|
+| `part` | Part id. |
+| `decision` | `accept`, `edit` (accept with the person's `text`) or `reject`. |
+| `text` | Required with `edit`: the words to write instead. |
+| `answer` | For a question part that is accepted or edited: the person's answer, written as its `resolution`. |
+
+Parts left out stay pending, so a screen can send one decision at a time.
+The answer has the proposal after the change, `accepted` and `rejected`
+(counts of this request), `comments_kept`, `findings` (schema findings of
+the story bible after the write) and `commit` (`null` when nothing was
+written, such as a request that only rejects). Refusals: 400 `bad_params`
+(no decisions, an unknown decision, an edit without text, a part twice),
+404 `part_not_found`, 409 `part_decided` for a part decided before, 409
+`proposal_closed` for a proposal that is closed or discarded.
+
+<!-- example:proposal-decide-request -->
+```json
+{
+  "decisions": [
+    { "part": "P01", "decision": "accept" },
+    { "part": "P02", "decision": "edit", "text": "Quiet and tense, with dry humour." },
+    "... 5 more"
+  ]
+}
+```
+<!-- /example:proposal-decide-request -->
+
+<!-- example:proposal-decide -->
+```json
+{
+  "proposal": {
+    "id": "prop_2026112620285268003_7fc2",
+    "kind": "draft",
+    "title": "Draft of the story bible",
+    "title_code": "proposal.title.draft",
+    "title_params": {},
+    "instruction": null,
+    "status": "open",
+    "created_at": "2026-11-26T20:28:52Z",
+    "updated_at": "2026-11-26T20:28:52Z",
+    "job": "job_2026112620285265602_77d6",
+    "tool": "claude",
+    "summary": "This is the fake assistant. It proposes 6 kind(s) of story text for you to accept or reject.",
+    "decisions": [],
+    "conversation": null,
+    "message": null,
+    "parts": [
+      {
+        "id": "P01",
+        "type": "premise",
+        "text": "A ferry pilot finds a stowaway the harbour patrol is hunting.",
+        "status": "accepted",
+        "decided_at": "2026-11-26T20:28:52Z",
+        "final_text": "A ferry pilot finds a stowaway the harbour patrol is hunting.",
+        "written": {}
+      },
+      {
+        "id": "P02",
+        "type": "tone",
+        "text": "Plain and direct.",
+        "status": "edited",
+        "decided_at": "2026-11-26T20:28:52Z",
+        "final_text": "Quiet and tense, with dry humour.",
+        "written": {}
+      },
+      "... 7 more"
+    ],
+    "commits": ["7fbf62e2ccff5f38eaeb125e2d83222729eacce8"],
+    "counts": { "parts": 9, "pending": 2, "accepted": 5, "edited": 1, "rejected": 1 }
+  },
+  "accepted": 6,
+  "rejected": 1,
+  "comments_kept": true,
+  "findings": [],
+  "commit": "7fbf62e2ccff5f38eaeb125e2d83222729eacce8"
+}
+```
+<!-- /example:proposal-decide -->
+
+### `DELETE /api/projects/:id/proposals/:proposal`
+
+Discards an open proposal: its pending parts are never written. Parts
+accepted before stay in the story bible. The proposal stays readable with
+`status: "discarded"`. 409 `proposal_closed` when it is already closed or
+discarded.
+
+<!-- example:proposal-discard -->
+```json
+{
+  "proposal": {
+    "id": "prop_2026112620285285506_7bd6",
+    "kind": "complete",
+    "title": "What the story bible lacks",
+    "title_code": "proposal.title.complete",
+    "title_params": {},
+    "instruction": null,
+    "status": "discarded",
+    "created_at": "2026-11-26T20:28:52Z",
+    "updated_at": "2026-11-26T20:28:52Z",
+    "job": "job_2026112620285283705_2bf3",
+    "tool": "claude",
+    "summary": "This is the fake assistant. It proposes 2 kind(s) of story text for you to accept or reject.",
+    "decisions": [],
+    "conversation": null,
+    "message": null,
+    "parts": [
+      {
+        "id": "P01",
+        "type": "world_rule",
+        "text": "Placeholder rule from the fake assistant.",
+        "status": "pending",
+        "decided_at": null,
+        "final_text": null,
+        "written": null
+      },
+      "... 1 more"
+    ],
+    "commits": [],
+    "discarded_at": "2026-11-26T20:28:52Z",
+    "counts": { "parts": 2, "pending": 2, "accepted": 0, "edited": 0, "rejected": 0 }
+  }
+}
+```
+<!-- /example:proposal-discard -->
+
 ## History
 
-Every finished step, save, approval, chat turn and restore is an entry in the
+Every finished step, save, approval, decision on a proposal, chat turn and restore is an entry in the
 project's activity log, and every entry that changed files links to a git
 commit of the project directory.
 
@@ -3670,7 +4872,7 @@ for the next page.
 | Field | Meaning |
 |---|---|
 | `entries[].id`, `at` | Entry id and time. |
-| `entries[].kind` | `project`, `step`, `save`, `approval`, `lettering`, `restore`. |
+| `entries[].kind` | `project`, `step`, `save`, `approval`, `proposal` (a decision on a story proposal), `lettering`, `restore`. |
 | `entries[].title` | What happened, for the person, with `title_code` and `title_params` beside it. An entry is stored with the code, so the title follows the language of the request. |
 | `entries[].actor` | `person`, `claude`, `codex`, or `studio` for a mechanical step. |
 | `entries[].job`, `op`, `step` | For a job step. |
@@ -3686,30 +4888,30 @@ for the next page.
 {
   "entries": [
     {
-      "id": "act_202611261901400872a_47f1",
-      "at": "2026-11-26T19:01:40Z",
+      "id": "act_202611262029047452f_eae8",
+      "at": "2026-11-26T20:29:04Z",
       "kind": "step",
       "title": "Chat: Answer the message",
       "title_code": "activity.step",
       "title_params": { "title": "Chat", "label": "Answer the message" },
       "actor": "claude",
-      "job": "job_2026112619013988029_8e3e",
+      "job": "job_202611262029045602e_2852",
       "op": "chat.turn",
       "step": "reply",
       "files": [{ "path": "issues/ISS_001/pages/PG_001_003/page.yaml", "change": "modified" }],
       "images": [],
-      "commit": "b9997c60a2edd4e6a85a99919990c03b7d92c7c8",
+      "commit": "1863372dd85d0f58f823304167924a987b29b23b",
       "restorable": true
     },
     {
-      "id": "act_2026112619013984527_6b48",
-      "at": "2026-11-26T19:01:39Z",
+      "id": "act_202611262029045192b_d7e6",
+      "at": "2026-11-26T20:29:04Z",
       "kind": "step",
       "title": "Publish: Build the files",
       "title_code": "activity.step",
       "title_params": { "title": "Publish", "label": "Build the files" },
       "actor": "studio",
-      "job": "job_2026112619013935325_85d1",
+      "job": "job_2026112620290405529_f6b0",
       "op": "publish.build",
       "step": "build",
       "files": [
@@ -3720,28 +4922,28 @@ for the next page.
       "images": [
         {
           "path": "editions/ED_001_01/exports/the-night-ferry-001-ed01-images/000-cover.png",
-          "url": "/api/projects/the-night-ferry/raw/editions/ED_001_01/exports/the-night-ferry-001-ed01-images/000-cover.png?v=6tsmwxx580m",
+          "url": "/api/projects/the-night-ferry/raw/editions/ED_001_01/exports/the-night-ferry-001-ed01-images/000-cover.png?v=6tsmwy09mu6",
           "width": 600,
           "height": 900,
           "bytes": 8848,
-          "mtime": "2026-11-26T19:01:39.670Z"
+          "mtime": "2026-11-26T20:29:04.350Z"
         },
         {
           "path": "editions/ED_001_01/exports/the-night-ferry-001-ed01-images/001.png",
-          "url": "/api/projects/the-night-ferry/raw/editions/ED_001_01/exports/the-night-ferry-001-ed01-images/001.png?v=6vqmwxx580m",
+          "url": "/api/projects/the-night-ferry/raw/editions/ED_001_01/exports/the-night-ferry-001-ed01-images/001.png?v=6vqmwy09mu6",
           "width": 600,
           "height": 900,
           "bytes": 8918,
-          "mtime": "2026-11-26T19:01:39.670Z"
+          "mtime": "2026-11-26T20:29:04.350Z"
         },
         "... 6 more"
       ],
-      "commit": "a67c95106c0690c45a033d4635b5183a4e81417d",
+      "commit": "463966b00c41222a01091a18e253660ba7901b38",
       "restorable": true
     },
     "... 1 more"
   ],
-  "total": 60,
+  "total": 59,
   "more": true,
   "restore": { "available": true, "reason": null }
 }
@@ -3764,14 +4966,14 @@ that changed no files, 404 for an unknown entry or commit.
 <!-- example:restore -->
 ```json
 {
-  "commit": "1079866f4fbefc58358a9d2c9fe90328fc843b5a",
-  "restored": "142937637be33c8d8af529c7c4eabe84411e22e9",
+  "commit": "b47168ad0c7b390a977fb1e6450dd81c4683c9fe",
+  "restored": "c207fb53d6405e8523a73042675433cdfaf1c8a6",
   "unchanged": false,
   "saved_first": null,
   "files": 15,
   "activity": {
-    "id": "act_202611261901410662c_a32c",
-    "at": "2026-11-26T19:01:41Z",
+    "id": "act_202611262029058672u_1a8d",
+    "at": "2026-11-26T20:29:05Z",
     "kind": "restore",
     "title": "Went back to an earlier point: Approved the cover of ISS_001",
     "title_code": "activity.restore",
@@ -3786,8 +4988,8 @@ that changed no files, 404 for an unknown entry or commit.
       "... 13 more"
     ],
     "images": [],
-    "commit": "1079866f4fbefc58358a9d2c9fe90328fc843b5a",
-    "restored_from": "142937637be33c8d8af529c7c4eabe84411e22e9"
+    "commit": "b47168ad0c7b390a977fb1e6450dd81c4683c9fe",
+    "restored_from": "c207fb53d6405e8523a73042675433cdfaf1c8a6"
   }
 }
 ```
@@ -3826,25 +5028,25 @@ A saved text file:
 <!-- example:diff -->
 ```json
 {
-  "from": "7e6090f3f7b5b5c8ef28b09a5dd38d36e6fd27aa",
-  "to": "28f72e35b33e84854df482c8217138ad24f9c55e",
+  "from": "40cd2dd1ed95ea33f9ed802996e2e4788e51a6dd",
+  "to": "6cec5c1324bd526ffcf69583e3f732aab05bf270",
   "files": [
     {
       "path": "story/series-plan.yaml",
       "status": "modified",
       "kind": "text",
       "before": {
-        "text": "# Schema: schemas/series-plan.schema.json\n\ntitle: The Night Ferry\nissues:\n  - id: ISS_001\n    number: 1\n    title: Issue 1\n    summary: A ferry pilot finds a st…",
-        "bytes": 238,
+        "text": "# production/story/series-plan.yaml: the story divided into issues\n# Schema: schemas/series-plan.schema.json\n# Written by /series-plan. An issue is the publicat…",
+        "bytes": 376,
         "truncated": false
       },
       "after": {
-        "text": "# Schema: schemas/series-plan.schema.json\n\ntitle: The Night Ferry\nissues:\n  - id: ISS_001\n    number: 1\n    title: Crossing\n    summary: A ferry pilot finds a s…",
-        "bytes": 239,
+        "text": "# production/story/series-plan.yaml: the story divided into issues\n# Schema: schemas/series-plan.schema.json\n# Written by /series-plan. An issue is the publicat…",
+        "bytes": 369,
         "truncated": false
       },
-      "before_url": "/api/projects/the-night-ferry/at/7e6090f3f7b5b5c8ef28b09a5dd38d36e6fd27aa/raw/story/series-plan.yaml",
-      "after_url": "/api/projects/the-night-ferry/at/28f72e35b33e84854df482c8217138ad24f9c55e/raw/story/series-plan.yaml"
+      "before_url": "/api/projects/the-night-ferry/at/40cd2dd1ed95ea33f9ed802996e2e4788e51a6dd/raw/story/series-plan.yaml",
+      "after_url": "/api/projects/the-night-ferry/at/6cec5c1324bd526ffcf69583e3f732aab05bf270/raw/story/series-plan.yaml"
     }
   ],
   "total": 1,
@@ -3858,8 +5060,8 @@ A step that drew a page:
 <!-- example:diff-image -->
 ```json
 {
-  "from": "7ef916bd972d0bb30a92e95eeb0fef1cc06da95c",
-  "to": "c668fe237bc7970b09a3def36f02185d8f579c29",
+  "from": "58419e28fafdcdcdc144fdce7f926b2b4acb42f1",
+  "to": "7aabeafcc70532b3d81a62be43114e3229f0a158",
   "files": [
     {
       "path": "generations/PG_001_003/GEN_PG_001_003_01.request.json",
@@ -3872,7 +5074,7 @@ A step that drew a page:
         "truncated": false
       },
       "before_url": null,
-      "after_url": "/api/projects/the-night-ferry/at/c668fe237bc7970b09a3def36f02185d8f579c29/raw/generations/…"
+      "after_url": "/api/projects/the-night-ferry/at/7aabeafcc70532b3d81a62be43114e3229f0a158/raw/generations/…"
     },
     {
       "path": "generations/PG_001_003/GEN_PG_001_003_01.yaml",
@@ -3885,7 +5087,7 @@ A step that drew a page:
         "truncated": false
       },
       "before_url": null,
-      "after_url": "/api/projects/the-night-ferry/at/c668fe237bc7970b09a3def36f02185d8f579c29/raw/generations/…"
+      "after_url": "/api/projects/the-night-ferry/at/7aabeafcc70532b3d81a62be43114e3229f0a158/raw/generations/…"
     },
     {
       "path": "issues/ISS_001/pages/PG_001_003/page.yaml",
@@ -3901,8 +5103,8 @@ A step that drew a page:
         "bytes": 3713,
         "truncated": false
       },
-      "before_url": "/api/projects/the-night-ferry/at/7ef916bd972d0bb30a92e95eeb0fef1cc06da95c/raw/issues/ISS_0…",
-      "after_url": "/api/projects/the-night-ferry/at/c668fe237bc7970b09a3def36f02185d8f579c29/raw/issues/ISS_0…"
+      "before_url": "/api/projects/the-night-ferry/at/58419e28fafdcdcdc144fdce7f926b2b4acb42f1/raw/issues/ISS_0…",
+      "after_url": "/api/projects/the-night-ferry/at/7aabeafcc70532b3d81a62be43114e3229f0a158/raw/issues/ISS_0…"
     },
     {
       "path": "issues/ISS_001/pages/PG_001_003/renders/PG_001_003_V01.png",
@@ -3911,7 +5113,7 @@ A step that drew a page:
       "before": null,
       "after": null,
       "before_url": null,
-      "after_url": "/api/projects/the-night-ferry/at/c668fe237bc7970b09a3def36f02185d8f579c29/raw/issues/ISS_0…"
+      "after_url": "/api/projects/the-night-ferry/at/7aabeafcc70532b3d81a62be43114e3229f0a158/raw/issues/ISS_0…"
     }
   ],
   "total": 4,
@@ -3977,14 +5179,14 @@ also freezes the style block (`style_frozen: true` in the answer).
   "warnings": [],
   "image": {
     "path": "references/style/LOOK_NOIR_INK_MASTER_V01.png",
-    "url": "/api/projects/the-night-ferry/raw/references/style/LOOK_NOIR_INK_MASTER_V01.png?v=665mwxx500k",
+    "url": "/api/projects/the-night-ferry/raw/references/style/LOOK_NOIR_INK_MASTER_V01.png?v=665mwy09f5m",
     "width": 600,
     "height": 900,
     "bytes": 7997,
-    "mtime": "2026-11-26T19:01:29.300Z"
+    "mtime": "2026-11-26T20:28:54.394Z"
   },
   "style_frozen": true,
-  "commit": "a73333fb5144f46120b39b4d043cff582fd0c3d4"
+  "commit": "70ced4b5a1c78bdf46c00740cdcc4b1fe628534c"
 }
 ```
 <!-- /example:approve-asset -->
@@ -4024,7 +5226,7 @@ findings become `accepted`, and their ids come back in `accepted_notes`.
   "overruled": false,
   "accepted_notes": [],
   "status": "approved",
-  "commit": "c63719d7dd5819685f67980c8a705230644953d6"
+  "commit": "100fa108a450ac2561d3f2a231fc610509072d42"
 }
 ```
 <!-- /example:approve-page -->
@@ -4089,7 +5291,7 @@ is read the same way.
   "overruled": true,
   "accepted_notes": [],
   "status": "approved",
-  "commit": "41fa63919b8f4a0b8c0c1f6d80dc4d121b1bfe13"
+  "commit": "d0cbc12e609920a344f3253509a40be351a867ed"
 }
 ```
 <!-- /example:approve-page-overrule -->
@@ -4162,11 +5364,11 @@ The review of that render afterwards, and the summary of the page in
   "renders": 3,
   "image": {
     "path": "issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V03.png",
-    "url": "/api/projects/overlay-letters/raw/issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V03.png?v=7gcmwxx5cy9",
+    "url": "/api/projects/overlay-letters/raw/issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V03.png?v=7gcmwy09rqx",
     "width": 600,
     "height": 900,
     "bytes": 9660,
-    "mtime": "2026-11-26T19:01:46.065Z"
+    "mtime": "2026-11-26T20:29:10.713Z"
   },
   "verdict": "fixed",
   "outcome": "pass",
@@ -4204,7 +5406,7 @@ edition.
   "overruled": false,
   "accepted_notes": [],
   "status": "approved",
-  "commit": "142937637be33c8d8af529c7c4eabe84411e22e9"
+  "commit": "c207fb53d6405e8523a73042675433cdfaf1c8a6"
 }
 ```
 <!-- /example:approve-cover -->
@@ -4274,14 +5476,14 @@ and lists it in every draft edition that ships that render. Answers 201.
   "path": "issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V01.lettered.png",
   "image": {
     "path": "issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V01.lettered.png",
-    "url": "/api/projects/overlay-letters/raw/issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V01.lettered.png?v=39hmwxx5dr6",
+    "url": "/api/projects/overlay-letters/raw/issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V01.lettered.png?v=39hmwy09shy",
     "width": 400,
     "height": 600,
     "bytes": 4229,
-    "mtime": "2026-11-26T19:01:47.106Z"
+    "mtime": "2026-11-26T20:29:11.686Z"
   },
   "editions": [],
-  "commit": "30d6e5d8efbd91a768039a438f5856e3808aaf81"
+  "commit": "31d683156b519e33a987cc5e860e4c6132da8b60"
 }
 ```
 <!-- /example:lettered-post -->
@@ -4299,44 +5501,147 @@ scaffold's `codex-cli` provider.
 
 ### `project.setup`
 
-Fills the project metadata and writes the story bible and the series plan
-(one issue). Scaffold commands: project-init, story-bible, series-plan.
+Deprecated: use [`story.draft`](#storydraft). It is kept for older clients
+and is queued by `POST /api/projects` only with `"setup": true`. It no longer
+writes the story: it saves the description as `story/source/description.md`
+(and, when the story bible is still the template or the empty starter, writes
+the starter story files as `POST /api/projects` does), then asks for a draft
+of the story bible as a proposal, exactly like `story.draft`.
 
 | Param | Type | Meaning |
 |---|---|---|
-| `description` | string, required | What the comic is about. Saved as `story/source/description.md`, the source for provenance. |
-| `pages` | integer 1 to 200 | Page budget of the first issue. Default 4. |
+| `description` | string, required | What the comic is about. Saved as `story/source/description.md`, the person's source text. |
+| `pages` | integer 1 to 200 | Page budget of the first issue, for the starter series plan. Default 4. |
 
-Steps: `source`, `story` (plan), `check`. `result.problems` lists what
-`validate-workspace.js` reports about the new files.
+Steps: `source`, `story` (plan, read-only: the draft), `check`. Result:
+`summary`, `decisions`, `tool`, `proposal` (the id), `parts`, `files`
+(always empty: the AI wrote nothing) and `problems`, what
+`validate-workspace.js` reports.
 
 <!-- example:op.project.setup -->
 ```json
 {
-  "params": {
-    "description": "A ferry pilot finds a stowaway the harbour patrol is hunting. She decides not to hand him over.",
-    "pages": 3
-  },
+  "params": { "description": "A lighthouse keeper finds a bottle with a map in it.", "pages": 1 },
   "steps": [
     { "id": "source", "label": "Save the description", "status": "done" },
-    { "id": "story", "label": "Write the story bible and the series plan", "status": "done" },
+    { "id": "story", "label": "Draft a story bible for you to review", "status": "done" },
     { "id": "check", "label": "Check the files", "status": "done" }
   ],
   "result": {
-    "summary": "Wrote the story bible and a one-issue plan of 3 page(s) for \"The Night Ferry\".",
-    "decisions": ["One issue, because the description names no chapters."],
-    "files": ["project.yaml", "story/story-bible.yaml", "... 1 more"],
+    "summary": "This is the fake assistant. It proposes 6 kind(s) of story text for you to accept or reject.",
+    "decisions": [],
+    "files": [],
     "tool": "claude",
+    "proposal": "prop_202611262029121883v_580f",
+    "parts": 7,
     "problems": []
   }
 }
 ```
 <!-- /example:op.project.setup -->
 
+### `story.draft`
+
+Reads the person's own text (the description and every text file under
+`story/source/`) and proposes a story bible: premise, tone, world rules,
+facts, character arcs, timeline events, and questions about what the text
+leaves open. It writes no file: the run is read-only, and what comes back is
+stored as a [proposal](#story-proposals). Facts the text states come with
+provenance `source` and a `source_ref`; the AI is told not to add events,
+explanations or endings the text does not state, and to ask instead.
+Commands, for the method: source-analyze, story-bible.
+
+| Param | Type | Meaning |
+|---|---|---|
+| `source` | string | One file under `story/source/` to draft from. Default: every text file there, the description first. |
+
+409 `no_story_text` when the project has no text of the person's yet. Step:
+`propose` (plan). It may pause with `needs_decision` when the AI cannot go on
+without an answer. Result: `proposal` (the id), `parts`, `questions` (how
+many parts are questions), `summary`, `decisions`, `tool`.
+
+<!-- example:op.story.draft -->
+```json
+{
+  "params": { "source": null },
+  "steps": [{ "id": "propose", "label": "Read your text and draft a proposal", "status": "done" }],
+  "result": {
+    "proposal": "prop_2026112620285268003_7fc2",
+    "parts": 9,
+    "questions": 1,
+    "summary": "This is the fake assistant. It proposes 6 kind(s) of story text for you to accept or reject.",
+    "decisions": [],
+    "tool": "claude"
+  }
+}
+```
+<!-- /example:op.story.draft -->
+
+### `story.complete`
+
+Proposes only what the story bible still lacks: an empty tone, no world
+rules, no facts, characters with no arc, no timeline, and questions about
+what the person's text leaves open. What is already there is not proposed
+again. Read-only, like `story.draft`. No parameters. Step: `propose` (plan).
+Result as in `story.draft`.
+
+<!-- example:op.story.complete -->
+```json
+{
+  "params": {},
+  "steps": [{ "id": "propose", "label": "Propose what the story bible lacks", "status": "done" }],
+  "result": {
+    "proposal": "prop_2026112620285285506_7bd6",
+    "parts": 2,
+    "questions": 1,
+    "summary": "This is the fake assistant. It proposes 2 kind(s) of story text for you to accept or reject.",
+    "decisions": [],
+    "tool": "claude"
+  }
+}
+```
+<!-- /example:op.story.complete -->
+
+### `story.suggest`
+
+A free request for story text, such as "suggest an ending". What the AI
+proposes for it is invented, so its facts come with provenance `addition`;
+it is a proposal like the others and nothing is written until the person
+accepts it. Read-only.
+
+| Param | Type | Meaning |
+|---|---|---|
+| `instruction` | string, required | What to propose, in the person's words. |
+
+Step: `propose` (plan). Result as in `story.draft`.
+
+<!-- example:op.story.suggest -->
+```json
+{
+  "params": { "instruction": "Suggest an ending." },
+  "steps": [{ "id": "propose", "label": "Write a proposal for your request", "status": "done" }],
+  "result": {
+    "proposal": "prop_2026112620285289808_e296",
+    "parts": 3,
+    "questions": 1,
+    "summary": "This is the fake assistant. It proposes 3 kind(s) of story text for you to accept or reject.",
+    "decisions": [],
+    "tool": "claude"
+  }
+}
+```
+<!-- /example:op.story.suggest -->
+
 ### `story.update`
 
-Applies a change to the canon, or folds in an uploaded source text. Commands:
-source-analyze (with a source), story-bible, series-plan.
+Applies a change the person states to the canon, or folds in a source text
+they uploaded. It writes the story bible directly, because the words are the
+person's: a change is a `user_change` fact, what a source states is a
+`source` fact. The AI is told to add no `addition` fact here; where the
+change would need invented story it adds an open question or pauses with
+`needs_decision`. For story text the AI should write, use the proposal
+operations below. Commands: source-analyze (with a source), story-bible,
+series-plan.
 
 | Param | Type | Meaning |
 |---|---|---|
@@ -4389,7 +5694,7 @@ At least one of `preset`, `description`, `uploads`. Steps: `prepare`, `bible`
   "params": {
     "preset": "noir-ink",
     "description": "Heavy ink and wet streets.",
-    "uploads": ["up_2026112619012788406_cadd"],
+    "uploads": ["up_202611262028530820a_bf70"],
     "attach_references": true
   },
   "steps": [
@@ -4459,7 +5764,7 @@ approved, or with no drawing tool, the two sheet steps are skipped and
   "params": {
     "name": "Mara",
     "description": "Ferry pilot in her fifties, grey cropped hair.",
-    "uploads": ["up_202611261901296340h_164c"],
+    "uploads": ["up_202611262028547650l_b975"],
     "draw": true,
     "character": "CHAR_MARA"
   },
@@ -4589,7 +5894,13 @@ Steps: `write` (plan), then the plate steps.
 
 From a text of what happens to planned pages. Commands: issue-breakdown, then
 smart-page (layout, panel script, lettering text, ledger). The new pages are
-appended after the issue's existing ones.
+appended after the issue's existing ones. The AI turns the person's text
+into panels and is told to add no story event, line or reveal the text does
+not have. What it has to fill in to make a page drawable (where figures
+stand, who holds what, a background, a time of day) is listed in
+`result.assumptions` as `[{ page, panel, text }]` (`panel` may be `null`),
+and the page detail shows the same list as `assumptions`, so the person can
+read it and change any of it.
 
 | Param | Type | Meaning |
 |---|---|---|
@@ -4638,6 +5949,28 @@ before it draws.
     "summary": "Planned 3 page(s) with three panels each.",
     "decisions": [],
     "tool": "claude",
+    "assumptions": [
+      {
+        "page": "PG_001_001",
+        "panel": null,
+        "text": "Placeholder: the scene happens by day, because the text does not say when."
+      },
+      {
+        "page": "PG_001_001",
+        "panel": "PN_001_001_01",
+        "text": "Placeholder: the figures stand left and right of the room and hold nothing, because the text does not say."
+      },
+      {
+        "page": "PG_001_002",
+        "panel": "PN_001_002_01",
+        "text": "Placeholder: the figures stand left and right of the room and hold nothing, because the text does not say."
+      },
+      {
+        "page": "PG_001_003",
+        "panel": "PN_001_003_01",
+        "text": "Placeholder: the figures stand left and right of the room and hold nothing, because the text does not say."
+      }
+    ],
     "fix_pass": false,
     "continuity": [],
     "validation": { "errors": [], "warnings": [] },
@@ -4974,11 +6307,11 @@ file.
           "path": "references/style/LOOK_SOFT_PENCIL_WARM_MASTER_V01.png",
           "image": {
             "path": "references/style/LOOK_SOFT_PENCIL_WARM_MASTER_V01.png",
-            "url": "/api/projects/by-hand/raw/references/style/LOOK_SOFT_PENCIL_WARM_MASTER_V01.png?v=34omwxx5esz",
+            "url": "/api/projects/by-hand/raw/references/style/LOOK_SOFT_PENCIL_WARM_MASTER_V01.png?v=34omwy09tjp",
             "width": 400,
             "height": 600,
             "bytes": 4056,
-            "mtime": "2026-11-26T19:01:48.467Z"
+            "mtime": "2026-11-26T20:29:13.045Z"
           }
         },
         {
@@ -4988,11 +6321,11 @@ file.
           "path": "characters/CHAR_NELL/refs/CHAR_NELL_TURN_MASTER_V01.png",
           "image": {
             "path": "characters/CHAR_NELL/refs/CHAR_NELL_TURN_MASTER_V01.png",
-            "url": "/api/projects/by-hand/raw/characters/CHAR_NELL/refs/CHAR_NELL_TURN_MASTER_V01.png?v=2dtmwxx5fbi",
+            "url": "/api/projects/by-hand/raw/characters/CHAR_NELL/refs/CHAR_NELL_TURN_MASTER_V01.png?v=2dtmwy09u24",
             "width": 400,
             "height": 400,
             "bytes": 3089,
-            "mtime": "2026-11-26T19:01:49.134Z"
+            "mtime": "2026-11-26T20:29:13.708Z"
           }
         }
       ],
@@ -5023,7 +6356,7 @@ when no tool is installed to check it.
     "sheet": null,
     "outfit": null,
     "repair": false,
-    "upload": "up_2026112619015003540_7c55"
+    "upload": "up_202611262029146154g_ef94"
   },
   "steps": [
     { "id": "prepare", "label": "Prepare page 1", "status": "done" },
@@ -5327,34 +6660,48 @@ Result: `edition`, `reused`, `draft`, `formats`, `written[]` and `skipped[]`
 
 ### `chat.turn`
 
-One chat message. It is started by `POST .../chats/:key`, which stores the
-person's message first; `POST .../ops` refuses it. Its parameters are `key`
-(the screen key) and `text` (the message), which that route fills in. Step:
-`reply` (plan). Result: `{ key, message }` with the assistant's message.
+One message of the project conversation. It is started by
+`POST .../conversation` (or the deprecated `POST .../chats/:key`), which
+stores the person's message first; `POST .../ops` refuses it. Its parameters,
+which that route fills in: `screen` (`{ key, label, route }`), `text` (the
+message), `conversation` (the conversation id), and `key`, the screen key
+again, kept for older clients. Step: `reply` (plan). The reply may change the
+files of the screen, never the story bible: story text comes back as a
+proposal, and a reply that wrote the story bible anyway is undone inside the
+step and listed in `reverted`. Result: `{ conversation, key, message }` with
+the assistant's message.
 
 <!-- example:op.chat.turn -->
 ```json
 {
   "params": {
     "key": "page:PG_001_003",
+    "screen": { "key": "page:PG_001_003", "label": "Page 3", "route": "/p/the-night-ferry/pages/PG_001_003" },
+    "conversation": "conv_202611262029045562c_48f6",
     "text": "EDIT bring the last panel closer",
-    "message": "msg_2026112619013987828_a49d"
+    "message": "msg_202611262029045572d_fd86"
   },
   "steps": [{ "id": "reply", "label": "Answer the message", "status": "done" }],
   "result": {
+    "conversation": "conv_202611262029045562c_48f6",
     "key": "page:PG_001_003",
     "message": {
-      "id": "msg_202611261901400922b_267c",
-      "at": "2026-11-26T19:01:40Z",
-      "key": "page:PG_001_003",
+      "id": "msg_202611262029047492g_ca32",
+      "at": "2026-11-26T20:29:04Z",
+      "conversation": "conv_202611262029045562c_48f6",
       "role": "assistant",
       "text": "This is the fake assistant. You wrote: \"EDIT bring the last panel closer\". With a real tool installed, the answer comes from Claude Code or Codex. I a…",
-      "job": "job_2026112619013988029_8e3e",
+      "job": "job_202611262029045602e_2852",
       "tool": "claude",
-      "reply_to": "msg_2026112619013987828_a49d",
+      "reply_to": "msg_202611262029045572d_fd86",
+      "screen": { "key": "page:PG_001_003", "label": "Page 3", "route": "/p/the-night-ferry/pages/PG_001_003" },
+      "key": "page:PG_001_003",
       "files": ["issues/ISS_001/pages/PG_001_003/page.yaml"],
-      "commit": "b9997c60a2edd4e6a85a99919990c03b7d92c7c8",
-      "decisions": []
+      "commit": "1863372dd85d0f58f823304167924a987b29b23b",
+      "decisions": [],
+      "links": [],
+      "proposal": null,
+      "reverted": []
     }
   }
 }
@@ -5380,7 +6727,20 @@ of the interface reachable:
 | `NOTE` | The text of a page or a cover | Its first review lists one minor finding. The page passes with a note (`outcome: notes`) and no repair is tried. |
 | `FAILDRAW` | The text of a page | Drawing that page fails. |
 | `SLOWDRAW` | The text of a page | Drawing that page takes `STUDIO_FAKE_SLOW_MS` (default 4000 ms). |
-| `EDIT` | A chat message | The reply also changes the first file of the screen. |
+| `EDIT` | A chat message | The reply also changes the first file of the screen, never the story bible. |
+| `PROPOSE` | A chat message | The reply comes with a proposal of one fact (`user_change`) and one question. |
+| `LINK` | A chat message | The reply suggests three screens: Characters, and two that do not exist, which the server drops. |
+| `WRITEBIBLE` | A chat message | The reply writes the story bible directly, and the studio undoes it (`reverted`). |
+
+The proposal operations return placeholder parts built from the person's
+text: a draft proposes a premise, a tone, a world rule, the first sentences
+of the description as `source` facts, one `addition`, timeline events and a
+question. When a chat turn starts a new session, the fake reply says how
+many earlier messages its summary held.
+
+The model lists of fake mode are fixed and marked `source: "fake"`: Claude
+Code offers `fake-large` (the default) and `fake-fast`, Codex offers
+`fake-codex` (the default) and `fake-codex-mini`.
 
 `STUDIO_FAKE_TOOLS` lists the tools the fake reports as installed, for
 example `STUDIO_FAKE_TOOLS=claude` to see the interface with no drawing tool.

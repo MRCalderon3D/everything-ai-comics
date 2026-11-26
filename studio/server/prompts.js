@@ -24,7 +24,7 @@ const REVIEW_CHECKS = ['identity', 'cast_count', 'position', 'movement', 'role_c
 
 /** Template name -> file. One per operation that calls the AI. */
 const TEMPLATES = {
-  'project.setup': 'project-setup.txt',
+  'story.propose': 'story-propose.txt',
   'story.update': 'story-update.txt',
   'style.define': 'style-define.txt',
   'character.write': 'character.txt',

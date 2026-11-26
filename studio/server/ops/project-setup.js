@@ -1,19 +1,22 @@
 'use strict';
 /**
- * project.setup: from a title and a description to project metadata, a
- * story bible and a series plan. Runs right after a project is created.
- * Commands: project-init, story-bible, series-plan.
+ * project.setup (deprecated: use story.draft). Kept so older clients keep
+ * working, and run by POST /api/projects only when the body asks for it
+ * with "setup": true.
+ *
+ * It no longer writes the story. It saves the description as the person's
+ * source text, makes sure the starter story files exist (an empty story
+ * bible and a one-issue series plan, written mechanically), and asks the AI
+ * for a draft of the story bible as a proposal, exactly like story.draft.
  */
 
 const fs = require('fs');
-const path = require('path');
 const S = require('../scaffold');
+const story = require('../story');
 const { msg } = require('../i18n');
 const pipeline = require('../pipeline');
-const { runAi } = require('../ai');
+const { propose } = require('./story-propose');
 const { str, int } = require('./shared');
-
-const SOURCE = 'story/source/description.md';
 
 module.exports = {
   name: 'project.setup',
@@ -40,19 +43,23 @@ module.exports = {
     const title = (S.ws.loadProject(root) || {}).title || 'Untitled';
 
     await ctx.step('source', () => {
-      const file = S.ws.abs(root, SOURCE);
-      fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(file, `# ${title}\n\n${params.description}\n`);
+      const bible = S.ws.loadYaml(S.ws.abs(root, story.BIBLE));
+      // A template, or the starter bible nobody has written in yet, takes the new description.
+      const untouched = bible && (!Array.isArray(bible.facts) || !bible.facts.length) &&
+        [title, project.state().description || ''].includes(String(bible.premise || ''));
+      const template = !bible || untouched || (typeof bible.premise === 'string' && /^TODO/i.test(bible.premise));
+      if (template) {
+        story.writeStarterStory(project, { title, description: params.description, pages: params.pages });
+      } else {
+        const file = S.ws.abs(root, story.SOURCE);
+        fs.mkdirSync(require('path').dirname(file), { recursive: true });
+        fs.writeFileSync(file, `# ${title}\n\n${params.description}\n`);
+      }
       project.saveState({ description: params.description });
-      return { file: SOURCE };
+      return { file: story.SOURCE };
     });
 
-    const story = await ctx.step('story', (h) => runAi(ctx, h, {
-      verb: 'plan',
-      kind: 'project.setup',
-      vars: { title, description: params.description, pages: params.pages, pages_count: params.pages, source_file: SOURCE },
-      fakeText: params.description,
-    }), { verb: 'plan' });
+    const drafted = await propose(ctx, 'story', { mode: 'draft' });
 
     const check = await ctx.step('check', (h) => {
       const result = pipeline.mechanical(root, null);
@@ -62,10 +69,12 @@ module.exports = {
     });
 
     return {
-      summary: story.summary,
-      decisions: story.decisions,
-      files: story.files_written,
-      tool: story.tool,
+      summary: drafted.summary,
+      decisions: drafted.decisions,
+      files: [],
+      tool: drafted.tool,
+      proposal: drafted.proposal,
+      parts: drafted.parts,
       problems: check.errors,
     };
   },

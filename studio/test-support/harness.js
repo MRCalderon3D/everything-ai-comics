@@ -22,6 +22,8 @@ async function start(options = {}) {
     fake: options.fake !== false,
     fakeTools: options.fakeTools,
     heartbeatMs: options.heartbeatMs,
+    previewsDir: options.previewsDir,
+    modelOptions: options.modelOptions,
   });
   const { url, port } = await app.listen();
 
@@ -88,8 +90,9 @@ async function start(options = {}) {
   }
 
   /**
-   * A project ready for pages: set up, style defined from a preset, look page
-   * drawn and approved, one character with an approved turnaround.
+   * A project ready for pages: created from a description (the story bible
+   * holds only that), style defined from a preset, look page drawn and
+   * approved, one character with an approved turnaround.
    * @returns {Promise<string>} the project id
    */
   async function seedProject(title = 'Seed Project', extra = {}) {
@@ -102,7 +105,7 @@ async function start(options = {}) {
       if (job.status !== 'done') throw new Error(`${what}: ${job.status} ${JSON.stringify(job.error)}`);
       return job;
     };
-    expectDone(await waitJob(id, created.body.job.id), 'project.setup');
+    if (created.body.job) expectDone(await waitJob(id, created.body.job.id), 'project.setup');
     expectDone(await runOp(id, 'style.define', { preset: 'ligne-claire' }), 'style.define');
     const look = expectDone(await runOp(id, 'style.look', {}), 'style.look');
     let res = await api('POST', `/api/projects/${id}/approve/asset`, { candidate: look.result.candidate_id });

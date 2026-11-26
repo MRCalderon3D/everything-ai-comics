@@ -427,12 +427,15 @@ function story(project) {
   const data = bible.data || {};
   const written = bible.exists && typeof data.premise === 'string' && !/^TODO/i.test(data.premise) &&
     Array.isArray(data.facts) && data.facts.some((f) => f && f.statement && !/^TODO/i.test(String(f.statement)));
+  const sources = files.listDir(project, 'story/source');
   return {
     written,
+    // The person's own text is there: a description or a source file. Enough to go on to the style.
+    has_text: !!(project.state().description || '').trim() || sources.length > 0,
     description: project.state().description || '',
     bible,
     series_plan: files.readDoc(project, 'story/series-plan.yaml'),
-    sources: files.listDir(project, 'story/source'),
+    sources,
     blocking_questions: (Array.isArray(data.open_questions) ? data.open_questions : [])
       .filter((q) => q && q.blocking === true && !q.resolution).map((q) => q.question),
     characters_named: (Array.isArray(data.characters) ? data.characters : []).map((c) => c && c.id).filter(Boolean)
@@ -749,6 +752,8 @@ function page(project, pageId, drivers) {
     draw: { available: draw.available && S.providerIds().includes('codex-cli'), tool: draw.name, reason: draw.reason },
     repair_limit: pipeline.repairLimit(project),
     neighbors: { previous: at > 0 ? pagesInOrder[at - 1] : null, next: at !== -1 && at < pagesInOrder.length - 1 ? pagesInOrder[at + 1] : null },
+    // What the planner filled in that the person's text did not say.
+    assumptions: require('./assumptions').ofPage(project, pageId),
     chat_key: `page:${pageId}`,
   };
 }
@@ -898,12 +903,15 @@ function overview(project, services) {
   const screens = [];
   const add = (key, status, summary, extra = {}) => screens.push(Object.assign({ key, status, summary, blockers: [], counts: {} }, extra));
 
-  add('story', storyState.written ? 'done' : 'todo',
-    msg(storyState.written ? 'screen.story.done' : 'screen.story.todo'),
+  add('story', storyState.written || storyState.has_text ? 'done' : 'todo',
+    msg(storyState.written ? 'screen.story.done' : storyState.has_text ? 'screen.story.text' : 'screen.story.todo'),
     {
       // The question is the project's own text, written by whoever wrote the story bible.
       blockers: storyState.blocking_questions.map((q) => ({ code: 'blocking_question', message: msg('blocker.blocking_question', { question: q }) })),
-      counts: { facts: storyState.bible.data && Array.isArray(storyState.bible.data.facts) ? storyState.bible.data.facts.length : 0 },
+      counts: {
+        facts: storyState.bible.data && Array.isArray(storyState.bible.data.facts) ? storyState.bible.data.facts.length : 0,
+        proposals_open: safe(() => require('./story').list(project, { status: 'open' }).length, 0),
+      },
     });
 
   let styleStatus = 'todo';

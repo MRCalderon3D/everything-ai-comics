@@ -18,6 +18,7 @@
 const S = require('../scaffold');
 const { msg } = require('../i18n');
 const pipeline = require('../pipeline');
+const assumptions = require('../assumptions');
 const { runAi } = require('../ai');
 const { OpError } = require('../jobs');
 const { HttpError } = require('../util');
@@ -87,8 +88,12 @@ module.exports = {
           first_number: first,
         },
         fakeText: params.text,
+        pages: params.pages,
       });
-      return { page_ids: pageIds, summary: result.summary, decisions: result.decisions, tool: result.tool, data: result.data };
+      return {
+        page_ids: pageIds, summary: result.summary, decisions: result.decisions, tool: result.tool, data: result.data,
+        assumptions: assumptions.clean(result.data.assumptions, pageIds),
+      };
     }, { verb: 'plan' });
     const pageIds = breakdown.page_ids;
 
@@ -98,12 +103,16 @@ module.exports = {
         kind: 'pages.plan',
         vars: { issue, text: params.text, page_ids: pageIds.join(', '), page_list: pageIds, provider },
         fakeText: params.text,
+        pages: params.pages,
       });
       const missing = pageIds.filter((id) => !S.ws.loadPage(root, id));
       if (missing.length) {
         throw new OpError('pages_missing', `The plan was not written for ${missing.join(', ')}.`, undefined, { pages: missing });
       }
-      return { summary: result.summary, decisions: result.decisions, tool: result.tool };
+      // What the planner had to fill in to make a page drawable, for the person to see and change.
+      const filled = [...(breakdown.assumptions || []), ...assumptions.clean(result.data.assumptions, pageIds)];
+      assumptions.save(project, pageIds, filled, ctx.job.id);
+      return { summary: result.summary, decisions: result.decisions, tool: result.tool, assumptions: filled };
     }, { verb: 'plan' });
 
     const report = (h, result) => {
@@ -158,6 +167,7 @@ module.exports = {
       summary: planned.summary,
       decisions: [...(breakdown.decisions || []), ...(planned.decisions || [])],
       tool: planned.tool,
+      assumptions: planned.assumptions || [],
       fix_pass: fixed,
       continuity: gates.continuity,
       validation: gates.validation,

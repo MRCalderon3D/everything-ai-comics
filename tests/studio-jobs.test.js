@@ -88,14 +88,16 @@ async function main() {
     await stream.waitFor((e) => e.type === 'job' && e.data.job.id === jobId && e.data.job.status === 'done');
     const types = new Set(stream.events.map((e) => e.type));
     for (const type of ['hello', 'heartbeat', 'job', 'log', 'activity', 'files']) assert.ok(types.has(type), `no ${type} event`);
-    const log = stream.events.find((e) => e.type === 'log' && /writing story\/story-bible.yaml/.test(e.data.line));
+    const log = stream.events.find((e) => e.type === 'log' && /reading commands for story.propose/.test(e.data.line));
     assert.ok(log, 'tool use shows up as short progress lines');
     assert.deepStrictEqual(Object.keys(log.data).sort(), ['at', 'job', 'line', 'step']);
     assert.strictEqual(log.data.step, 'story');
     const filesEvent = stream.events.find((e) => e.type === 'files' && e.data.paths.includes('story/story-bible.yaml'));
     assert.ok(filesEvent, 'changed files are announced with workspace-relative paths');
-    const activity = stream.events.find((e) => e.type === 'activity' && e.data.entry.step === 'story');
-    assert.strictEqual(activity.data.entry.actor, 'claude');
+    // The setup writes the description mechanically; the AI step only proposes and writes nothing.
+    const activity = stream.events.find((e) => e.type === 'activity' && e.data.entry.step === 'source');
+    assert.strictEqual(activity.data.entry.actor, 'studio');
+    assert.ok(!stream.events.some((e) => e.type === 'activity' && e.data.entry.step === 'story'), 'the proposal step changes no file');
     assert.ok(stream.events.every((e) => e.id), 'every event has an id');
     r = await s.api('GET', `${P}/jobs/${jobId}?log=200`);
     assert.ok(r.body.log.some((line) => /waiting for a decision/.test(line)));

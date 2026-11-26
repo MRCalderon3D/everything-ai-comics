@@ -53,9 +53,11 @@ Environment:
 /**
  * Create the server without starting it.
  * @param {{port?: number, home?: string, fake?: boolean, fakeTools?: string[],
- *          heartbeatMs?: number, webDir?: string}} [options]
+ *          heartbeatMs?: number, webDir?: string, previewsDir?: string, modelOptions?: object}} [options]
  *   port 0 picks a free port (tests). fakeTools: which tools the fake
- *   reports as installed (default both).
+ *   reports as installed (default both). previewsDir: where the sample
+ *   pages of the presets are read from (default templates/looks/previews).
+ *   modelOptions: passed to the model detection (tests).
  * @returns {{server, listen: () => Promise<{port, url}>, close: () => Promise<void>,
  *            services, port: () => number, url: () => string}}
  */
@@ -68,7 +70,10 @@ function createServer(options = {}) {
     heartbeatMs: options.heartbeatMs || 15000,
     languageOf: (projectId) => registry.get(projectId).settings().language,
   });
-  const drivers = createDrivers({ fake, fakeTools });
+  const drivers = createDrivers({ fake, fakeTools, modelOptions: options.modelOptions });
+  // The model lists of the installed tools are looked up once at start (and on request).
+  drivers.refreshModels().catch(() => {});
+  if (options.previewsDir) require('./looks').setPreviewsDir(options.previewsDir);
   const services = { registry, events, drivers, ops, fake, touched: new Map() };
   const jobs = new JobManager({ events, ops, services });
   services.jobs = jobs;
@@ -183,6 +188,7 @@ function createServer(options = {}) {
   async function close() {
     await jobs.shutdown();
     events.close();
+    if (options.previewsDir) require('./looks').setPreviewsDir(null);
     if (fake) {
       if (previousCodexBin === undefined) delete process.env.CODEX_BIN;
       else process.env.CODEX_BIN = previousCodexBin;

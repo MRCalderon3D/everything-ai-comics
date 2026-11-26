@@ -15,6 +15,9 @@ const { msg } = require('../i18n');
 const MODULES = [
   './project-setup',
   './story-update',
+  './story-draft',
+  './story-complete',
+  './story-suggest',
   './style-define',
   './style-look',
   './character-create',

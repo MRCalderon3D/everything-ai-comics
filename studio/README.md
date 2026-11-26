@@ -62,9 +62,14 @@ Each project is one directory in the studio home:
 ```
 <home>/<project>/
 ├── production/    the scaffold workspace: project.yaml, story/, style/, characters/, issues/, editions/ ...
-├── .studio/       settings.json, state.json, activity.jsonl, jobs/, chats/, uploads/
+├── .studio/       settings.json, state.json, activity.jsonl, jobs/, uploads/,
+│                  conversations/, proposals/, timings.jsonl, assumptions.json
 └── .git/          one commit per finished step
 ```
+
+`chats/` may also be there, from an earlier version that had one
+conversation per screen; its messages are folded into the project
+conversation the first time it is read.
 
 `production/` is an ordinary workspace: `node scripts/validate-workspace.js
 --root <home>/<project>/production` works on it, and so does every command of
@@ -124,6 +129,82 @@ Which tool does what is a setting per project (plan, look, draw), with a
 model per tool and verb. When the tool a verb is set to is not installed, the
 other one takes it and the job says so.
 
+## Models
+
+The Settings screen offers, per job, the models the installed tools report.
+Neither CLI has a command that only lists its models, so the server reads
+what each tool keeps on disk when it starts (and again when asked through
+`POST /api/tools/refresh`), never on every request:
+
+- Claude Code keeps the model catalog it downloads in
+  `~/.claude/cache/model-catalog/`. It lists the models, the aliases
+  (`fable`, `opus`, `sonnet`, `haiku`) and the account's default. Without
+  it, the server falls back to the aliases that `claude --help` names, marked
+  as documented.
+- Codex keeps its catalog in `~/.codex/models_cache.json`; without it,
+  `codex debug models --bundled` prints the list built into the binary
+  without going to the network. The default is the `model` of
+  `~/.codex/config.toml`.
+
+Every model in the answer says where it came from, and a name typed by hand
+is still accepted. The details, file by file, are in
+[docs/api.md](docs/api.md#where-the-model-lists-come-from).
+
+Every AI call is timed and recorded per project in `.studio/timings.jsonl`
+(tool, model, job, duration, how many pages it worked on). The settings
+route returns the averages per model, including the time per page, so the
+interface can say how long a page takes with the model the person picked.
+
+## The person writes the story
+
+Creating a project starts no AI job. The server saves the description as
+the person's source text (`story/source/description.md`), writes a story
+bible that is empty but valid (its premise is the description) and a series
+plan of one issue with the page count given. `validate-workspace.js` passes
+on it, and every later step (style, characters, pages, cover, publishing)
+works with a story bible that holds only that.
+
+The AI writes story text only when asked: "draft a story bible from my
+text" (`story.draft`), "complete what is missing" (`story.complete`), a free
+request such as "suggest an ending" (`story.suggest`), or a chat message.
+Each of these runs read-only and returns a proposal, stored in
+`.studio/proposals/`: parts (the premise, the tone, each world rule, each
+fact, each arc, each timeline event, each question) that the person
+accepts, edits or rejects one by one. Only accepted parts reach
+`story/story-bible.yaml`, through the scaffold's comment-keeping YAML
+helpers, as one commit. Where the person's text leaves open something the
+story needs, the AI asks: a question part, or a job that stops with
+`needs_decision`. It does not decide for them.
+
+Page planning follows the same rule. The AI turns the person's text into
+panels and adds no event of its own. What it has to fill in to make a page
+drawable (who stands where, what someone holds, the background) comes back
+as a list of assumptions per page and panel, shown on the page so the
+person can change any of it.
+
+## Styles
+
+The Style screen lists the look presets of `templates/looks/`. Each one comes
+with its sample page when it has been drawn
+(`templates/looks/previews/<preset>.png`, served by
+`GET /api/presets/:key/preview` with a long cache) and with the list of what
+tends to drift across pages with that look. A style described in words or
+taken from uploaded images has no sample until its own look page is drawn.
+
+## One conversation per project
+
+The chat is one conversation per project, open on every screen. Each
+message carries the screen it was sent from, and the AI gets that screen's
+files, so "change this" means what the person is looking at. A reply can
+suggest screens to go to; the server keeps only the links that name real
+screens of the project. The conversation continues through the tool's own
+session (`--resume` for Claude Code, `codex exec resume` for Codex). When
+the answering tool changes, the new one starts a session of its own with a
+summary of the last messages, and the transcript says so. A chat never
+writes the story bible: story text comes back as a proposal, and a reply
+that wrote the file anyway is undone. The person can start a fresh
+conversation; the earlier ones stay readable.
+
 ## What a page goes through
 
 1. The plan: `pages.plan` runs the scaffold's issue breakdown and
@@ -160,7 +241,7 @@ figure is the whole job, from the click to the last commit.
 
 | Job | Time |
 |---|---|
-| `project.setup` (story bible and series plan) | 92 s |
+| `project.setup` (story bible and series plan, as it worked then) | 92 s |
 | `style.define` | 152 s |
 | `style.look` (one look page) | 157 s |
 | `character.create`, with its turnaround sheet | 150 to 180 s per character |
@@ -231,8 +312,11 @@ the sandboxed reader load them.
 
 `tests/studio-*.test.js` run with the rest of the suite (`npm test`), in fake
 mode, each on a temporary studio home. They drive the server over HTTP: the
-whole pipeline, cancel, questions and answers, the event stream, the checks
-above, and the command lines built for both tools. No test starts a real CLI.
+whole pipeline from a project that holds only the person's description,
+story proposals decided part by part, the project conversation, the model
+lists (read from files in a temporary home), cancel, questions and answers,
+the event stream, the checks above, and the command lines built for both
+tools. No test starts a real CLI.
 `studio/test-support/record-api-examples.js` refreshes the examples in the
 API reference from such a run.
 

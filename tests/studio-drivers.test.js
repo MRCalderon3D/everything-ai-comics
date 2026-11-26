@@ -247,16 +247,26 @@ async function main() {
   assert.strictEqual(assignment.look.tool, 'codex');
 
   // --- prompts -------------------------------------------------------------------------------------------
-  const prompt = prompts.build('project.setup', {
-    title: 'The Night Ferry', description: 'A ferry pilot finds a stowaway.', pages: 4, source_file: 'story/source/description.md',
-  }, { workspace: WORKSPACE, language: 'es', comicFormat: 'paged', answers: { q1: { question: 'Which ending?', answer: 'The quiet one' } } });
+  // A proposal run: read-only, the person's text by path, questions instead of inventions.
+  const prompt = prompts.build('story.propose', {
+    draft: true, mode: 'draft', sources: '- story/source/description.md', bible: 'story/story-bible.yaml',
+  }, { workspace: WORKSPACE, language: 'es', comicFormat: 'paged', readOnly: true, answers: { q1: { question: 'Which ending?', answer: 'The quiet one' } } });
   for (const needle of [
-    'commands/project-init.md', 'commands/story-bible.md', 'commands/series-plan.md',
-    `Workspace root: ${WORKSPACE}`, 'Project language: es', 'A ferry pilot finds a stowaway.',
-    'HEADLESS CONTRACT', 'needs_decision', `node scripts/validate-workspace.js --root "${WORKSPACE}" --json`,
+    'commands/source-analyze.md', 'commands/story-bible.md', 'Draft a story bible from the person\'s own text',
+    `Workspace root: ${WORKSPACE}`, 'Project language: es', 'story/source/description.md', 'data.proposal',
+    'do not write their story for them', 'ask the person in "questions" instead of deciding',
+    'HEADLESS CONTRACT', 'needs_decision', 'This is a read-only run',
     'ANSWERS FROM THE PERSON', 'The quiet one',
   ]) {
     assert.ok(prompt.includes(needle), `the prompt lacks: ${needle}`);
+  }
+  assert.ok(!prompt.includes('Propose only for what the story bible lacks'), 'the draft prompt leaves out the other modes');
+  // Page planning turns the person's text into panels and lists what it had to fill in.
+  const planPrompt = prompts.build('pages.plan', { issue: 'ISS_001', text: 'x', page_ids: 'PG_001_001', provider: 'codex-cli' }, { workspace: WORKSPACE });
+  for (const needle of ['Add no story event', 'data.assumptions']) assert.ok(planPrompt.includes(needle), `pages.plan lacks: ${needle}`);
+  const chatPrompt = prompts.build('chat', { screen: 'story', screen_key: 'story', screens: 'story, style', bible: 'B' }, { workspace: WORKSPACE });
+  for (const needle of ['Never write the story bible', 'data.proposal', 'data.links', 'Never say you did something you did not do']) {
+    assert.ok(chatPrompt.includes(needle), `chat lacks: ${needle}`);
   }
   assert.ok(!/\{\{[#/a-z_ ]+\}\}/.test(prompt), 'no template token is left in a prompt');
   assert.ok(prompt.length < 6000, 'prompts stay short: the commands carry the method');

@@ -14,6 +14,7 @@ const fs = require('fs');
 const path = require('path');
 const S = require('./scaffold');
 const prompts = require('./prompts');
+const timings = require('./timings');
 const i18n = require('./i18n');
 
 const { msg } = i18n;
@@ -337,6 +338,15 @@ async function draw(ctx, handle, packageFile, options = {}) {
     }
   } else {
     let outcome;
+    const started = Date.now();
+    const timing = (ok) => {
+      const rel = toPosix(String(packageFile));
+      const kind = /\/cover\//.test(rel) ? 'cover' : /\/pages\//.test(rel) ? 'page' : 'sheet';
+      timings.record(ctx.project, {
+        tool: 'codex', model: drawTarget(ctx).model, job: 'draw', kind, op: ctx.job && ctx.job.op,
+        ms: Date.now() - started, ok, pages: kind === 'page' ? 1 : null,
+      });
+    };
     try {
       outcome = await S.generateAssets({
         package: packageFile,
@@ -348,9 +358,12 @@ async function draw(ctx, handle, packageFile, options = {}) {
       });
     } catch (err) {
       if (ctx.signal.aborted) throw abortError();
+      timing(false);
       throw new OpError(err.code || 'draw_failed', pipelineMessage(err));
     }
     if (ctx.signal.aborted) throw abortError();
+    const drawnRecord = outcome.results[0] && outcome.results[0].record;
+    timing(!!drawnRecord && drawnRecord.status === 'succeeded');
     if (!outcome.results.length) {
       throw new OpError('draw_failed', outcome.failures[0] || 'The image was not drawn.');
     }
@@ -680,6 +693,7 @@ async function reviewRender(ctx, handle, options) {
     allowWrite: false,
     dataSchema: prompts.reviewDataSchema(),
     fakeText: options.fakeText || '',
+    pages: /^PG_/.test(render) ? 1 : undefined,
   });
   const returned = result.data && result.data.review;
   if (!returned || typeof returned !== 'object') {

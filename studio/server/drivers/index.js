@@ -21,6 +21,7 @@
 const claude = require('./claude');
 const codex = require('./codex');
 const fake = require('./fake');
+const models = require('../models');
 const { msg } = require('../i18n');
 
 const DRIVERS = { claude, codex };
@@ -28,17 +29,21 @@ const OTHER = { claude: 'codex', codex: 'claude' };
 const DETECT_TTL_MS = 60000;
 
 /**
- * @param {{fake?: boolean, fakeTools?: string[]}} options
+ * @param {{fake?: boolean, fakeTools?: string[], modelOptions?: object}} options
  *   fakeTools: the tools the fake reports as installed (default both).
+ *   modelOptions: passed to models.detectModels (tests point it at a
+ *   temporary home and a stub runner).
  */
 function createDrivers(options = {}) {
   const isFake = !!options.fake;
   const fakeTools = options.fakeTools || ['claude', 'codex'];
   let cached = null;
   let cachedAt = 0;
+  // The model lists: found once at start and on request, never per request.
+  let modelLists = null;
+  let modelsPending = null;
 
-  /** { claude: { installed, version }, codex: { installed, version } } */
-  function detect(refresh = false) {
+  function installedTools(refresh) {
     if (isFake) {
       const out = {};
       for (const name of Object.keys(DRIVERS)) {
@@ -56,6 +61,49 @@ function createDrivers(options = {}) {
       cachedAt = Date.now();
     }
     return cached;
+  }
+
+  /** Look for the models of every tool again. Resolves with the lists. */
+  function refreshModels() {
+    if (modelsPending) return modelsPending;
+    const tools = installedTools(true);
+    if (isFake) {
+      modelLists = {};
+      for (const name of Object.keys(DRIVERS)) modelLists[name] = models.fakeModels(name, tools[name].installed);
+      return Promise.resolve(modelLists);
+    }
+    modelsPending = (async () => {
+      const lists = {};
+      for (const name of Object.keys(DRIVERS)) {
+        lists[name] = await models.detectModels(name, Object.assign({}, options.modelOptions || {}, {
+          installed: tools[name].installed, fake: isFake,
+        }));
+      }
+      modelLists = lists;
+      return lists;
+    })().finally(() => { modelsPending = null; });
+    return modelsPending;
+  }
+
+  /** The list of a tool, or a placeholder while the first detection runs. */
+  function modelsOf(name) {
+    if (modelLists && modelLists[name]) return modelLists[name];
+    return {
+      jobs: models.JOBS[name].slice(), models: [], models_source: { kind: 'detecting', where: null, note: msg('model.source.detecting') },
+      models_detected_at: null,
+    };
+  }
+
+  /**
+   * { claude: { installed, version, jobs, models, models_source, models_detected_at }, codex: {...} }
+   * `refresh` looks for the tools again (the model lists change only through refreshModels).
+   */
+  function detect(refresh = false) {
+    const tools = installedTools(refresh);
+    if (!modelLists && !modelsPending) refreshModels().catch(() => {});
+    const out = {};
+    for (const [name, info] of Object.entries(tools)) out[name] = Object.assign({}, info, modelsOf(name));
+    return out;
   }
 
   /**
@@ -107,7 +155,25 @@ function createDrivers(options = {}) {
     return out;
   }
 
-  return { fake: isFake, detect, pick, assignment };
+  /** Per tool and verb: whether the model setting is the tool's default, a listed model, or a custom name. */
+  function modelStatus(settings) {
+    const out = {};
+    for (const name of Object.keys(DRIVERS)) {
+      out[name] = {};
+      for (const verb of Object.keys(settings.models[name] || {})) {
+        out[name][verb] = models.modelStatus(settings.models[name][verb], modelsOf(name).models);
+      }
+    }
+    return out;
+  }
+
+  /** Resolves once the first model detection has finished (tests, the refresh route). */
+  function modelsReady() {
+    if (modelLists && !modelsPending) return Promise.resolve(modelLists);
+    return modelsPending || refreshModels();
+  }
+
+  return { fake: isFake, detect, pick, assignment, refreshModels, modelsReady, modelStatus };
 }
 
 module.exports = { createDrivers, DRIVERS };

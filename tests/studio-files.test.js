@@ -137,7 +137,7 @@ async function projectsAndFiles() {
     assert.strictEqual(r.status, 404);
     r = await s.api('GET', '/api/ops');
     assert.deepStrictEqual(r.body.operations.map((o) => o.name), [
-      'project.setup', 'story.update', 'style.define', 'style.look', 'character.create', 'character.update',
+      'project.setup', 'story.update', 'story.draft', 'story.complete', 'story.suggest', 'style.define', 'style.look', 'character.create', 'character.update',
       'character.sheet', 'entities.derive', 'pages.plan', 'pages.generate', 'page.review', 'page.correct',
       'page.manual', 'cover.create', 'cover.correct', 'lettering.apply', 'publish.build', 'chat.turn',
     ]);
@@ -188,7 +188,7 @@ async function manualHandoff() {
     const id = r.body.project.id;
     const P = `/api/projects/${id}`;
     const root = path.join(s.home, id, 'production');
-    assertDone(await s.waitJob(id, r.body.job.id), 'project.setup');
+    assert.strictEqual(r.body.job, null, 'creating a project starts no AI job');
     assert.strictEqual(ws.loadProject(root).default_providers.image, 'codex-cli');
     assertDone(await s.runOp(id, 'style.define', { description: 'Soft pencil, warm paper.' }), 'style.define');
     r = await s.api('POST', `${P}/ops`, { op: 'style.look', params: {} });
@@ -266,9 +266,9 @@ async function manualHandoff() {
   try {
     const id = await c.seedProject('Codex Only');
     let r = await c.api('GET', `/api/projects/${id}/jobs?limit=50`);
-    const setup = r.body.jobs.find((j) => j.op === 'project.setup');
+    const setup = r.body.jobs.find((j) => j.op === 'character.create');
     assert.strictEqual(setup.tools.plan, 'codex', 'the result says which tool did the work');
-    assert.strictEqual(setup.steps.find((x) => x.id === 'story').tool, 'codex');
+    assert.strictEqual(setup.steps.find((x) => x.id === 'write').tool, 'codex');
     r = await c.api('GET', `/api/projects/${id}/jobs/${setup.id}/log`);
     assert.ok(r.body.lines.some((l) => /Claude Code is not installed: Codex does this step instead/.test(l)));
     assertDone(await c.runOp(id, 'pages.plan', { text: 'One quiet page.', pages: 1 }), 'pages.plan');
@@ -285,7 +285,8 @@ async function manualHandoff() {
   const n = await start({ fakeTools: [] });
   try {
     const r = await n.api('POST', '/api/projects', { title: 'No Tools', description: 'Nothing is installed.' });
-    const job = await n.waitJob(r.body.project.id, r.body.job.id);
+    assert.strictEqual(r.status, 201, 'a project is created with no tool installed: nothing calls the AI');
+    const job = await n.runOp(r.body.project.id, 'story.draft', {});
     assert.strictEqual(job.status, 'failed');
     assert.strictEqual(job.error.code, 'no_tool');
     assert.ok(/Install Claude Code or Codex/.test(job.error.message));

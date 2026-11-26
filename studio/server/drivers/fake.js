@@ -96,44 +96,42 @@ function characterIds(root) {
 // --- handlers: one per prompt template ----------------------------------------
 
 const handlers = {
-  'project.setup'(task, out) {
+  // A proposal, never a file: the run is read-only.
+  'story.propose'(task, out) {
     const { root, vars } = task;
-    const title = vars.title || (ws.loadProject(root) || {}).title || 'Untitled';
-    const description = String(vars.description || '').trim() || `A comic called ${title}.`;
-    const pages = Number.isInteger(vars.pages_count) ? vars.pages_count : 2;
-    setProjectLine(root, 'logline', JSON.stringify(firstSentence(description)));
-    const projectFile = path.join(root, 'project.yaml');
-    fs.writeFileSync(projectFile, fs.readFileSync(projectFile, 'utf8')
-      .replace(/^(\s*violence_treatment:\s*)"TODO:[^"\n]*"/m, '$1"Implied, never anatomical."'));
-    out.files.push('project.yaml');
-    writeYaml(root, 'story/story-bible.yaml', {
-      title,
-      premise: description,
-      tone: 'Plain and direct.',
-      world_rules: [],
-      facts: [
-        {
-          id: 'FACT_001', statement: firstSentence(description, 300), provenance: 'source',
-          source_ref: vars.source_file || 'story/source/description.md', replaces: null, affects: [],
-        },
-        {
-          id: 'FACT_002', statement: 'The story is told in one issue.', provenance: 'addition',
-          replaces: null, affects: [],
-        },
-      ],
-      characters: characterIds(root).map((id) => ({ id, role: 'supporting' })),
-      timeline: [{ order: 1, event: firstSentence(description, 200), issue: 'ISS_001' }],
-      open_questions: [],
-    }, out.files, 'Schema: schemas/story-bible.schema.json');
-    writeYaml(root, 'story/series-plan.yaml', {
-      title,
-      issues: [{
-        id: 'ISS_001', number: 1, title: 'Issue 1', summary: firstSentence(description, 200),
-        page_budget: pages, status: 'planning',
-      }],
-    }, out.files, 'Schema: schemas/series-plan.schema.json');
-    out.summary = `Wrote the story bible and a one-issue plan of ${pages} page(s) for "${title}".`;
-    out.decisions.push('One issue, because the description names no chapters.');
+    const sources = (vars.source_list || []).map((rel) => {
+      try {
+        return { rel, text: fs.readFileSync(ws.abs(root, rel), 'utf8').replace(/^#.*\n+/, '') };
+      } catch (err) {
+        return { rel, text: '' };
+      }
+    });
+    const first = sources[0] || { rel: null, text: '' };
+    const sentences = String(first.text).replace(/\s+/g, ' ').trim().match(/[^.!?]+[.!?]*/g) || [];
+    const bible = ws.loadYaml(ws.abs(root, 'story/story-bible.yaml')) || {};
+    const chars = characterIds(root);
+    const proposal = {};
+    if (vars.mode === 'draft') {
+      proposal.premise = firstSentence(first.text || 'A comic.', 300);
+      proposal.tone = 'Plain and direct.';
+      proposal.world_rules = ['Placeholder rule from the fake assistant: nothing happens that the text does not say.'];
+      proposal.facts = sentences.slice(0, 3).map((s) => ({ statement: s.trim(), provenance: 'source', source_ref: `${first.rel}#p1`, affects: [] }));
+      proposal.facts.push({ statement: 'Placeholder addition: the story is told in one issue.', provenance: 'addition', affects: [] });
+      if (chars[0]) proposal.arcs = [{ character: chars[0], role: 'protagonist', arc: 'Placeholder arc: from keeping out of it to taking a side.' }];
+      proposal.timeline = sentences.slice(0, 2).map((s, i) => ({ order: i + 1, event: s.trim(), issue: 'ISS_001' }));
+      proposal.questions = [{ question: 'The text does not say how it ends. How should it end?', blocking: false, options: [] }];
+    } else if (vars.mode === 'complete') {
+      if (!bible.tone) proposal.tone = 'Plain and direct.';
+      if (!Array.isArray(bible.world_rules) || !bible.world_rules.length) proposal.world_rules = ['Placeholder rule from the fake assistant.'];
+      if (!Array.isArray(bible.timeline) || !bible.timeline.length) proposal.timeline = [{ order: 1, event: firstSentence(first.text || bible.premise || 'Something happens.', 200), issue: 'ISS_001' }];
+      proposal.questions = [{ question: 'Placeholder question: what does the main character want?', blocking: false, options: [] }];
+    } else {
+      proposal.facts = [{ statement: `Placeholder addition for the request: ${words(vars.instruction, 20)}`, provenance: 'addition', affects: [] }];
+      proposal.timeline = [{ order: 1, event: `Placeholder event for the request: ${words(vars.instruction, 20)}`, issue: 'ISS_001' }];
+      proposal.questions = [{ question: 'Placeholder question: is this the direction you want?', blocking: false, options: ['Yes', 'No'] }];
+    }
+    out.data.proposal = proposal;
+    out.summary = `This is the fake assistant. It proposes ${Object.keys(proposal).length} kind(s) of story text for you to accept or reject.`;
   },
 
   'story.update'(task, out) {
@@ -315,6 +313,7 @@ const handlers = {
     out.data.scenes = [sceneId];
     out.data.locations = made ? [made] : [];
     out.data.props = [];
+    out.data.assumptions = [{ page: pageIds[0], panel: null, text: 'Placeholder: the scene happens by day, because the text does not say when.' }];
     out.summary = `Broke the text into one scene, ${sceneId}, over ${pageIds.length} page(s).`;
   },
 
@@ -430,6 +429,11 @@ const handlers = {
       issueDoc.page_count = ws.listPageIds(root, issue).length;
       writeYaml(root, `issues/${issue}/issue.yaml`, issueDoc, out.files, 'Schema: schemas/issue.schema.json');
     }
+    out.data.assumptions = pageIds.map((pageId) => ({
+      page: pageId,
+      panel: `PN_${pageId.slice(3)}_01`,
+      text: 'Placeholder: the figures stand left and right of the room and hold nothing, because the text does not say.',
+    }));
     out.summary = `Planned ${pageIds.length} page(s) with three panels each.`;
   },
 
@@ -624,8 +628,34 @@ const handlers = {
     const { root, vars } = task;
     const message = String(vars.message || '');
     out.summary = `This is the fake assistant. You wrote: "${words(message, 30)}". With a real tool installed, the answer comes from Claude Code or Codex.`;
+    if (vars.history) {
+      out.summary += ` I joined with a summary of ${String(vars.history).split('\n').filter((l) => l.startsWith('- ')).length} earlier message(s).`;
+    }
+    if (has(message, 'PROPOSE')) {
+      // Story text comes back as a proposal, never as a write to the story bible.
+      out.data.proposal = {
+        facts: [{ statement: `Placeholder fact asked for in the chat: ${words(message.replace(/\bPROPOSE\b/g, ''), 20)}`, provenance: 'user_change', affects: [] }],
+        questions: [{ question: 'Placeholder question from the chat: should this be canon?', blocking: false, options: [] }],
+      };
+      out.summary += ' I wrote it as a proposal on the Story screen.';
+    }
+    if (has(message, 'LINK')) {
+      out.data.links = [
+        { screen: 'characters', label: 'Characters' },
+        { screen: 'character:CHAR_NOBODY_HERE', label: 'A screen that does not exist' },
+        { route: `/p/x/nowhere`, label: 'A route that does not exist' },
+      ];
+      out.summary += ' Add the character on the Characters screen.';
+    }
+    if (has(message, 'WRITEBIBLE') && task.allowWrite && fs.existsSync(ws.abs(root, 'story/story-bible.yaml'))) {
+      // A reply that writes the story bible anyway: the studio undoes it.
+      const file = ws.abs(root, 'story/story-bible.yaml');
+      fs.writeFileSync(file, `${fs.readFileSync(file, 'utf8').replace(/\n*$/, '\n')}notes: "Written by the fake assistant, which should not."\n`);
+      out.files.push('story/story-bible.yaml');
+    }
     if (!has(message, 'EDIT') || !task.allowWrite) return;
-    const target = (vars.file_list || []).find((rel) => /\.(ya?ml|md|txt)$/i.test(rel) && fs.existsSync(ws.abs(root, rel)));
+    // The story bible is never the file a chat edits.
+    const target = (vars.file_list || []).find((rel) => rel !== 'story/story-bible.yaml' && /\.(ya?ml|md|txt)$/i.test(rel) && fs.existsSync(ws.abs(root, rel)));
     if (!target) return;
     const file = ws.abs(root, target);
     const text = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
@@ -728,7 +758,7 @@ async function run(options) {
     const handler = handlers[task.kind];
     const out = { summary: 'Done.', files: [], decisions: [], data: {} };
     if (handler) {
-      if (task.allowWrite === false && task.kind !== 'review' && task.kind !== 'chat') {
+      if (task.allowWrite === false && !['review', 'chat', 'story.propose'].includes(task.kind)) {
         return finish({ status: 'failed', summary: 'This step needs to write files and was run read-only.', files_written: [] });
       }
       handler(task, out);

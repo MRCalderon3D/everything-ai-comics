@@ -11,8 +11,10 @@ What happens on these pages:
 >>>
 
 INSTRUCTIONS FOR THIS RUN
+- Turn the person's text into panels. Add no story event, no line of dialogue and no reveal the person did not write. When the text is short, spend the panels on what it says (establishing shots, reactions, silent beats), not on new events.
+- A page must be drawable, so some things the text does not say have to be filled in: where each figure stands, who holds what, what is in the background, a facial expression. Fill them in plainly, and list every one in data.assumptions as [{"page": "<PAGE_ID>", "panel": "<PANEL_ID or null>", "text": "<what you filled in, in the interface language>"}]. The person reads this list and can change any of it.
 - Stop after the ledger audit. Skip steps 8 and 9 of the command (reference plans and prompt packages) and do not run build-board.js: the studio builds the reference plan and compiles the prompt right before it draws each page.
 - Set generation.mode to full_page and generation.provider to {{provider}} in every page, and status to scripted.
 - Run node scripts/check-continuity.js --root "{{workspace}}" --issue {{issue}} and fix every error in the plan until it reports none.
-- One drawable moment per panel. Write the exact words of every caption and balloon in the project's language.
+- One drawable moment per panel. Write the exact words of every caption and balloon in the project's language, taken from the person's text where it gives them.
 - Do not replan a page that already has a render.

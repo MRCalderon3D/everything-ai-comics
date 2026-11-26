@@ -8,6 +8,7 @@
 const prompts = require('./prompts');
 const { msg } = require('./i18n');
 const S = require('./scaffold');
+const timings = require('./timings');
 const { NeedsDecision, OpError } = require('./jobs');
 const { SCAFFOLD_ROOT, abortError } = require('./util');
 
@@ -39,9 +40,10 @@ function projectContext(project) {
  * @param {object} handle step handle (setTool, log)
  * @param {{verb: 'plan'|'look', kind: string, vars: object, images?: string[],
  *          allowWrite?: boolean, dataSchema?: object, sessionId?: string,
- *          fakeText?: string}} call
+ *          fakeText?: string, pages?: number}} call
  *   kind: a prompt template name. fakeText: the person's own words, which
- *   the fake driver scans for its test markers.
+ *   the fake driver scans for its test markers. pages: how many pages the
+ *   call works on, for the timings per page.
  * @returns {Promise<object>} the contract result plus { tool, sessionId, costUsd, durationMs, fallback }
  */
 async function runAi(ctx, handle, call) {
@@ -89,6 +91,16 @@ async function runAi(ctx, handle, call) {
     },
   });
   if (ctx.signal.aborted || result.cancelled) throw abortError();
+  timings.record(project, {
+    tool: pick.name,
+    model: pick.model,
+    job: call.verb,
+    kind: call.kind,
+    op: ctx.job && ctx.job.op,
+    ms: result.durationMs || (Date.now() - started),
+    ok: !!result.ok,
+    pages: call.pages,
+  });
   const seconds = Math.max(1, Math.round((result.durationMs || (Date.now() - started)) / 1000));
   if (typeof result.costUsd === 'number') {
     ctx.job.cost_usd = Math.round(((ctx.job.cost_usd || 0) + result.costUsd) * 10000) / 10000;

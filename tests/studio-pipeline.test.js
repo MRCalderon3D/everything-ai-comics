@@ -58,19 +58,31 @@ async function main() {
     assert.strictEqual(id, 'el-ultimo-ferry');
     const P = `/api/projects/${id}`;
     const root = path.join(s.home, id, 'production');
-    assertDone(await s.waitJob(id, r.body.job.id), 'project.setup');
+    // Creating a project starts no AI job: the person's text is saved, the story bible starts empty.
+    assert.strictEqual(r.body.job, null);
+    assert.deepStrictEqual(r.body.written, ['story/source/description.md', 'story/story-bible.yaml', 'story/series-plan.yaml']);
     assert.strictEqual(ws.loadProject(root).language, 'es');
     assert.strictEqual(ws.loadProject(root).default_providers.image, 'codex-cli');
     assert.strictEqual(fs.existsSync(path.join(s.home, id, '.git', 'HEAD')), HAS_GIT, 'the project has its own repository');
+    assert.deepStrictEqual(validateWorkspace(root).errors, [], 'a freshly created project passes validate-workspace.js');
+    r = await s.api('GET', `${P}/jobs`);
+    assert.deepStrictEqual(r.body.jobs, [], 'no job ran');
 
     r = await s.api('GET', '/api/projects');
     assert.deepStrictEqual(r.body.projects.map((p) => p.id), [id]);
     r = await s.api('GET', `${P}/story`);
-    assert.strictEqual(r.body.written, true);
+    assert.strictEqual(r.body.written, false, 'nothing is written for the person');
+    assert.strictEqual(r.body.has_text, true);
     assert.strictEqual(r.body.bible.schema, 'story-bible');
     assert.deepStrictEqual(r.body.bible.findings, []);
-    assert.ok(r.body.bible.data.premise.includes('polizón'));
+    assert.strictEqual(r.body.bible.data.premise, 'Una piloto de ferry encuentra a un polizón que la patrulla del puerto busca. Decide no entregarlo.');
+    assert.deepStrictEqual([r.body.bible.data.facts, r.body.bible.data.timeline, r.body.bible.data.world_rules], [[], [], []]);
     assert.strictEqual(r.body.series_plan.data.issues[0].page_budget, 3);
+    assert.strictEqual(r.body.series_plan.data.issues[0].source_span, 'story/source/description.md');
+    assert.deepStrictEqual(r.body.proposals, []);
+    assert.deepStrictEqual([r.body.screen.key, r.body.screen.route, r.body.screen.label_code], ['story', `/p/${id}/story`, 'screen_label.story']);
+    assert.ok(fs.readFileSync(path.join(root, 'story', 'source', 'description.md'), 'utf8').includes('polizón'));
+    // From here on the whole pipeline runs with a story bible that holds only the person's description.
     r = await s.api('GET', P);
     assert.strictEqual(r.body.screens.find((x) => x.key === 'story').status, 'done');
     assert.deepStrictEqual(r.body.next.screen, 'style');
@@ -170,6 +182,10 @@ async function main() {
     assert.strictEqual(job.result.mechanical_errors, 0, JSON.stringify([job.result.continuity, job.result.validation.errors]));
     assert.ok(job.result.pages.every((p) => p.blockers.length === 0), JSON.stringify(job.result.pages));
     assert.ok(job.steps.find((x) => x.id === 'fix').status === 'skipped', 'no fix pass when the gates are clean');
+    // What the planner filled in that the text does not say is listed, per page and panel.
+    assert.ok(job.result.assumptions.length >= 3, JSON.stringify(job.result.assumptions));
+    assert.ok(job.result.assumptions.every((a) => /^PG_001_00[1-3]$/.test(a.page) && a.text));
+    assert.ok(job.result.assumptions.some((a) => a.panel === 'PN_001_002_01'));
     r = await s.api('GET', `${P}/entities`);
     assert.strictEqual(r.body.locations.length, 1);
     assert.strictEqual(r.body.locations[0].has_map, true);
@@ -184,6 +200,9 @@ async function main() {
     assert.deepStrictEqual(r.body.findings.schema, []);
     assert.deepStrictEqual(r.body.neighbors, { previous: 'PG_001_001', next: 'PG_001_003' });
     assert.strictEqual(r.body.chat_key, 'page:PG_001_002');
+    assert.deepStrictEqual(r.body.screen, { key: 'page:PG_001_002', label: 'Página 2', label_code: 'screen_label.page', label_params: { n: 2 }, route: `/p/${id}/pages/PG_001_002` });
+    assert.deepStrictEqual(r.body.assumptions.map((a) => a.panel), ['PN_001_002_01']);
+    assert.ok(r.body.assumptions[0].text && r.body.assumptions[0].job);
 
     // Drawing needs approved plans; an edit after approval makes the approval stale.
     r = await s.api('POST', `${P}/ops`, { op: 'pages.generate', params: { issue: 'ISS_001' } });

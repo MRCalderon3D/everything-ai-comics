@@ -11,6 +11,11 @@ const git = require('./git');
 const { msg } = require('./i18n');
 const files = require('./files');
 const chats = require('./chats');
+const conversation = require('./conversation');
+const screens = require('./screens');
+const story = require('./story');
+const looks = require('./looks');
+const timings = require('./timings');
 const history = require('./history');
 const approvals = require('./approvals');
 const aggregates = require('./aggregates');
@@ -93,7 +98,9 @@ function createApi(services) {
 
   // --- studio -----------------------------------------------------------------
 
-  get('/api/health', (req, res, ctx) => {
+  get('/api/health', async (req, res, ctx) => {
+    // ?refresh=1 is a request to look again, models included; otherwise the answer is the cached one.
+    if (ctx.query.get('refresh') === '1') await drivers.refreshModels();
     const tools = drivers.detect(ctx.query.get('refresh') === '1');
     const gitInfo = git.detect(ctx.query.get('refresh') === '1');
     const providers = S.providerIds();
@@ -117,6 +124,12 @@ function createApi(services) {
     };
   });
 
+  post('/api/tools/refresh', async (req) => {
+    await readJsonBody(req, JSON_LIMIT);
+    await drivers.refreshModels();
+    return { tools: drivers.detect(true) };
+  });
+
   get('/api/ops', () => ({ operations: ops.catalog() }));
 
   get('/api/schemas', () => ({ schemas: S.schemaNames() }));
@@ -127,7 +140,19 @@ function createApi(services) {
     return { name: ctx.params.name, schema };
   });
 
-  get('/api/presets', () => ({ presets: require('./looks').listPresets(), choices: projectOptions.CHOICES }));
+  get('/api/presets', () => ({ presets: looks.listPresets(), choices: projectOptions.CHOICES }));
+
+  get('/api/presets/:key/preview', (req, res, ctx) => {
+    const key = ctx.params.key;
+    const known = looks.KEY_RE.test(key) && fs.existsSync(path.join(looks.LOOKS_DIR, `${key}.yaml`));
+    const found = known ? looks.previewFile(key) : null;
+    if (!found) throw new HttpError(404, 'preview_not_found', 'That style has no sample page yet.');
+    // The URL carries a version (?v=), so the image can be cached for good.
+    sendFile(req, res, found.file, {
+      contentType: contentTypeOf(found.file),
+      headers: { 'Cache-Control': 'public, max-age=31536000, immutable' },
+    });
+  });
 
   // --- projects -----------------------------------------------------------------
 
@@ -173,13 +198,16 @@ function createApi(services) {
     projectOptions.applyToProject(proj.root, Object.assign({}, partial, { default_providers: { image: provider } }));
     proj.saveSettings({ language: interfaceLanguage });
     proj.saveState({ description });
+    // The person's text, an empty story bible and a one-issue plan, written mechanically. No AI runs.
+    const written = story.writeStarterStory(proj, { title, description, pages });
     await git.init(dir);
     const commit = await git.commitAll(dir, `Create the project "${title}"`);
     proj.addActivity({ kind: 'project', title: msg('activity.project_created', { title }), actor: 'person', commit });
+    // Deprecated: "setup": true still asks for a first draft of the story bible, as a proposal.
     let job = null;
-    if (description && body.setup !== false) job = jobs.enqueue(proj, 'project.setup', { description, pages });
+    if (description && body.setup === true) job = jobs.enqueue(proj, 'project.setup', { description, pages });
     res.statusCode = 201;
-    return { project: aggregates.projectCard(proj, jobs), job };
+    return { project: aggregates.projectCard(proj, jobs), job, written };
   });
 
   get(P, (req, res, ctx) => {
@@ -213,6 +241,8 @@ function createApi(services) {
       settings,
       tools: drivers.assignment(settings),
       installed: drivers.detect(),
+      model_status: drivers.modelStatus(settings),
+      timings: timings.averages(proj),
       choices: require('./registry').DRIVER_CHOICES,
       languages: LANGUAGES,
     };
@@ -223,7 +253,7 @@ function createApi(services) {
     const body = await readJsonBody(req, JSON_LIMIT);
     proj.ensureStudioDirs();
     const settings = proj.saveSettings(body);
-    return { settings, tools: drivers.assignment(settings) };
+    return { settings, tools: drivers.assignment(settings), model_status: drivers.modelStatus(settings) };
   });
 
   get(`${P}/options`, (req, res, ctx) => {
@@ -249,18 +279,33 @@ function createApi(services) {
 
   // --- screens ----------------------------------------------------------------------
 
-  get(`${P}/story`, (req, res, ctx) => aggregates.story(project(ctx)));
-  get(`${P}/style`, (req, res, ctx) => aggregates.style(project(ctx)));
-  get(`${P}/characters`, (req, res, ctx) => aggregates.characters(project(ctx)));
-  get(`${P}/characters/:char`, (req, res, ctx) => aggregates.character(project(ctx), ctx.params.char));
-  get(`${P}/entities`, (req, res, ctx) => aggregates.entities(project(ctx)));
-  get(`${P}/locations/:loc`, (req, res, ctx) => aggregates.entity(project(ctx), 'locations', ctx.params.loc));
-  get(`${P}/props/:prop`, (req, res, ctx) => aggregates.entity(project(ctx), 'props', ctx.params.prop));
-  get(`${P}/issues`, (req, res, ctx) => aggregates.issues(project(ctx)));
-  get(`${P}/issues/:issue`, (req, res, ctx) => aggregates.issue(project(ctx), ctx.params.issue, drivers));
-  get(`${P}/issues/:issue/cover`, (req, res, ctx) => aggregates.cover(project(ctx), ctx.params.issue));
-  get(`${P}/issues/:issue/publish`, (req, res, ctx) => aggregates.publishScreen(project(ctx), ctx.params.issue));
-  get(`${P}/pages/:page`, (req, res, ctx) => aggregates.page(project(ctx), ctx.params.page, drivers));
+  // Every screen answers with `screen`: { key, label, route }, what a chat message sent from it carries.
+  const screenRoute = (pattern, build) => get(pattern, (req, res, ctx) => {
+    const proj = project(ctx);
+    const result = build(proj, ctx);
+    if (result && typeof result.chat_key === 'string') {
+      try {
+        result.screen = screens.screenOf(proj, result.chat_key);
+      } catch (err) {
+        result.screen = null;
+      }
+    }
+    return result;
+  });
+  screenRoute(`${P}/story`, (proj) => Object.assign(aggregates.story(proj), {
+    proposals: story.list(proj, { status: 'open' }),
+  }));
+  screenRoute(`${P}/style`, (proj) => aggregates.style(proj));
+  screenRoute(`${P}/characters`, (proj) => aggregates.characters(proj));
+  screenRoute(`${P}/characters/:char`, (proj, ctx) => aggregates.character(proj, ctx.params.char));
+  screenRoute(`${P}/entities`, (proj) => aggregates.entities(proj));
+  screenRoute(`${P}/locations/:loc`, (proj, ctx) => aggregates.entity(proj, 'locations', ctx.params.loc));
+  screenRoute(`${P}/props/:prop`, (proj, ctx) => aggregates.entity(proj, 'props', ctx.params.prop));
+  screenRoute(`${P}/issues`, (proj) => aggregates.issues(proj));
+  screenRoute(`${P}/issues/:issue`, (proj, ctx) => aggregates.issue(proj, ctx.params.issue, drivers));
+  screenRoute(`${P}/issues/:issue/cover`, (proj, ctx) => aggregates.cover(proj, ctx.params.issue));
+  screenRoute(`${P}/issues/:issue/publish`, (proj, ctx) => aggregates.publishScreen(proj, ctx.params.issue));
+  screenRoute(`${P}/pages/:page`, (proj, ctx) => aggregates.page(proj, ctx.params.page, drivers));
 
   // --- text artifacts ------------------------------------------------------------------
 
@@ -527,7 +572,70 @@ function createApi(services) {
 
   // --- chat ----------------------------------------------------------------------------------
 
-  get(`${P}/chats`, (req, res, ctx) => ({ chats: chats.list(project(ctx)) }));
+  // The project conversation: one per project, every message tagged with its screen.
+  const conversationView = (proj, entry) => {
+    const pending = jobs.list(proj, { active: true }).filter((j) => j.op === 'chat.turn' && j.params && j.params.conversation === entry.id);
+    const index = conversation.ensure(proj);
+    return {
+      id: entry.id,
+      started_at: entry.started_at,
+      current: index.current === entry.id,
+      session: entry.session ? { tool: entry.session.tool } : null,
+      folded: entry.folded || [],
+      messages: conversation.messages(proj, entry.id),
+      pending: pending.map((j) => j.id),
+    };
+  };
+
+  /** Store the person's message and queue the reply. */
+  const sendMessage = (proj, screen, text) => {
+    proj.ensureStudioDirs();
+    const entry = conversation.current(proj);
+    const message = conversation.append(proj, entry.id, { role: 'user', text, screen, key: screen.key });
+    const job = jobs.enqueue(proj, 'chat.turn', { screen, text, message: message.id, conversation: entry.id });
+    events.emit(proj.id, 'chat', { conversation: entry.id, key: screen.key, message });
+    return { message, job };
+  };
+
+  const messageText = (body) => {
+    const text = typeof body.text === 'string' ? body.text.trim() : '';
+    if (!text || text.length > 8000) throw new HttpError(400, 'bad_params', '"text" is required, at most 8000 characters.');
+    return text;
+  };
+
+  get(`${P}/conversation`, (req, res, ctx) => {
+    const proj = project(ctx);
+    return { conversation: conversationView(proj, conversation.current(proj)), conversations: conversation.list(proj) };
+  });
+
+  post(`${P}/conversation`, async (req, res, ctx) => {
+    const proj = project(ctx);
+    const body = await readJsonBody(req, JSON_LIMIT);
+    const text = messageText(body);
+    const screen = screens.checkScreen(proj, body.screen);
+    const sent = sendMessage(proj, screen, text);
+    res.statusCode = 202;
+    return Object.assign({ conversation: sent.message.conversation }, sent);
+  });
+
+  post(`${P}/conversation/new`, async (req, res, ctx) => {
+    const proj = project(ctx);
+    await readJsonBody(req, JSON_LIMIT);
+    proj.ensureStudioDirs();
+    const entry = conversation.start(proj);
+    res.statusCode = 201;
+    return { conversation: conversationView(proj, entry), conversations: conversation.list(proj) };
+  });
+
+  get(`${P}/conversations`, (req, res, ctx) => ({ conversations: conversation.list(project(ctx)) }));
+
+  get(`${P}/conversations/:conversation`, (req, res, ctx) => {
+    const proj = project(ctx);
+    return { conversation: conversationView(proj, conversation.get(proj, ctx.params.conversation)) };
+  });
+
+  // Deprecated: the chats per screen. They read the project conversation, filtered by screen.
+  get(`${P}/chats`, (req, res, ctx) => ({ chats: conversation.screensUsed(project(ctx)) }));
 
   get(`${P}/chats/:key`, (req, res, ctx) => {
     const proj = project(ctx);
@@ -537,7 +645,8 @@ function createApi(services) {
       key: context.key,
       screen: context.screen,
       files: context.files,
-      messages: chats.transcript(proj, ctx.params.key),
+      conversation: conversation.current(proj).id,
+      messages: conversation.byScreen(proj, ctx.params.key),
       pending: pending.map((j) => j.id),
     };
   });
@@ -545,15 +654,54 @@ function createApi(services) {
   post(`${P}/chats/:key`, async (req, res, ctx) => {
     const proj = project(ctx);
     const body = await readJsonBody(req, JSON_LIMIT);
-    const text = typeof body.text === 'string' ? body.text.trim() : '';
-    if (!text || text.length > 8000) throw new HttpError(400, 'bad_params', '"text" is required, at most 8000 characters.');
-    chats.contextOf(proj, ctx.params.key);
-    proj.ensureStudioDirs();
-    const message = chats.append(proj, ctx.params.key, { role: 'user', text });
-    const job = jobs.enqueue(proj, 'chat.turn', { key: ctx.params.key, text, message: message.id });
-    events.emit(proj.id, 'chat', { key: ctx.params.key, message });
+    const text = messageText(body);
+    const screen = screens.checkScreen(proj, ctx.params.key);
     res.statusCode = 202;
-    return { message, job };
+    return sendMessage(proj, screen, text);
+  });
+
+  // --- proposals: story text the AI suggests, decided part by part ----------------------------------
+
+  get(`${P}/proposals`, (req, res, ctx) => {
+    const status = ctx.query.get('status');
+    if (status && !['open', 'closed', 'discarded'].includes(status)) {
+      throw new HttpError(400, 'bad_params', '"status" must be open, closed or discarded.');
+    }
+    return { proposals: story.list(project(ctx), { status: status || undefined }) };
+  });
+
+  get(`${P}/proposals/:proposal`, (req, res, ctx) => ({ proposal: story.view(story.read(project(ctx), ctx.params.proposal)) }));
+
+  post(`${P}/proposals/:proposal/decide`, async (req, res, ctx) => {
+    const proj = project(ctx);
+    const body = await readJsonBody(req, JSON_LIMIT);
+    const proposal = story.read(proj, ctx.params.proposal);
+    const clean = story.checkDecisions(proposal, body.decisions);
+    const accepting = clean.filter((d) => d.decision !== 'reject').length;
+    let outcome;
+    const saved = await history.record(services, proj, {
+      kind: 'proposal',
+      title: msg('activity.proposal_decided', { accepted: accepting, rejected: clean.length - accepting }),
+    }, () => {
+      outcome = story.decide(proj, proposal, clean);
+    });
+    if (saved.commit) proposal.commits.push(saved.commit);
+    story.save(proj, proposal);
+    const bible = files.readDoc(proj, story.BIBLE);
+    return {
+      proposal: story.view(proposal),
+      accepted: outcome.accepted,
+      rejected: outcome.rejected,
+      comments_kept: outcome.preserved,
+      findings: bible.findings,
+      commit: saved.commit,
+    };
+  });
+
+  del(`${P}/proposals/:proposal`, (req, res, ctx) => {
+    const proj = project(ctx);
+    const proposal = story.discard(proj, story.read(proj, ctx.params.proposal));
+    return { proposal: story.view(proposal) };
   });
 
   // --- history -----------------------------------------------------------------------------------

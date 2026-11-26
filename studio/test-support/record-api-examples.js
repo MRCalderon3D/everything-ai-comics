@@ -114,7 +114,9 @@ async function record() {
   try {
     const tiny = placeholder({ width: 200, height: 300, label: 'UPLOAD', version: 1 });
     let r = await s.api('GET', '/api/health');
-    cap('health', r.body, { maxArray: 6 });
+    cap('health', r.body, { maxArray: 6, keys: { models: { maxArray: 1 } } });
+    r = await s.api('POST', '/api/tools/refresh', {});
+    cap('tools-refresh', r.body, { keys: { models: { maxArray: 2 } } });
     r = await s.api('GET', '/api/ops');
     cap('ops', r.body, { maxArray: 2, keys: { params: { maxArray: 5 } } });
     r = await s.api('GET', '/api/ops?lang=es');
@@ -124,7 +126,10 @@ async function record() {
     r = await s.api('GET', '/api/schemas/series-plan');
     cap('schema', r.body, { maxArray: 6, maxString: 90 });
     r = await s.api('GET', '/api/presets');
-    cap('presets', r.body, { maxArray: 1, maxString: 110, keys: { choices: { maxArray: 6 } } });
+    // The first preset that has a sample page, so the example shows one.
+    const withPreview = r.body.presets.findIndex((p) => p.preview);
+    if (withPreview > 0) r.body.presets.unshift(r.body.presets.splice(withPreview, 1)[0]);
+    cap('presets', r.body, { maxArray: 1, maxString: 110, keys: { choices: { maxArray: 6 }, drift_risks: { maxArray: 2 } } });
 
     // --- a project ---------------------------------------------------------------
     const createBody = {
@@ -143,11 +148,43 @@ async function record() {
     const stream = s.openEvents(id);
     const hello = await stream.waitFor((e) => e.type === 'hello');
     cap('event-hello', hello.data, { keys: { steps: { maxArray: 1 } } });
-    cap('op.project.setup', jobExample(done(await s.waitJob(id, r.body.job.id), 'project.setup')));
     r = await s.api('GET', '/api/projects');
     cap('projects', r.body);
     r = await s.api('GET', `${P}/story`);
-    cap('story', r.body, { maxString: 120, keys: { facts: { maxArray: 1 } } });
+    cap('story-new', r.body, { maxString: 120, keys: { facts: { maxArray: 1 } } });
+
+    // --- the story: a draft proposal, decided part by part --------------------------------------------
+    let job = done(await s.runOp(id, 'story.draft', {}), 'story.draft');
+    cap('op.story.draft', jobExample(job));
+    const draftId = job.result.proposal;
+    r = await s.api('GET', `${P}/proposals/${draftId}`);
+    cap('proposal', r.body, { maxArray: 4, maxString: 120 });
+    const parts = r.body.proposal.parts;
+    const pick = (type, n = 0) => parts.filter((p) => p.type === type)[n];
+    const decideBody = {
+      decisions: [
+        { part: pick('premise').id, decision: 'accept' },
+        { part: pick('tone').id, decision: 'edit', text: 'Quiet and tense, with dry humour.' },
+        { part: pick('world_rule').id, decision: 'reject' },
+        { part: pick('fact').id, decision: 'accept' },
+        { part: pick('fact', 1).id, decision: 'accept' },
+        { part: pick('timeline').id, decision: 'accept' },
+        { part: pick('question').id, decision: 'accept', answer: 'She lets him go at dawn.' },
+      ],
+    };
+    r = await s.api('POST', `${P}/proposals/${draftId}/decide`, decideBody);
+    cap('proposal-decide-request', decideBody);
+    cap('proposal-decide', r.body, { maxArray: 2, maxString: 100 });
+    job = done(await s.runOp(id, 'story.complete', {}), 'story.complete');
+    cap('op.story.complete', jobExample(job));
+    r = await s.api('DELETE', `${P}/proposals/${job.result.proposal}`);
+    cap('proposal-discard', r.body, { maxArray: 1, maxString: 100 });
+    job = done(await s.runOp(id, 'story.suggest', { instruction: 'Suggest an ending.' }), 'story.suggest');
+    cap('op.story.suggest', jobExample(job));
+    r = await s.api('GET', `${P}/proposals`);
+    cap('proposals', r.body, { maxArray: 3 });
+    r = await s.api('GET', `${P}/story`);
+    cap('story', r.body, { maxString: 120, keys: { facts: { maxArray: 1 }, proposals: { maxArray: 1 } } });
     r = await s.api('PUT', `${P}/options`, { repair_limit: 1, reading_direction: 'ltr' });
     cap('options-put', r.body);
     r = await s.api('GET', `${P}/options`);
@@ -165,7 +202,7 @@ async function record() {
     r = await s.api('GET', `${P}/file?path=story/series-plan.yaml`);
     cap('file-get', r.body, { maxString: 200 });
     const etag = r.body.file.etag;
-    r = await s.api('PUT', `${P}/file`, { path: 'story/series-plan.yaml', text: r.body.file.text.replace('Issue 1', 'Crossing'), base_etag: etag });
+    r = await s.api('PUT', `${P}/file`, { path: 'story/series-plan.yaml', text: r.body.file.text.replace(/(\n\s+title: )The Night Ferry/, '$1Crossing'), base_etag: etag });
     cap('file-put', r.body, { maxString: 120 });
     if (r.body.commit) {
       const diff = await s.api('GET', `${P}/diff?commit=${r.body.commit}`);
@@ -178,7 +215,7 @@ async function record() {
     r = await s.api('PUT', `${P}/file`, { path: 'story/series-plan.yaml', text: 'title: The Night Ferry\nissues:\n  - id: ISS_001\n    number: 1\n    title: Crossing\n    page_budget: 3\n    status: planning\n' });
 
     // --- style ---------------------------------------------------------------------------
-    let job = done(await s.runOp(id, 'style.define', { preset: 'noir-ink', description: 'Heavy ink and wet streets.', uploads: [styleRef.id] }), 'style.define');
+    job = done(await s.runOp(id, 'style.define', { preset: 'noir-ink', description: 'Heavy ink and wet streets.', uploads: [styleRef.id] }), 'style.define');
     cap('op.style.define', jobExample(job));
     r = await s.api('POST', `${P}/ops`, { op: 'style.look', params: {} });
     cap('op-start', r.body);
@@ -226,6 +263,8 @@ async function record() {
     job = done(await s.waitJob(id, generateId, 60000), 'pages.generate');
     cap('op.pages.generate', jobExample(job), { maxArray: 20, keys: { pages: { maxArray: 2 } } });
     cap('job', { job }, { maxArray: 4, keys: { pages: { maxArray: 1 }, params: { maxArray: 3 } } });
+    r = await s.api('GET', `${P}/settings`);
+    cap('settings-timings', { timings: r.body.timings }, { maxArray: 4 });
     r = await s.api('GET', `${P}/jobs?limit=2`);
     cap('jobs', r.body, { maxArray: 1, keys: { steps: { maxArray: 1 }, pages: { maxArray: 1 }, commits: { maxArray: 1 } } });
     r = await s.api('GET', `${P}/jobs/${generateId}/log?tail=6`);
@@ -291,16 +330,41 @@ async function record() {
     r = await s.api('GET', `${P}/issues/ISS_001/publish`);
     cap('publish', r.body, { maxArray: 2, keys: { formats: { maxArray: 5 }, exports: { maxArray: 3 } } });
 
-    // --- chat --------------------------------------------------------------------------------------
-    r = await s.api('POST', `${P}/chats/page:PG_001_003`, { text: 'EDIT bring the last panel closer' });
-    cap('chat-post', r.body, { maxArray: 1, drop: ['steps'] });
+    // --- the project conversation -------------------------------------------------------------------
+    const sendBody = { text: 'EDIT bring the last panel closer', screen: { key: 'page:PG_001_003', label: 'Page 3', route: `/p/${id}/pages/PG_001_003` } };
+    r = await s.api('POST', `${P}/conversation`, sendBody);
+    cap('conversation-post-request', sendBody);
+    cap('conversation-post', r.body, { maxArray: 1, drop: ['steps'] });
     job = done(await s.waitJob(id, r.body.job.id), 'chat.turn');
     cap('op.chat.turn', jobExample(job));
     cap('event-chat', stream.events.filter((e) => e.type === 'chat').pop().data);
+    r = await s.api('POST', `${P}/conversation`, { text: 'LINK PROPOSE Where do I add the boy? He is twelve.', screen: { key: 'style', label: 'Style', route: `/p/${id}/style` } });
+    done(await s.waitJob(id, r.body.job.id), 'chat.turn with links');
+    await s.api('PUT', `${P}/settings`, { drivers: { plan: 'codex' } });
+    r = await s.api('POST', `${P}/conversation`, { text: 'Is the cover ready?', screen: { key: 'cover:ISS_001' } });
+    done(await s.waitJob(id, r.body.job.id), 'chat.turn with codex');
+    await s.api('PUT', `${P}/settings`, { drivers: { plan: 'claude' } });
+    r = await s.api('GET', `${P}/conversation`);
+    const convMessages = r.body.conversation.messages;
+    const linked = convMessages.find((m) => m.role === 'assistant' && m.links && m.links.length);
+    const changed = convMessages.find((m) => m.role === 'event' && m.event === 'tool_changed');
+    cap('conversation', Object.assign({}, r.body, {
+      conversation: Object.assign({}, r.body.conversation, { messages: [convMessages[0], convMessages[1], linked, changed] }),
+    }), { maxString: 160, keys: { messages: { maxArray: 4 } } });
     r = await s.api('GET', `${P}/chats/page:PG_001_003`);
     cap('chat', r.body);
     r = await s.api('GET', `${P}/chats`);
     cap('chats', r.body);
+    r = await s.api('POST', `${P}/chats/style`, { text: 'Sent the old way.' });
+    cap('chat-post', r.body, { maxArray: 1, drop: ['steps'] });
+    done(await s.waitJob(id, r.body.job.id), 'chat.turn old route');
+    const oldConversation = convMessages[0].conversation;
+    r = await s.api('POST', `${P}/conversation/new`, {});
+    cap('conversation-new', r.body);
+    r = await s.api('GET', `${P}/conversations`);
+    cap('conversations', r.body);
+    r = await s.api('GET', `${P}/conversations/${oldConversation}`);
+    cap('conversation-old', r.body, { maxArray: 2, maxString: 120 });
 
     // --- history -------------------------------------------------------------------------------------
     r = await s.api('GET', `${P}/history?limit=3`);
@@ -355,6 +419,10 @@ async function record() {
     cap('lettered-post', JSON.parse(r.buffer.toString()));
     r = await s.api('DELETE', Q);
     cap('project-delete', r.body);
+
+    // --- deprecated: a client that still asks for the setup when it creates a project ---------------------
+    r = await s.api('POST', '/api/projects', { title: 'Old Client', description: 'A lighthouse keeper finds a bottle with a map in it.', pages: 1, setup: true });
+    cap('op.project.setup', jobExample(done(await s.waitJob(r.body.project.id, r.body.job.id), 'project.setup')));
   } finally {
     await s.close();
   }
@@ -365,7 +433,6 @@ async function record() {
   try {
     let r = await m.api('POST', '/api/projects', { title: 'By Hand', description: 'A short story made without a drawing tool.', pages: 1 });
     const id = r.body.project.id;
-    done(await m.waitJob(id, r.body.job.id), 'project.setup');
     done(await m.runOp(id, 'style.define', { description: 'Soft pencil, warm paper.' }), 'style.define');
     let upload = await m.upload(id, 'look.png', placeholder({ width: 400, height: 600, label: 'HAND', version: 1 }), 'image/png');
     let job = done(await m.runOp(id, 'page.manual', { entity: 'LOOK_SOFT_PENCIL_WARM', sheet: 'look', upload: upload.id }), 'look upload');

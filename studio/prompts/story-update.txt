@@ -1,5 +1,5 @@
 TASK
-Update the story canon as the person asks.
+Update the story canon as the person asks. The person writes their story: record what they say, and invent nothing.
 
 COMMAND FILES TO FOLLOW, IN THIS ORDER
 {{#if source_file}}- commands/source-analyze.md (source: {{source_file}})
@@ -11,9 +11,11 @@ INPUT FROM THE PERSON
 <<<
 {{instruction}}
 >>>
-{{/if}}{{#if source_file}}A source text was added to the workspace at {{source_file}}. Analyse it and fold it into the canon.
+{{/if}}{{#if source_file}}A source text the person wrote was added to the workspace at {{source_file}}. Analyse it and fold what it states into the canon.
 {{/if}}
 INSTRUCTIONS FOR THIS RUN
 - A change the person asks for is a user_change: add a new fact, set "replaces" to the fact it supersedes, and walk the change to every file listed in that fact's "affects" (character, location and prop files, wardrobe, dialogue already written in page files).
+- A fact the source text states is a source fact with a source_ref. Write no fact with provenance addition in this run: anything the person did not state stays out of the canon.
+- Where the change or the source leaves open something the story needs, and choosing would mean inventing story (an explanation, an ending, who holds what), do not choose: add it to open_questions, or stop with "needs_decision" when the change cannot be made without the answer.
 - Report under "decisions" every file the change reached.
 - Do not touch a page that already has a render without saying so in the summary: its render no longer matches.

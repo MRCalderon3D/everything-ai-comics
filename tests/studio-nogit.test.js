@@ -22,10 +22,17 @@ async function main() {
     assert.strictEqual(r.status, 201, JSON.stringify(r.body));
     const id = r.body.project.id;
     const P = `/api/projects/${id}`;
-    const job = await s.waitJob(id, r.body.job.id);
+    assert.strictEqual(r.body.job, null);
+    const job = await s.runOp(id, 'story.update', { instruction: 'The patrol boat is grey.' });
     assert.strictEqual(job.status, 'done', JSON.stringify(job.error));
     assert.ok(job.steps.every((step) => step.commit === null), 'no commits without git');
     assert.ok(!fs.existsSync(path.join(s.home, id, '.git')), 'no repository is created');
+    // A decided proposal is recorded too, with no commit.
+    const draft = await s.runOp(id, 'story.draft', {});
+    assert.strictEqual(draft.status, 'done', JSON.stringify(draft.error));
+    r = await s.api('POST', `${P}/proposals/${draft.result.proposal}/decide`, { decisions: [{ part: 'P02', decision: 'accept' }] });
+    assert.strictEqual(r.status, 200, JSON.stringify(r.body));
+    assert.strictEqual(r.body.commit, null);
 
     r = await s.api('PUT', `${P}/file`, { path: 'style/color-script.md', text: '# Color\n\nOne palette.\n' });
     assert.strictEqual(r.status, 200);
@@ -33,10 +40,11 @@ async function main() {
 
     r = await s.api('GET', `${P}/history`);
     assert.strictEqual(r.status, 200);
-    assert.ok(r.body.entries.length >= 4, 'the activity log works without git');
+    assert.ok(r.body.entries.length >= 4, `the activity log works without git: ${JSON.stringify(r.body.entries.map((e) => [e.kind, e.step, e.files.length]))}`);
     assert.ok(r.body.entries.every((e) => e.commit === null && e.restorable === false));
     assert.ok(r.body.entries.some((e) => e.kind === 'save' && e.files[0].path === 'style/color-script.md'));
-    assert.ok(r.body.entries.some((e) => e.step === 'story' && e.files.some((f) => f.path === 'story/story-bible.yaml')));
+    assert.ok(r.body.entries.some((e) => e.step === 'update' && e.files.some((f) => f.path === 'story/story-bible.yaml')));
+    assert.ok(r.body.entries.some((e) => e.kind === 'proposal' && e.files.some((f) => f.path === 'story/story-bible.yaml')));
     assert.deepStrictEqual(r.body.restore.available, false);
     assert.ok(/git is not installed/.test(r.body.restore.reason));
 

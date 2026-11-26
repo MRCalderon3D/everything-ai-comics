@@ -227,11 +227,14 @@ async function spanishProject() {
     const id = r.body.project.id;
     const P = `/api/projects/${id}`;
     const events = s.openEvents(id);
-    let job = await s.waitJob(id, r.body.job.id);
+    assert.strictEqual(r.body.job, null, 'creating a project starts no AI job');
+    let job = await s.runOp(id, 'story.draft', {});
     assert.strictEqual(job.status, 'done', JSON.stringify(job.error));
-    assert.deepStrictEqual([job.title, job.title_code], ['Preparar el proyecto', 'op.project.setup.title']);
-    assert.deepStrictEqual(job.steps.map((x) => x.label_code), ['step.project.setup.source', 'step.project.setup.story', 'step.check.files']);
-    assert.strictEqual(job.steps[0].label, 'Guardar la descripción');
+    assert.deepStrictEqual([job.title, job.title_code], ['Proponer la biblia de la historia', 'op.story.draft.title']);
+    assert.deepStrictEqual(job.steps.map((x) => x.label_code), ['step.story.draft.propose']);
+    assert.strictEqual(job.steps[0].label, 'Leer tu texto y redactar una propuesta');
+    r = await s.api('GET', `${P}/proposals/${job.result.proposal}`);
+    assert.deepStrictEqual([r.body.proposal.title, r.body.proposal.title_code], ['Borrador de la biblia de la historia', 'proposal.title.draft']);
     r = await s.api('GET', `${P}/settings`);
     assert.strictEqual(r.body.settings.language, 'es', 'the interface language follows the language the project was made in');
 
@@ -336,19 +339,19 @@ async function spanishProject() {
     //     and after the interface language of the project changes ------------------------------------
     const first = jobs[jobs.length - 1];
     r = await s.api('GET', `${P}/jobs/${first.id}?lang=en`);
-    assert.deepStrictEqual([r.body.job.title, r.body.job.steps[0].label], ['Set up the project', 'Save the description']);
+    assert.deepStrictEqual([r.body.job.title, r.body.job.steps[0].label], ['Draft the story bible', 'Read your text and draft a proposal']);
     const stored = JSON.parse(fs.readFileSync(path.join(s.home, id, '.studio', 'jobs', `${first.id}.json`), 'utf8'));
-    assert.deepStrictEqual(stored.title, { $t: 'op.project.setup.title', params: {} }, 'a job file keeps the code, not a sentence');
+    assert.deepStrictEqual(stored.title, { $t: 'op.story.draft.title', params: {} }, 'a job file keeps the code, not a sentence');
     r = await s.api('PUT', `${P}/settings`, { language: 'en' });
     assert.strictEqual(r.status, 200, JSON.stringify(r.body));
     r = await s.api('GET', `${P}/jobs/${first.id}`);
-    assert.strictEqual(r.body.job.title, 'Set up the project');
+    assert.strictEqual(r.body.job.title, 'Draft the story bible');
     r = await s.api('GET', `${P}/history?limit=500`);
     assert.ok(r.body.entries.some((e) => e.title === 'Draw pages: Page 1: draw'));
     r = await s.api('GET', P);
-    assert.strictEqual(r.body.screens.find((x) => x.key === 'story').summary, 'The story bible is written.');
+    assert.strictEqual(r.body.screens.find((x) => x.key === 'story').summary, 'Your text is saved. Write the story bible yourself, or ask the AI for a draft.');
     r = await s.api('GET', `${P}?lang=es`);
-    assert.strictEqual(r.body.screens.find((x) => x.key === 'story').summary, 'La historia está escrita.');
+    assert.strictEqual(r.body.screens.find((x) => x.key === 'story').summary, 'Tu texto está guardado. Escribe tú la biblia de la historia o pide a la IA un borrador.');
   } finally {
     await s.close();
   }

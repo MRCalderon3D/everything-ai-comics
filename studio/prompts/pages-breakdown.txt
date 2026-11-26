@@ -12,7 +12,9 @@ What happens:
 {{#if append}}The issue already has pages up to {{last_page}}. The new scene or scenes continue after them: the new pages start at page number {{first_number}}, and continuity carries on from the last existing panel.
 {{/if}}
 INSTRUCTIONS FOR THIS RUN
+- The scenes and beats come from the person's text and from nothing else. Add no event, no line of dialogue the text does not imply, no explanation and no character the text does not name. Splitting what the text says into beats is your job; adding to it is not.
 - Write or update issues/{{issue}}/issue.yaml and one scene file per new scene under issues/{{issue}}/scenes/, each with its location, cast, geography and beats, and the page IDs each beat gets. The new pages are: {{page_ids}}.
-- Use only characters that exist under characters/. When the text needs someone who has no character file, write the file with commands/character-bible.md and say so under "decisions": the person has to draw and approve that character's sheet before the page can be generated.
+- Use only characters that exist under characters/. When the text names someone who has no character file, write the file with commands/character-bible.md from what the text says and say so under "decisions": the person has to draw and approve that character's sheet before the page can be generated.
 - A scene needs a location with a map. When the scene needs a place or a tracked object the workspace lacks, write the location or prop file now with commands/location-bible.md or commands/prop-bible.md, and list what you created in data.locations and data.props.
+- Whatever you had to choose that the text does not say (a time of day, the layout of a place, where someone enters from), list in data.assumptions as [{"page": "<PAGE_ID>", "panel": null, "text": "<what you chose, in the interface language>"}]. The person reads this list and can change any of it.
 - Do not write page files in this run.
