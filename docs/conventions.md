@@ -296,7 +296,9 @@ rows above. `validate.js` cross-checks every listed name against the manifests.
 - Assets: `CHAR_*`, `LOC_*`, `PROP_*`, `LOOK_*`, versioned `_V##`
   (e.g. `CHAR_MARA_TURN_MASTER_V02`). Approved masters carry `_MASTER`.
 - Wardrobe states: `WARD_<CHARACTER>_<NAME>` (e.g. `WARD_MARA_OILSKIN`).
-- Prompt packages: `PP_<page-or-asset-id>_<PROVIDER>`.
+- Prompt packages: `PP_<page-or-asset-id>_<PROVIDER>`, with a `-P##` suffix for
+  a single panel and a `-<TAG>` suffix for a reference sheet (`TURN`, `EXPR`,
+  `WARD`, `PLATE`, `PROP`, `LOOK`, `DETAIL`).
 - Generation records: `GEN_<page-id>_<attempt##>` or `GEN_<asset-id>_<attempt##>`.
 - Canon facts: `FACT_###`, unique within the story bible.
 - Review findings: `F##`, unique within a review file.

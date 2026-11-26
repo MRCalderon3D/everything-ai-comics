@@ -104,6 +104,28 @@ function setTopLevelLine(text, key, rendered) {
   });
 }
 
+/** Rewrite a "key: value" line nested under the top-level `page:` map. */
+function setPageLine(text, key, rendered) {
+  const re = new RegExp(`^(  ${key}:[^\\n#]*)(#.*)?$`, 'm');
+  if (!re.test(text)) return text;
+  return text.replace(re, (m, head, comment) => {
+    const line = `  ${key}: ${rendered}`;
+    return comment ? line.padEnd(Math.max(head.length, line.length + 1)) + comment : line;
+  });
+}
+
+/**
+ * Webtoon defaults: a vertical 9:16 scroll segment (a ratio every image
+ * provider accepts), a series publication, and no print geometry.
+ */
+function applyWebtoonDefaults(text) {
+  let out = setTopLevelLine(text, 'publication', 'webtoon-series') || text;
+  out = setPageLine(out, 'aspect_ratio', '"9:16"');
+  out = setPageLine(out, 'width_px', '1080');
+  out = setPageLine(out, 'height_px', '1920');
+  return out.replace(/^  (trim_mm|bleed_mm|safe_margin_mm):.*\n/gm, '');
+}
+
 /**
  * project.yaml text for a new workspace.
  * @param {string} title
@@ -122,6 +144,7 @@ function buildProjectYaml(title, templateText, format = null) {
     if (format) {
       text = setTopLevelLine(text, 'comic_format', format) || `${text.replace(/\n*$/, '\n')}comic_format: ${format}\n`;
     }
+    if (format === 'webtoon') text = applyWebtoonDefaults(text);
     return text;
   }
   // Minimal but schema-valid project.yaml (schemas/project.schema.json).
@@ -134,7 +157,7 @@ function buildProjectYaml(title, templateText, format = null) {
     language: 'en',
     reading_direction: 'ltr',
     page: webtoon
-      ? { aspect_ratio: '5:8', width_px: 800, height_px: 1280 }
+      ? { aspect_ratio: '9:16', width_px: 1080, height_px: 1920 }
       : { aspect_ratio: '2:3', width_px: 2000, height_px: 3000 },
     color_mode: 'full_color',
     lettering: { mode: 'in_image' },

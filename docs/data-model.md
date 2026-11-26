@@ -274,7 +274,7 @@ time_of_day: night                     # dawn | day | dusk | night
 cast: [CHAR_MARA, CHAR_OSKAR]          # required
 summary: Mara hears the crates shift and finds the boy.   # required
 geography:
-  travel_direction: left_to_right      # left_to_right | right_to_left | toward_reader | away_from_reader | none
+  travel_direction: right_to_left      # left_to_right | right_to_left | toward_reader | away_from_reader | none
   threat_direction: right_to_left
   notes: The patrol launch always approaches from the stern (screen right).
 beats:                                 # required
@@ -439,7 +439,7 @@ One role per entry, and an asset appears once. A `style` entry is never also
 ## issues/<ISS_ID>/pages/<PG_ID>/prompts/<provider>.yaml (`prompt-package`)
 
 ```yaml
-id: PP_PG_001_001_HARNESS-NATIVE       # required. PP_<page or asset id>_<PROVIDER>
+id: PP_PG_001_001_HARNESS-NATIVE       # required. PP_<page or asset id>_<PROVIDER>[-P## | -<TAG>]
 page: PG_001_001                       # required. page ID, or null for an asset-scoped package
 asset: null                            # entity ID for asset-scoped packages
 provider: harness-native               # required
