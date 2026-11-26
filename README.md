@@ -330,9 +330,12 @@ node scripts/generate-assets.js --asset CHAR_OSKAR --root production
 
 `--sheet` takes `turnaround`, `expressions`, or `wardrobe` for a character,
 `plate` for a location, `prop` for a prop, `look` for a look, and `detail`
-(with `--subject`) for any entity. The package is written under the entity's `refs/prompts/`
-(look pages under `references/style/prompts/`). The generated file is the
-next versioned candidate, such as `CHAR_OSKAR_EXPR_V01.png`. It never takes
+(with `--subject`) for any entity. `--outfit` picks the outfit of a wardrobe
+sheet and `--time` the time of day of a plate. The package is written under
+the entity's `refs/prompts/` (look pages under `references/style/prompts/`);
+each outfit and each detail subject gets its own file. The generated file is
+the next versioned candidate, such as `CHAR_OSKAR_EXPR_V01.png` or
+`PROP_FLARE_GUN_SHEET_V01.png`. It never takes
 the `_MASTER` name: promotion to master is an approval step.
 
 ## Providers and keys

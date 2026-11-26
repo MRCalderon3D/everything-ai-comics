@@ -298,8 +298,12 @@ rows above. `validate.js` cross-checks every listed name against the manifests.
 - Wardrobe states: `WARD_<CHARACTER>_<NAME>` (e.g. `WARD_MARA_OILSKIN`).
 - Prompt packages: `PP_<page-or-entity-id>_<PROVIDER>`, with a `-P##` suffix for
   a single panel and a `-<TAG>` suffix for a reference sheet (`TURN`, `EXPR`,
-  `WARD`, `PLATE`, `PROP`, `LOOK`, `DETAIL`).
-- Reference candidates: `<ENTITY_ID>_<TAG>_V##`. Promotion to a master is an
+  `WARD`, `PLATE`, `SHEET` for a prop, `LOOK`, `DETAIL`). A wardrobe sheet
+  appends its outfit, a detail its subject, and a plate a non-default time
+  of day: `PP_CHAR_MARA_FAL-WARD-OILSKIN`.
+- Reference candidates: `<ENTITY_ID>_<TAG>_V##`, with the same variant after
+  the tag (`CHAR_MARA_WARD_OILSKIN_V01`, `PROP_FLARE_GUN_SHEET_V01`,
+  `LOC_FERRY_DECK_PLATE_DUSK_V01`). Promotion to a master is an
   approval step: the file is copied to the `_MASTER` name and registered in
   `references/manifest.yaml`; the candidate stays on disk.
 - Generation records: `GEN_<page-id>_<attempt##>` or `GEN_<entity-id>_<attempt##>`.

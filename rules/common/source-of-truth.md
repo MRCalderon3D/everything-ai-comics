@@ -93,9 +93,9 @@ fact it replaces (see `writing/adaptation-fidelity.md`).
 - `scripts/validate-workspace.js` schema-checks every structured file in the
   workspace and resolves the cross-references between them.
 - `prompt-package.schema.json` requires `source_hashes` on every package.
-  `scripts/generate-assets.js` compares the page and style-block hashes with
-  the current files: a dry run warns about a stale package and a live run
-  refuses it.
+  `scripts/generate-assets.js` compares the page, reference-plan, and
+  style-block hashes with the current files: a dry run warns about a stale
+  package and a live run refuses it.
 - `hooks/validate-after-write.js` re-validates a schema-known file on write.
 - `hooks/protect-approved-assets.js` blocks writes to approved reference
   assets.

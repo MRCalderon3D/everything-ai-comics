@@ -249,6 +249,15 @@ assets:
     notes: ""
 ```
 
+Registry rules (`validate-workspace.js` enforces them mechanically):
+
+- Asset IDs are unique, and `entity` is the prefix of the asset ID.
+- The `path` of an `approved` asset exists on disk. For any other status a
+  missing file is a warning.
+- An ID that carries `_MASTER` has status `approved` or `superseded`.
+- Every asset ID in a character, wardrobe, location, or prop file is
+  registered here for that entity.
+
 ## issues/<ISS_ID>/issue.yaml (`issue`)
 
 ```yaml
@@ -480,8 +489,14 @@ Two variants use the same schema:
   `<entity dir>/refs/prompts/<provider>.<kind>.yaml`, and for LOOK entities to
   `references/style/prompts/<provider>.<LOOK_ID>.yaml`. Their id is
   `PP_<ENTITY_ID>_<PROVIDER>-<TAG>` with TAG one of `TURN`, `EXPR`, `WARD`,
-  `PLATE`, `PROP`, `LOOK`, `DETAIL`. Generation writes the next free candidate
-  `<ENTITY_ID>_<TAG>_V##` in the entity's `refs/` directory (look pages in
+  `PLATE`, `SHEET` (props), `LOOK`, `DETAIL`. A sheet with a variant carries
+  it in all three names: a wardrobe sheet its outfit
+  (`<provider>.wardrobe.<WARD_ID>.yaml`, `-WARD-<OUTFIT>`), a detail a slug
+  of its subject (`<provider>.detail.<slug>.yaml`, `-DETAIL-<SUBJECT>`), and
+  a plate compiled with `--time` for a state other than the location's
+  first (`<provider>.plate.<state>.yaml`, `-PLATE-<STATE>`). Generation
+  writes the next free candidate `<ENTITY_ID>_<TAG>[_<VARIANT>]_V##` in the
+  entity's `refs/` directory (look pages in
   `references/style/`). A candidate never carries `_MASTER`: promoting it to
   a master is an approval step that registers the file in
   `references/manifest.yaml`.

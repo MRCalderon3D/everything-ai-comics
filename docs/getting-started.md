@@ -285,8 +285,13 @@ generate-assets: 1 package(s), mode: DRY RUN
 `--sheet` takes `turnaround`, `expressions`, or `wardrobe` for a character,
 `plate` for a location, `prop` for a prop, `look` for a look, and `detail`
 with `--subject` for a close study of any entity. `--outfit` picks the
-wardrobe state for a wardrobe sheet and `--expressions` the list for an
-expression sheet. A sheet needs the style block, the entity's bible file,
+wardrobe state for a wardrobe sheet, `--expressions` the list for an
+expression sheet, and `--time` the time of day of a plate. Wardrobe and
+detail packages carry the outfit ID or a slug of the subject in their file
+name (`harness-native.wardrobe.WARD_OSKAR_HOODED_JACKET.yaml`,
+`harness-native.detail.cut-on-his-left-hand.yaml`), and their candidates
+the same variant (`CHAR_OSKAR_WARD_HOODED_JACKET_V01.png`). A prop sheet is
+`<PROP_ID>_SHEET_V##`. A sheet needs the style block, the entity's bible file,
 and an approved look master. The first look page is the only request made
 without one. `generate-assets.js --package <file>` runs a single package.
 
@@ -885,7 +890,7 @@ touches the file, its manifest, and `docs/conventions.md` together. See
 | `compile-prompts.js` rejects the package | The provider cannot honor it: an unsupported aspect ratio, too many references, a repair on a provider that cannot edit, or lettering on a provider with no text rendering. The message lists every limit violated. |
 | A live run stops asking for `--yes` | Read the estimate and run again with `--live --yes`. |
 | A provider refuses a live run | Its environment variable is missing. `node scripts/doctor.js` shows which are set. |
-| A live run says the package is stale | The page or the style block changed after compiling. Run `compile-prompts.js` again. |
+| A live run says the package is stale | The page, its reference plan, or the style block changed after compiling. Run `compile-prompts.js` again. |
 | `compile-prompts.js --repair` refuses | The page reached `repair_policy.max_cycles`. Fix the plan or the references and start the page again as a first render. |
 | `build-edition.js` refuses a render | Its review is missing or `flagged`. Review or repair the page, or build a marked draft with `--draft`. |
 | A written file fails schema validation | In Claude Code the write hook blocks it and names the fields. Fix them. Elsewhere, `validate-workspace.js` reports the same errors. |

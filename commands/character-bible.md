@@ -70,8 +70,9 @@ and reviews check identity against.
    the planned sheets in the file's `notes`. `/visual-development` compiles
    each one from this file with `compile-prompts.js --asset <CHAR_ID>
    --sheet <kind>`, and the approved pick is registered as
-   `<CHAR_ID>_<TAG>_MASTER_V##` (`CHAR_MARA_TURN_MASTER_V01`). `references`
-   stays empty until then.
+   `<CHAR_ID>_<TAG>_MASTER_V##` (`CHAR_MARA_TURN_MASTER_V01`, or
+   `CHAR_MARA_WARD_OILSKIN_MASTER_V01` for an outfit sheet, which carries
+   the outfit name). `references` stays empty until then.
 7. Apply pending user changes from the story bible to the description and
    the wardrobe in the same run, and note which registered sheets no longer
    match.

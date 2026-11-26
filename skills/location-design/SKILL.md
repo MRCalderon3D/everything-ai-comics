@@ -73,7 +73,10 @@ first panel.
    The candidate lands in `production/locations/<LOC_ID>/refs/` as
    `<LOC_ID>_PLATE_V##`. The approved pick is saved as
    `<LOC_ID>_PLATE_MASTER_V##` and registered with `kind: plate` and
-   `default_role: spatial_continuity`. List it in `references`. Write the
+   `default_role: spatial_continuity`. The plate is lit for the first
+   entry of `time_of_day_states`. Another state gets its own plate with
+   `--time <state>`, written to `<provider>.plate.<state>.yaml` and
+   generated as `<LOC_ID>_PLATE_<STATE>_V##`. List it in `references`. Write the
    map first: without `map.yaml` the script warns that the plate states no
    sides, levels, or landmarks.
 10. Version changes. An approved location is immutable. When the story

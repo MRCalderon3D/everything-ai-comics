@@ -95,7 +95,11 @@ reference plays when it is attached to a request.
   A per-panel package adds the panel ID (`prompts/fal.PN_001_002_03.yaml`),
   a sheet package the sheet kind (`refs/prompts/fal.turnaround.yaml`), and
   a look package the look ID
-  (`references/style/prompts/fal.LOOK_NOIR_INK.yaml`).
+  (`references/style/prompts/fal.LOOK_NOIR_INK.yaml`). A wardrobe package
+  adds the outfit ID (`fal.wardrobe.WARD_MARA_OILSKIN.yaml`), a detail
+  package a lowercase-kebab slug of its subject
+  (`fal.detail.torn-left-cuff.yaml`), and a plate for a non-default time
+  of day that state (`fal.plate.dusk.yaml`).
 - Everything else is lowercase-kebab (`reference-plan.yaml`,
   `story-bible.yaml`, `series-plan.yaml`). NEVER use spaces, camelCase, or
   non-ASCII characters in a filename.
