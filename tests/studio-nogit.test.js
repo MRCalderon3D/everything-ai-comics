@@ -48,6 +48,15 @@ async function main() {
     assert.strictEqual(r.body.error.code, 'history_unavailable');
     assert.ok(/git is not installed/.test(r.body.error.message));
 
+    // What a commit changed, and a file as it was, need the repository: a clear refusal, not an empty answer.
+    r = await s.api('GET', `${P}/diff?commit=0123456789abcdef0123456789abcdef01234567`);
+    assert.deepStrictEqual([r.status, r.body.error.code], [409, 'history_unavailable']);
+    r = await s.api('GET', `${P}/diff?from=0123456789abcdef&to=fedcba9876543210`);
+    assert.deepStrictEqual([r.status, r.body.error.code], [409, 'history_unavailable']);
+    r = await s.api('GET', `${P}/at/0123456789abcdef0123456789abcdef01234567/raw/project.yaml`);
+    assert.deepStrictEqual([r.status, r.body.error.code], [409, 'history_unavailable']);
+    assert.ok(/git/.test(r.body.error.message));
+
     r = await s.api('GET', P);
     assert.strictEqual(r.body.history.git, false);
   } finally {

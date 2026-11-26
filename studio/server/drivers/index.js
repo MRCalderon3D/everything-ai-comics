@@ -21,6 +21,7 @@
 const claude = require('./claude');
 const codex = require('./codex');
 const fake = require('./fake');
+const { msg } = require('../i18n');
 
 const DRIVERS = { claude, codex };
 const OTHER = { claude: 'codex', codex: 'claude' };
@@ -68,10 +69,10 @@ function createDrivers(options = {}) {
     const base = { requested, fake: isFake, driver: null, model: null, name: null, fallback: false, available: false, reason: null };
     if (verb === 'draw') {
       if (requested === 'manual') {
-        return Object.assign(base, { reason: 'The project is set to draw by hand.' });
+        return Object.assign(base, { reason: msg('reason.draw_manual') });
       }
       if (!tools.codex.installed) {
-        return Object.assign(base, { reason: 'Codex is not installed, and it is the only tool here that draws.' });
+        return Object.assign(base, { reason: msg('reason.no_codex') });
       }
       return Object.assign(base, {
         available: true, name: 'codex', driver: isFake ? fake : codex, model: settings.models.codex.draw || null,
@@ -81,7 +82,7 @@ function createDrivers(options = {}) {
     if (!tools[name] || !tools[name].installed) {
       const other = OTHER[requested];
       if (!other || !tools[other].installed) {
-        return Object.assign(base, { reason: 'Neither Claude Code nor Codex is installed.' });
+        return Object.assign(base, { reason: msg('reason.no_tools') });
       }
       name = other;
     }

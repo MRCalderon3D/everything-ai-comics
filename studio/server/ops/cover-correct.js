@@ -14,8 +14,6 @@ const { checkRegion } = require('./page-correct');
 
 module.exports = {
   name: 'cover.correct',
-  title: 'Correct the cover',
-  summary: 'Records a change the person asks for on the cover and produces a new version: an edit of the existing cover, or a redraw from an updated plan once the repair limit is reached.',
   params: [
     { name: 'issue', type: 'string', required: false, description: 'Issue ID. Default ISS_001.' },
     { name: 'text', type: 'string', required: true, description: 'What to change.' },
@@ -41,7 +39,7 @@ module.exports = {
   },
 
   steps(params) {
-    return correction.steps('the cover', params.path);
+    return correction.steps('cover', params.path);
   },
 
   async run(ctx) {
@@ -52,7 +50,6 @@ module.exports = {
       text: params.text,
       region: params.region,
       lettering: params.lettering,
-      what: 'the cover',
     });
     return Object.assign({ issue: params.issue }, outcome);
   },

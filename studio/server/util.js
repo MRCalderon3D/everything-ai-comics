@@ -6,19 +6,38 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const i18n = require('./i18n');
 
 /** The scaffold root: two levels up from studio/server/. */
 const SCAFFOLD_ROOT = path.resolve(__dirname, '..', '..');
 const STUDIO_ROOT = path.resolve(__dirname, '..');
 
-/** An error the HTTP layer turns into a JSON error body with this status. */
+/**
+ * An error the HTTP layer turns into a JSON error body with this status.
+ * `message` is a plain technical string or a message descriptor
+ * (i18n.msg). `params` are values for the dictionary entry of the code
+ * (error.<code>), which is what the person reads.
+ */
 class HttpError extends Error {
-  constructor(status, code, message, details) {
-    super(message);
+  constructor(status, code, message, details, params) {
+    super(i18n.isMsg(message) ? i18n.t('en', message.$t, message.params) : message);
     this.status = status;
     this.code = code;
+    if (i18n.isMsg(message)) this.text = message;
     if (details !== undefined) this.details = details;
+    if (params !== undefined) this.params = params;
   }
+}
+
+/**
+ * The descriptor of what an error says to the person. Its params always
+ * carry `detail`: the technical text in English.
+ */
+function errorText(err) {
+  if (err && err.text) {
+    return i18n.msg(err.text.$t, Object.assign({ detail: String(err.message || '') }, err.text.params));
+  }
+  return i18n.errorMsg(err && typeof err.code === 'string' ? err.code : 'other', err && err.message, err && err.params);
 }
 
 function nowIso() {
@@ -203,6 +222,7 @@ module.exports = {
   SCAFFOLD_ROOT,
   STUDIO_ROOT,
   HttpError,
+  errorText,
   nowIso,
   today,
   newId,

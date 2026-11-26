@@ -7,16 +7,16 @@
  */
 
 const chats = require('../chats');
+const { msg } = require('../i18n');
 const prompts = require('../prompts');
 const S = require('../scaffold');
 const { runAi } = require('../ai');
 const { isCancel, NeedsDecision } = require('../jobs');
 const { str } = require('./shared');
+const { errorText } = require('../util');
 
 module.exports = {
   name: 'chat.turn',
-  title: 'Chat',
-  summary: 'One chat message for a screen. The AI answers and may change that screen\'s files.',
   params: [
     { name: 'key', type: 'string', required: true, description: 'Screen key: story, style, options, characters, places, character:<ID>, location:<ID>, prop:<ID>, pages:<ISS_ID>, page:<PAGE_ID>, cover:<ISS_ID>, publish:<ISS_ID>.' },
     { name: 'text', type: 'string', required: true, description: 'The person\'s message.' },
@@ -29,7 +29,7 @@ module.exports = {
   },
 
   steps() {
-    return [{ id: 'reply', label: 'Answer the message' }];
+    return [{ id: 'reply', label: msg('step.chat.reply') }];
   },
 
   async run(ctx) {
@@ -69,7 +69,7 @@ module.exports = {
     } catch (err) {
       if (!isCancel(err) && !(err instanceof NeedsDecision)) {
         emit(chats.append(project, params.key, {
-          role: 'assistant', text: '', error: err.message, job: ctx.job.id, reply_to: params.message,
+          role: 'assistant', text: '', error: errorText(err), job: ctx.job.id, reply_to: params.message,
         }));
       }
       throw err;

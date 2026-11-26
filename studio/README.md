@@ -184,7 +184,22 @@ with a readable message, under its own identity (`Comics Studio
 Every entry of the activity log links to its commit. Restoring an earlier
 point makes a new commit that brings the workspace back to that state: files
 added later leave the workspace and stay in git, so the later state can be
-restored too.
+restored too. The same repository answers two read-only questions for the
+interface: what a point of the history changed, file by file, and what a
+file looked like at that point. Without git the activity log still works and
+those two answer that the history is not available.
+
+## Language
+
+The server writes its own text in English and in Spanish: job titles, step
+labels, the summaries and blockers of the project home, history titles and
+error messages. A project has an interface language, and a request can ask
+for another with `?lang=`. Jobs and history entries are stored with the code
+of each sentence, so they read in whichever language they are asked for.
+Every sentence comes with that code and its values, for an interface that
+prefers its own wording. The dictionaries are in
+`studio/server/i18n-text.js`. What a tool wrote, the scaffold's mechanical
+findings and the job log stay as they were written.
 
 ## Fake mode
 
@@ -207,7 +222,10 @@ is not its own address, which stops a web page from reaching it through DNS
 rebinding, and it refuses writes that come from another origin. Every file
 path sent by the browser is resolved and has to stay inside the project's
 workspace. Uploads take images and text files only, with size limits. HTML
-and SVG files of the workspace are served sandboxed.
+and SVG files of the workspace are served sandboxed, so they never run with
+the app's origin. The exported web reader is one of them: it opens in the
+app or in a tab, and only its page images are sent with a policy that lets
+the sandboxed reader load them.
 
 ## Tests
 

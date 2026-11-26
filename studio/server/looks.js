@@ -7,6 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const S = require('./scaffold');
+const { msg, has } = require('./i18n');
 const { SCAFFOLD_ROOT, idToken } = require('./util');
 
 const LOOKS_DIR = path.join(SCAFFOLD_ROOT, 'templates', 'looks');
@@ -34,8 +35,10 @@ function listPresets() {
       file: `templates/looks/${name}`,
       id,
       look_id: /^LOOK_[A-Z][A-Z0-9_]*$/.test(id.replace(/_V\d{2}$/, '')) ? id.replace(/_V\d{2}$/, '') : `LOOK_${idToken(name.replace(/\.ya?ml$/i, ''))}`,
-      name: String(doc.name || name),
-      intent: String(doc.intent || ''),
+      // The scaffold's presets are written in English; the dictionary carries their name and
+      // intent in the interface languages (preset.<key>.name, preset.<key>.intent).
+      name: has(`preset.${name.replace(/\.ya?ml$/i, '')}.name`) ? msg(`preset.${name.replace(/\.ya?ml$/i, '')}.name`) : String(doc.name || name),
+      intent: has(`preset.${name.replace(/\.ya?ml$/i, '')}.intent`) ? msg(`preset.${name.replace(/\.ya?ml$/i, '')}.intent`) : String(doc.intent || ''),
       color_mode: doc.color_mode || null,
       line: doc.line || '',
       inking: doc.inking || '',

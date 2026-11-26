@@ -236,7 +236,7 @@ async function main() {
   drivers = createDrivers({ fake: true, fakeTools: ['claude'] });
   pick = drivers.pick('draw', settings);
   assert.strictEqual(pick.available, false, 'only Codex draws');
-  assert.ok(/Codex is not installed/.test(pick.reason));
+  assert.strictEqual(pick.reason.$t, 'reason.no_codex', 'the reason is a message descriptor, worded when it is sent');
   assert.strictEqual(drivers.pick('look', mergeSettings({ drivers: { look: 'codex' } })).name, 'claude');
   drivers = createDrivers({ fake: true, fakeTools: [] });
   assert.strictEqual(drivers.pick('plan', settings).available, false);

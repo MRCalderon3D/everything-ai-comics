@@ -6,14 +6,13 @@
  */
 
 const S = require('../scaffold');
+const { msg } = require('../i18n');
 const pipeline = require('../pipeline');
 const { HttpError } = require('../util');
 const { lookState, requireDrawTool } = require('./shared');
 
 module.exports = {
   name: 'style.look',
-  title: 'Draw a look page',
-  summary: 'Compiles the look sheet and draws a look page candidate in the defined style.',
   params: [],
 
   validate(params, { project }) {
@@ -25,8 +24,8 @@ module.exports = {
 
   steps() {
     return [
-      { id: 'compile', label: 'Prepare the look page' },
-      { id: 'draw', label: 'Draw the look page' },
+      { id: 'compile', label: msg('step.style.look.compile') },
+      { id: 'draw', label: msg('step.style.look.draw') },
     ];
   },
 

@@ -15,6 +15,7 @@ const http = require('http');
 const path = require('path');
 const { spawn } = require('child_process');
 const security = require('./security');
+const i18n = require('./i18n');
 const ops = require('./ops');
 const S = require('./scaffold');
 const { EventHub } = require('./events');
@@ -63,7 +64,10 @@ function createServer(options = {}) {
   const fakeTools = options.fakeTools ||
     (process.env.STUDIO_FAKE_TOOLS ? process.env.STUDIO_FAKE_TOOLS.split(',').map((s) => s.trim()).filter(Boolean) : undefined);
   const registry = new Registry(options.home || defaultHome());
-  const events = new EventHub({ heartbeatMs: options.heartbeatMs || 15000 });
+  const events = new EventHub({
+    heartbeatMs: options.heartbeatMs || 15000,
+    languageOf: (projectId) => registry.get(projectId).settings().language,
+  });
   const drivers = createDrivers({ fake, fakeTools });
   const services = { registry, events, drivers, ops, fake, touched: new Map() };
   const jobs = new JobManager({ events, ops, services });
@@ -78,7 +82,29 @@ function createServer(options = {}) {
 
   const router = createApi(services);
 
+  /**
+   * The language of a request: ?lang=, else the interface language of the
+   * project in the path, else Accept-Language, else English.
+   */
+  function languageOf(req, url) {
+    let projectLanguage = null;
+    const m = url ? /^\/api\/projects\/([a-z0-9][a-z0-9-]*)(?:\/|$)/.exec(url.pathname) : null;
+    if (m) {
+      try {
+        projectLanguage = registry.get(m[1]).settings().language;
+      } catch (err) {
+        projectLanguage = null;
+      }
+    }
+    return i18n.pickLang({
+      query: url ? url.searchParams.get('lang') : null,
+      projectLanguage,
+      acceptLanguage: req.headers['accept-language'],
+    });
+  }
+
   async function handle(req, res) {
+    let lang = i18n.fromAcceptLanguage(req.headers['accept-language']) || i18n.DEFAULT_LANG;
     try {
       security.checkHost(req, port);
       security.checkOrigin(req, port);
@@ -89,12 +115,14 @@ function createServer(options = {}) {
         throw new HttpError(400, 'bad_request', 'The URL is malformed.');
       }
       const pathname = url.pathname;
+      lang = languageOf(req, url);
       if (pathname === '/api' || pathname.startsWith('/api/')) {
         const match = router.match(req.method, pathname);
         if (!match) throw new HttpError(404, 'not_found', 'There is no such API route.');
         if (match.methodMismatch) throw new HttpError(405, 'method_not_allowed', `${req.method} is not allowed on this route.`);
-        const result = await match.route.handler(req, res, { params: match.params, query: url.searchParams, url });
-        if (result !== undefined && !res.headersSent) sendJson(res, res.statusCode || 200, result);
+        const result = await match.route.handler(req, res, { params: match.params, query: url.searchParams, url, lang });
+        // Message descriptors anywhere in the result become text in the request's language.
+        if (result !== undefined && !res.headersSent) sendJson(res, res.statusCode || 200, i18n.localize(lang, result));
         return;
       }
       if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -116,7 +144,7 @@ function createServer(options = {}) {
           error = new HttpError(500, 'internal', err && err.message ? err.message : 'Unexpected error.');
         }
       }
-      sendError(res, error);
+      sendError(res, error, lang);
     }
   }
 

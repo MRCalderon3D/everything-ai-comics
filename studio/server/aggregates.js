@@ -14,10 +14,12 @@ const S = require('./scaffold');
 const files = require('./files');
 const looks = require('./looks');
 const pipeline = require('./pipeline');
+const { parseOverrule } = require('./approvals');
 const projectOptions = require('./project-options');
 const publish = require('./ops/publish-build');
 const lettering = require('./ops/lettering-apply');
 const { lookState } = require('./ops/shared');
+const { msg } = require('./i18n');
 const { HttpError } = require('./util');
 
 const ASSET_STEM = /^(CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*_V\d{2}$/;
@@ -147,6 +149,8 @@ function reviewView(project, renderId) {
   const doc = file ? loadYamlSafe(file) : null;
   if (!doc) return null;
   const findings = Array.isArray(doc.findings) ? doc.findings : [];
+  const overrule = parseOverrule(doc.notes);
+  const minor = (f) => f && f.severity === 'minor' && f.source !== 'user_request';
   return {
     path: S.ws.rel(root, file),
     verdict: doc.verdict || null,
@@ -164,6 +168,14 @@ function reviewView(project, renderId) {
     findings,
     open_findings: findings.filter((f) => f && f.status === 'open').length,
     open_blocking: findings.filter((f) => f && f.status === 'open' && f.severity === 'blocking').length,
+    // Notes are minor findings of the reviewer: still open, or accepted by the person.
+    open_notes: findings.filter((f) => minor(f) && f.status === 'open').length,
+    accepted_notes: findings.filter((f) => minor(f) && f.status === 'accepted').length,
+    // The person approved against the review: when, what, and their own words.
+    overruled: overrule.overruled,
+    overruled_at: overrule.overruled_at,
+    overrule_note: overrule.overrule_note,
+    overruled_items: overrule.overruled_items,
     change_requests: findings.filter((f) => f && f.source === 'user_request').length,
     compared_against: doc.compared_against || { references: [], neighbors: [] },
     notes: doc.notes || '',
@@ -245,9 +257,20 @@ function nameOf(project, cache, charId) {
 function readablePlan(project, page) {
   const names = new Map();
   const panels = (Array.isArray(page.panels) ? page.panels.slice() : []).sort((a, b) => (a.order || 0) - (b.order || 0));
+  // Where each panel sits, as the plan says it: which tier, and which place in the tier.
+  // The plan gives no tier heights and no panel widths, so there is no rectangle here.
+  let slots = new Map();
+  try {
+    const layoutLanguage = require(path.join(S.ROOT, 'scripts', 'lib', 'layout-language.js'));
+    const direction = (safe(() => S.ws.loadProject(project.root), null) || {}).reading_direction === 'rtl' ? 'rtl' : 'ltr';
+    slots = layoutLanguage.panelSlots(page, direction);
+  } catch (err) {
+    slots = new Map();
+  }
   const out = panels.map((panel, index) => ({
     id: panel.id,
     number: index + 1,
+    slot: slots.has(panel.id) ? (({ tier, tiers, slot, of, placement }) => ({ tier, tiers, slot, of, placement }))(slots.get(panel.id)) : null,
     size: panel.size || null,
     shot: panel.framing && panel.framing.shot_size ? panel.framing.shot_size : null,
     moment: panel.moment || '',
@@ -269,7 +292,7 @@ function readablePlan(project, page) {
       text: el.text,
     })),
   }));
-  const lines = [`Page ${page.number}: ${page.purpose || ''}`.trim()];
+  const lines = [];
   for (const p of out) {
     const who = p.cast.filter((c) => !c.off_panel).map((c) => c.name).join(', ');
     lines.push(`${p.number}. ${p.moment}${who ? ` (${who})` : ''}`);
@@ -282,7 +305,8 @@ function readablePlan(project, page) {
     grid: page.layout && page.layout.grid ? page.layout.grid : '',
     tiers: page.layout && Array.isArray(page.layout.tiers) ? page.layout.tiers : [],
     panels: out,
-    text: lines.join('\n'),
+    // The heading is the studio's own words; the rest is the plan's text.
+    text: msg('plan.text', { n: page.number, purpose: page.purpose || '', body: lines.join('\n') }),
   };
 }
 
@@ -297,7 +321,7 @@ function pageSummary(project, entry, provider) {
   const root = project.root;
   const page = entry.doc;
   if (!page) {
-    return { id: entry.id, number: null, broken: true, blockers: [{ code: 'page_missing', message: 'page.yaml is missing or does not parse.' }] };
+    return { id: entry.id, number: null, broken: true, blockers: [pipeline.blockerOf('page_missing', 'page.yaml is missing or does not parse.', entry.id)] };
   }
   const renders = S.ws.listRenders(root, entry.id);
   const current = page.current_render || renders[renders.length - 1] || null;
@@ -320,6 +344,11 @@ function pageSummary(project, entry, provider) {
     passes: review ? review.passes : false,
     flagged: !!review && !review.passes,
     open_findings: review ? review.open_findings : 0,
+    open_notes: review ? review.open_notes : 0,
+    accepted_notes: review ? review.accepted_notes : 0,
+    overruled: review ? review.overruled : false,
+    overruled_at: review ? review.overruled_at : null,
+    overrule_note: review ? review.overrule_note : null,
     repair_cycle: review ? review.repair_cycle : 0,
     independent: review ? review.independent : null,
     human_approval: review ? review.human_approval.status : null,
@@ -575,6 +604,12 @@ function coverSummary(project, issue) {
     verdict: review ? review.verdict : null,
     outcome: review ? review.outcome : null,
     open_findings: review ? review.open_findings : 0,
+    open_notes: review ? review.open_notes : 0,
+    accepted_notes: review ? review.accepted_notes : 0,
+    overruled: review ? review.overruled : false,
+    overruled_at: review ? review.overruled_at : null,
+    overrule_note: review ? review.overrule_note : null,
+    human_approval: review ? review.human_approval.status : null,
     passes: review ? review.passes : false,
   };
 }
@@ -638,7 +673,7 @@ function issue(project, issueId, drivers) {
       flagged: pages.filter((p) => p.flagged).length,
     },
     mechanical: {
-      note: 'These checks read the plan files. They say nothing about a drawing.',
+      note: msg('note.mechanical'),
       continuity: gates.continuity,
       validation: gates.validation,
       errors: gates.errors,
@@ -697,7 +732,7 @@ function page(project, pageId, drivers) {
     prompts: packagesIn(project, `${base}/prompts`),
     reference_plan: Object.assign(planDoc, { entries: planEntries }),
     findings: {
-      note: 'Mechanical checks of the plan files. A review verdict is a separate thing, under each render.',
+      note: msg('note.mechanical.page'),
       continuity: gates.continuity.filter((f) => f.page === pageId),
       validation: {
         errors: gates.validation.errors.filter((e) => String(e.file || '').startsWith(base)),
@@ -737,9 +772,8 @@ function cover(project, issueId) {
   });
 }
 
-const FORMAT_LABELS = {
-  pdf: 'PDF', cbz: 'CBZ (comic reader apps)', epub: 'EPUB (fixed layout)', web: 'Web reader', images: 'Images, one per page',
-};
+/** Export formats that have a label in the dictionary (format.<id>). */
+const FORMAT_IDS = ['pdf', 'cbz', 'epub', 'web', 'images'];
 
 function exportView(project, entry) {
   const root = project.root;
@@ -779,7 +813,7 @@ function publishScreen(project, issueId) {
   const projectDoc = safe(() => S.ws.loadProject(root), null) || {};
   const overlay = projectDoc.lettering && projectDoc.lettering.mode === 'overlay';
   const exists = S.ws.listIssues(root).includes(issueId) && !!safe(() => S.ws.loadIssue(root, issueId), null);
-  const ready = exists ? publish.readiness(root, issueId) : { blockers: [{ page: null, render: null, code: 'no_pages', message: 'This issue has no pages yet.' }], edition: null, continuity_errors: 0 };
+  const ready = exists ? publish.readiness(root, issueId) : { blockers: [publish.blocker(null, null, 'no_pages', 'This issue has no pages yet.')], edition: null, continuity_errors: 0 };
   const draft = ready.edition;
   const editions = S.ws.listEditions(root).filter((id) => id.startsWith(`ED_${issueId.slice(4)}_`)).map((id) => {
     const doc = safe(() => S.ws.loadEdition(root, id), null) || {};
@@ -799,13 +833,13 @@ function publishScreen(project, issueId) {
   }).reverse();
   return {
     issue: issueId,
-    formats: S.editionFormats().map((id) => ({ id, label: FORMAT_LABELS[id] || id })),
+    formats: S.editionFormats().map((id) => ({ id, label: FORMAT_IDS.includes(id) ? msg(`format.${id}`) : id })),
     readiness: {
       final_possible: ready.blockers.length === 0 && !!draft && draft.pages.length > 0,
       draft_possible: !!draft && draft.pages.length > 0,
       blockers: ready.blockers,
       continuity_errors: ready.continuity_errors,
-      note: 'Final means every shipped render has a passing review on file. It does not certify the drawings.',
+      note: msg('note.final_edition'),
     },
     next_edition: draft ? {
       id: draft.id,
@@ -865,56 +899,57 @@ function overview(project, services) {
   const add = (key, status, summary, extra = {}) => screens.push(Object.assign({ key, status, summary, blockers: [], counts: {} }, extra));
 
   add('story', storyState.written ? 'done' : 'todo',
-    storyState.written ? 'The story bible is written.' : 'The story is not written yet.',
+    msg(storyState.written ? 'screen.story.done' : 'screen.story.todo'),
     {
-      blockers: storyState.blocking_questions.map((q) => ({ code: 'blocking_question', message: q })),
+      // The question is the project's own text, written by whoever wrote the story bible.
+      blockers: storyState.blocking_questions.map((q) => ({ code: 'blocking_question', message: msg('blocker.blocking_question', { question: q }) })),
       counts: { facts: storyState.bible.data && Array.isArray(storyState.bible.data.facts) ? storyState.bible.data.facts.length : 0 },
     });
 
   let styleStatus = 'todo';
-  let styleSummary = 'The style is not defined yet.';
+  let styleSummary = msg('screen.style.todo');
   if (look.frozen) {
     styleStatus = 'done';
-    styleSummary = 'The look is approved and the style is frozen.';
+    styleSummary = msg('screen.style.done');
   } else if (lookAssets.candidates.length) {
     styleStatus = 'in_progress';
-    styleSummary = 'A look page is drawn. Approve one to freeze the style.';
+    styleSummary = msg('screen.style.candidate');
   } else if (!block.template && block.exists) {
     styleStatus = 'in_progress';
-    styleSummary = 'The style is written. Draw a look page next.';
+    styleSummary = msg('screen.style.written');
   }
   add('style', styleStatus, styleSummary, { counts: { candidates: lookAssets.candidates.length } });
 
   const withIdentity = chars.filter((c) => c.has_identity).length;
   add('characters', !chars.length ? 'todo' : withIdentity === chars.length ? 'done' : 'in_progress',
-    !chars.length ? 'No characters yet.'
-      : withIdentity === chars.length ? `${chars.length} character(s), each with an approved reference.`
-        : `${chars.length - withIdentity} of ${chars.length} character(s) still need an approved sheet.`,
+    !chars.length ? msg('screen.characters.todo')
+      : withIdentity === chars.length ? msg('screen.characters.done', { n: chars.length })
+        : msg('screen.characters.missing', { n: chars.length - withIdentity, total: chars.length }),
     {
       counts: { characters: chars.length, approved: withIdentity },
-      blockers: look.frozen || !chars.length ? [] : [{ code: 'look_not_approved', message: 'Character sheets are drawn in the approved look. Approve a look page first.' }],
+      blockers: look.frozen || !chars.length ? [] : [{ code: 'look_not_approved', message: msg('blocker.look_not_approved.sheets') }],
     });
 
   const ent = entities(project);
-  add('places', 'optional', `${ent.locations.length} place(s) and ${ent.props.length} object(s). They are written when pages are planned.`,
+  add('places', 'optional', msg('screen.places', { locations: ent.locations.length, props: ent.props.length }),
     { counts: { locations: ent.locations.length, props: ent.props.length } });
 
   const pageBlockers = [];
-  if (!look.frozen) pageBlockers.push({ code: 'look_not_approved', message: 'Pages are drawn from the approved look. Approve a look page first.' });
-  if (!draw.available) pageBlockers.push({ code: 'no_draw_tool', message: `${draw.reason} Pages can still be made by hand and uploaded.` });
+  if (!look.frozen) pageBlockers.push({ code: 'look_not_approved', message: msg('blocker.look_not_approved.pages') });
+  if (!draw.available) pageBlockers.push({ code: 'no_draw_tool', message: msg('blocker.no_draw_tool', { reason: draw.reason }) });
   for (const p of allPages) {
     for (const b of p.blockers) {
-      if (b.code !== 'look_missing' && b.code !== 'look_unapproved') pageBlockers.push({ code: b.code, message: b.message, page: p.id });
+      if (b.code !== 'look_missing' && b.code !== 'look_unapproved') pageBlockers.push(Object.assign({}, b, { page: p.id }));
     }
   }
   let pagesStatus = 'todo';
-  let pagesSummary = 'No pages are planned yet.';
+  let pagesSummary = msg('screen.pages.todo');
   if (allPages.length && rendered.length === allPages.length) {
     pagesStatus = 'done';
-    pagesSummary = `All ${allPages.length} page(s) are drawn.`;
+    pagesSummary = msg('screen.pages.done', { n: allPages.length });
   } else if (allPages.length) {
     pagesStatus = pageBlockers.length ? 'blocked' : 'in_progress';
-    pagesSummary = `${allPages.length} page(s) planned, ${rendered.length} drawn.`;
+    pagesSummary = msg('screen.pages.progress', { n: allPages.length, drawn: rendered.length });
   }
   add('pages', pagesStatus, pagesSummary, {
     blockers: pageBlockers.slice(0, 20),
@@ -922,10 +957,10 @@ function overview(project, services) {
   });
 
   add('check', !rendered.length ? 'todo' : flagged.length ? 'in_progress' : 'done',
-    !rendered.length ? 'Nothing to check yet.'
-      : flagged.length ? `${flagged.length} page(s) are flagged and need a look.`
-        : withNotes.length ? `All ${rendered.length} drawn page(s) passed the automatic check, ${withNotes.length} with notes to read.`
-          : `All ${rendered.length} drawn page(s) passed the automatic check.`,
+    !rendered.length ? msg('screen.check.todo')
+      : flagged.length ? msg('screen.check.flagged', { n: flagged.length })
+        : withNotes.length ? msg('screen.check.notes', { n: rendered.length, notes: withNotes.length })
+          : msg('screen.check.done', { n: rendered.length }),
     {
       counts: {
         passed: passed.length, with_notes: withNotes.length, flagged: flagged.length,
@@ -934,24 +969,24 @@ function overview(project, services) {
     });
 
   add('corrections', 'optional',
-    flagged.length ? `${flagged.length} page(s) wait for a correction or a decision.`
-      : withNotes.length ? `${withNotes.length} page(s) have notes. Any of them can become a correction.`
-        : 'Ask for a change on any drawn page.',
+    flagged.length ? msg('screen.corrections.flagged', { n: flagged.length })
+      : withNotes.length ? msg('screen.corrections.notes', { n: withNotes.length })
+        : msg('screen.corrections.idle'),
     { counts: { flagged: flagged.length, with_notes: withNotes.length } });
 
   add('cover', 'optional',
-    coverState.status === 'approved' ? 'The cover is approved.'
-      : coverState.renders ? 'A cover is drawn. Approve it to put it in the edition.'
-        : coverState.exists ? 'The cover is written and not drawn yet.' : 'No cover yet. It is optional.',
+    coverState.status === 'approved' ? msg('screen.cover.approved')
+      : coverState.renders ? msg('screen.cover.drawn')
+        : coverState.exists ? msg('screen.cover.written') : msg('screen.cover.none'),
     { counts: { renders: coverState.renders }, done: coverState.status === 'approved' });
 
   const publishBlockers = [];
-  if (!rendered.length) publishBlockers.push({ code: 'no_renders', message: 'No page is drawn yet.' });
+  if (!rendered.length) publishBlockers.push({ code: 'no_renders', message: msg('blocker.no_renders') });
   add('publish', editions.length ? 'done' : publishBlockers.length ? 'blocked' : (flagged.length || rendered.length < allPages.length ? 'in_progress' : 'next'),
-    editions.length ? `${editions.length} edition(s) built.`
-      : publishBlockers.length ? 'Nothing to publish yet.'
-        : flagged.length || rendered.length < allPages.length ? 'A draft can be built now. A final edition needs every page to pass.'
-          : 'Everything is ready for a final edition.',
+    editions.length ? msg('screen.publish.done', { n: editions.length })
+      : publishBlockers.length ? msg('screen.publish.blocked')
+        : flagged.length || rendered.length < allPages.length ? msg('screen.publish.draft')
+          : msg('screen.publish.ready'),
     { blockers: publishBlockers, counts: { editions: editions.length } });
 
   // The one obvious next action: the first required screen that is not done.

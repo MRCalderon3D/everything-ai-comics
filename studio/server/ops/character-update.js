@@ -6,6 +6,7 @@
  */
 
 const S = require('../scaffold');
+const { msg } = require('../i18n');
 const prompts = require('../prompts');
 const { runAi } = require('../ai');
 const { HttpError } = require('../util');
@@ -14,8 +15,6 @@ const sheets = require('./sheets');
 
 module.exports = {
   name: 'character.update',
-  title: 'Change a character',
-  summary: 'Applies a change to a character\'s files, with optional new photos, and can draw a new turnaround candidate.',
   params: [
     { name: 'character', type: 'string', required: true, description: 'Character ID, for example CHAR_MARTA.' },
     { name: 'instruction', type: 'string', required: false, description: 'What to change.' },
@@ -34,8 +33,8 @@ module.exports = {
 
   steps(params) {
     return [
-      ...(params.uploads.length ? [{ id: 'photos', label: 'File the photos' }] : []),
-      { id: 'write', label: 'Change the character' },
+      ...(params.uploads.length ? [{ id: 'photos', label: msg('step.photos') }] : []),
+      { id: 'write', label: msg('step.character.update.write') },
       ...(params.draw ? sheets.steps('turnaround') : []),
     ];
   },
@@ -50,7 +49,7 @@ module.exports = {
         role: 'identity',
         kind: 'detail',
         approved: true,
-        note: 'Identity reference supplied by the person through the studio.',
+        note: 'asset.note.identity_ref',
       }));
     }
     const written = await ctx.step('write', (h) => runAi(ctx, h, {

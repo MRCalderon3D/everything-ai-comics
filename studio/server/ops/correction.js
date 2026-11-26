@@ -21,13 +21,15 @@
 
 const S = require('../scaffold');
 const pipeline = require('../pipeline');
+const { msg } = require('../i18n');
 const { runAi } = require('../ai');
 const { OpError } = require('../jobs');
 const { renderReviewRepair, requireDrawTool } = require('./shared');
 
+/** What the result says about the path taken, for the person. */
 const PATH_LABELS = {
-  edit: 'edited the existing image',
-  redraw: 'redrew it from an updated plan',
+  edit: msg('path.edit'),
+  redraw: msg('path.redraw'),
 };
 
 /** The scaffold's own repair limit (project.repair_policy.max_cycles, default 2). */
@@ -44,21 +46,22 @@ function pathFor(root, render) {
 }
 
 /** Step list for a correction, known when the job is created. */
-function steps(what, path) {
+function steps(kind, path) {
+  const what = kind === 'cover' ? 'cover' : 'page';
   if (path === 'redraw') {
     return [
-      { id: 'request', label: 'Record the request' },
-      { id: 'plan', label: `Repair limit reached: put the change into the plan of ${what}` },
-      { id: 'compile', label: 'Prepare a fresh drawing' },
-      { id: 'draw', label: `Redraw ${what} from the updated plan` },
-      { id: 'review', label: `Check the new ${what.replace(/^the /, '')}` },
+      { id: 'request', label: msg('step.correct.request') },
+      { id: 'plan', label: msg(`step.correct.plan.${what}`) },
+      { id: 'compile', label: msg('step.correct.compile.redraw') },
+      { id: 'draw', label: msg(`step.correct.draw.redraw.${what}`) },
+      { id: 'review', label: msg(`step.correct.review.redraw.${what}`) },
     ];
   }
   return [
-    { id: 'request', label: 'Record the request' },
-    { id: 'compile', label: 'Prepare the correction' },
-    { id: 'draw', label: `Edit the existing ${what.replace(/^the /, '')}` },
-    { id: 'review', label: `Check the corrected ${what.replace(/^the /, '')}` },
+    { id: 'request', label: msg('step.correct.request') },
+    { id: 'compile', label: msg('step.correct.compile.edit') },
+    { id: 'draw', label: msg(`step.correct.draw.edit.${what}`) },
+    { id: 'review', label: msg(`step.correct.review.edit.${what}`) },
   ];
 }
 
@@ -119,7 +122,7 @@ async function run(ctx, spec) {
     const outcome = await renderReviewRepair(ctx, {
       owner: spec.owner,
       prefix: '',
-      label: 'Correction',
+      kind: 'correction',
       compileGenerate: () => ({ file: compiled.file }),
       compileRepair,
       supersedes: spec.render,
@@ -129,8 +132,8 @@ async function run(ctx, spec) {
   }
 
   // Redraw: the change goes into the plan, then a fresh render starts a new lineage.
-  ctx.addStep({ id: 'plan', label: `Repair limit reached: put the change into the plan of ${spec.what}` }, { after: 'request' });
-  ctx.log(`${spec.render} has used its ${scaffoldLimit(root)} repair cycle(s): the change goes into the plan and ${spec.what} is drawn again`);
+  ctx.addStep({ id: 'plan', label: msg(`step.correct.plan.${isCover ? 'cover' : 'page'}`) }, { after: 'request' });
+  ctx.log(`${spec.render} has used its ${scaffoldLimit(root)} repair cycle(s): the change goes into the plan and it is drawn again`);
   const old = S.ws.loadReview(root, spec.render);
   const open = (old && Array.isArray(old.findings) ? old.findings : [])
     .filter((f) => f && f.status === 'open' && f.source !== 'user_request');
@@ -179,13 +182,13 @@ async function run(ctx, spec) {
   const outcome = await renderReviewRepair(ctx, {
     owner: spec.owner,
     prefix: '',
-    label: 'Redraw',
+    kind: 'correction',
     compileGenerate: () => ({ file: fresh.file }),
     compileRepair,
     supersedes: null,
     requests: [spec.text],
     replaces: spec.render,
-    lineageNote: `Drawn again from an updated plan: ${spec.render} had reached the repair limit, so this render starts a new lineage.`,
+    lineageNote: msg('review.note.redrawn', { render: spec.render }),
     fakeText: spec.text,
   });
   return Object.assign({ from: spec.render, finding: request.finding, path, path_label: PATH_LABELS[path] }, outcome);

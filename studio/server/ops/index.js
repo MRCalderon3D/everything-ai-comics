@@ -3,11 +3,14 @@
  * The operations a job can run. Each is one module in this directory with
  * the same shape:
  *
- *   name, title, summary, params      what it is, for GET /api/ops
+ *   name, params                      what it is, for GET /api/ops (its title and
+ *                                     summary are in the dictionary: op.<name>.title)
  *   validate(params, { project, services }) -> clean params (throws HttpError)
  *   steps(params, { project })        the steps known up front
  *   async run(ctx)                    does the work through ctx.step()
  */
+
+const { msg } = require('../i18n');
 
 const MODULES = [
   './project-setup',
@@ -40,8 +43,8 @@ for (const file of MODULES) {
 function catalog() {
   return [...ops.values()].map((op) => ({
     name: op.name,
-    title: op.title,
-    summary: op.summary,
+    title: msg(`op.${op.name}.title`),
+    summary: msg(`op.${op.name}.summary`),
     params: op.params,
   }));
 }

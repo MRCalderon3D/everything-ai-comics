@@ -117,6 +117,8 @@ async function record() {
     cap('health', r.body, { maxArray: 6 });
     r = await s.api('GET', '/api/ops');
     cap('ops', r.body, { maxArray: 2, keys: { params: { maxArray: 5 } } });
+    r = await s.api('GET', '/api/ops?lang=es');
+    cap('language-es', { operations: r.body.operations.slice(8, 9) }, { keys: { params: { maxArray: 1 } } });
     r = await s.api('GET', '/api/schemas');
     cap('schemas', r.body, { maxArray: 6 });
     r = await s.api('GET', '/api/schemas/series-plan');
@@ -165,6 +167,10 @@ async function record() {
     const etag = r.body.file.etag;
     r = await s.api('PUT', `${P}/file`, { path: 'story/series-plan.yaml', text: r.body.file.text.replace('Issue 1', 'Crossing'), base_etag: etag });
     cap('file-put', r.body, { maxString: 120 });
+    if (r.body.commit) {
+      const diff = await s.api('GET', `${P}/diff?commit=${r.body.commit}`);
+      cap('diff', diff.body, { maxString: 160 });
+    }
     r = await s.api('PUT', `${P}/file`, { path: 'story/series-plan.yaml', text: 'title: "unclosed\nissues: []\n' });
     cap('file-put-yaml-error', r.body);
     r = await s.api('PUT', `${P}/file`, { path: 'story/series-plan.yaml', text: 'title: The Night Ferry\nissues:\n  - id: ISS_1\n    number: 1\n    title: Crossing\n    page_budget: 3\n    status: planning\n' });
@@ -270,6 +276,8 @@ async function record() {
     // --- cover ----------------------------------------------------------------------------------
     job = done(await s.runOp(id, 'cover.create', { description: 'Mara at the wheel at night, the river behind her.' }), 'cover.create');
     cap('op.cover.create', jobExample(job));
+    job = done(await s.runOp(id, 'cover.create', {}), 'cover.create existing');
+    cap('op.cover.create.existing', jobExample(job));
     job = done(await s.runOp(id, 'cover.correct', { issue: 'ISS_001', text: 'Make the title larger.', lettering: true }), 'cover.correct');
     cap('op.cover.correct', jobExample(job));
     r = await s.api('POST', `${P}/approve/cover`, { issue: 'ISS_001' });
@@ -298,7 +306,12 @@ async function record() {
     r = await s.api('GET', `${P}/history?limit=3`);
     cap('history', r.body, { maxArray: 3, keys: { entries: { maxArray: 2 } } });
     const all = await s.api('GET', `${P}/history?limit=500`);
-    const target = all.body.entries.find((e) => e.kind === 'approval' && /cover/.test(e.title));
+    const target = all.body.entries.find((e) => e.kind === 'approval' && e.title_code === 'activity.approved_cover');
+    const drew = all.body.entries.find((e) => e.step === 'PG_001_003:draw' && e.commit);
+    if (drew) {
+      const diff = await s.api('GET', `${P}/diff?commit=${drew.commit}`);
+      cap('diff-image', diff.body, { maxArray: 4, maxString: 90 });
+    }
     if (target && target.restorable) {
       r = await s.api('POST', `${P}/history/restore`, { entry: target.id });
       cap('restore', r.body, { maxArray: 2 });
@@ -308,6 +321,8 @@ async function record() {
     // --- errors ---------------------------------------------------------------------------------------
     r = await s.api('GET', `${P}/pages/PG_001_099`);
     cap('error-404', r.body);
+    r = await s.api('GET', `${P}/pages/PG_001_099?lang=es`);
+    cap('error-404-es', r.body);
     r = await s.api('POST', `${P}/ops`, { op: 'pages.plan', params: { pages: 99, text: 'x' } });
     cap('error-400', r.body);
     r = await s.api('POST', `${P}/ops`, { op: 'style.define', params: { description: 'Something else' } });
@@ -327,6 +342,10 @@ async function record() {
     cap('error-review-flagged', r.body);
     r = await s.api('POST', `${Q}/approve/page`, { page: 'PG_001_002', overrule: true, note: 'It reads fine to me.' });
     cap('approve-page-overrule', r.body);
+    r = await s.api('GET', `${Q}/pages/PG_001_002`);
+    cap('review-overruled', r.body.renders[r.body.renders.length - 1].review, { maxArray: 2, drop: ['compared_against'] });
+    r = await s.api('GET', `${Q}/issues/ISS_001`);
+    cap('page-summary-overruled', r.body.pages.find((p) => p.id === 'PG_001_002'));
     job = done(await s.runOp(other, 'lettering.apply', { issue: 'ISS_001' }), 'lettering.apply');
     cap('op.lettering.apply', jobExample(job), { keys: { pages: { maxArray: 1 }, warnings: { maxArray: 1 } } });
     r = await s.api('GET', `${Q}/pages/PG_001_001/lettering`);

@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const S = require('./scaffold');
 const git = require('./git');
+const { msg } = require('./i18n');
 const files = require('./files');
 const chats = require('./chats');
 const history = require('./history');
@@ -30,6 +31,32 @@ const UPLOAD_KINDS = {
   image: { ext: ['.png', '.jpg', '.jpeg', '.webp'], limit: IMAGE_UPLOAD_LIMIT },
   source: { ext: ['.txt', '.md', '.fountain'], limit: TEXT_UPLOAD_LIMIT },
 };
+
+const DIFF_MAX_FILES = 100;
+const DIFF_TEXT_BYTES = 200 * 1024;
+const DIFF_TEXT_EXT = ['.yaml', '.yml', '.md', '.txt', '.fountain', '.json', '.svg', '.html', '.xml', '.css'];
+
+/** The web reader of an edition: editions/<ED_ID>/exports/<name>-web/. */
+const WEB_READER_RE = /^editions\/ED_\d{3}_\d{2}\/exports\/[^/]+-web\//;
+
+/**
+ * Extra headers for a file of the workspace.
+ *
+ * An HTML or SVG file runs sandboxed, with an opaque origin: it can show
+ * itself and never acts on the API as the app. That same opaque origin
+ * makes its own images cross-origin requests, which the default
+ * Cross-Origin-Resource-Policy (same-origin) would block. So the images of
+ * an exported web reader, and only those, are sent as loadable from any
+ * origin: they are copies of pages made to be published.
+ */
+function workspaceFileHeaders(rel, type) {
+  const headers = {};
+  if (/^(text\/html|image\/svg\+xml)/.test(type)) headers['Content-Security-Policy'] = 'sandbox allow-scripts';
+  if (WEB_READER_RE.test(rel) && /^image\/(png|jpeg|webp|gif)$/.test(type)) {
+    headers['Cross-Origin-Resource-Policy'] = 'cross-origin';
+  }
+  return headers;
+}
 
 function intParam(value, fallback, min, max) {
   const n = Number.parseInt(value, 10);
@@ -148,7 +175,7 @@ function createApi(services) {
     proj.saveState({ description });
     await git.init(dir);
     const commit = await git.commitAll(dir, `Create the project "${title}"`);
-    proj.addActivity({ kind: 'project', title: `Created the project "${title}"`, actor: 'person', commit });
+    proj.addActivity({ kind: 'project', title: msg('activity.project_created', { title }), actor: 'person', commit });
     let job = null;
     if (description && body.setup !== false) job = jobs.enqueue(proj, 'project.setup', { description, pages });
     res.statusCode = 201;
@@ -174,7 +201,7 @@ function createApi(services) {
     }
     const name = registry.trash(proj.id);
     jobs.forget(proj.id);
-    return { deleted: proj.id, trash: `.trash/${name}`, note: 'The project was moved to the trash folder of the studio home. Nothing was erased.' };
+    return { deleted: proj.id, trash: `.trash/${name}`, note: msg('note.trashed') };
   });
 
   // --- settings and options -------------------------------------------------------
@@ -213,7 +240,7 @@ function createApi(services) {
     if (partial.comic_format && partial.comic_format !== current.comic_format && hasPages) {
       throw new HttpError(409, 'format_locked', 'The format cannot change once pages are planned: their layout depends on it.');
     }
-    const saved = await history.record(services, proj, { kind: 'save', title: 'Changed the project options' }, () => {
+    const saved = await history.record(services, proj, { kind: 'save', title: msg('activity.options') }, () => {
       projectOptions.applyToProject(proj.root, partial);
     });
     const doc = files.readDoc(proj, 'project.yaml');
@@ -271,7 +298,7 @@ function createApi(services) {
       }
     }
     const checked = files.checkText(clean, text);
-    const saved = await history.record(services, proj, { kind: 'save', title: `Edited ${clean}` }, () => {
+    const saved = await history.record(services, proj, { kind: 'save', title: msg('activity.edited', { path: clean }) }, () => {
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, text.endsWith('\n') ? text : `${text}\n`);
     });
@@ -305,10 +332,92 @@ function createApi(services) {
     if (rel.split('/').some((part) => part.startsWith('.'))) throw new HttpError(404, 'not_found', 'File not found.');
     const file = resolveInside(proj.root, rel);
     const type = contentTypeOf(file);
-    const headers = {};
-    // A page from the workspace runs sandboxed: it can show itself, not call the API as the app.
-    if (/^(text\/html|image\/svg\+xml)/.test(type)) headers['Content-Security-Policy'] = 'sandbox allow-scripts';
-    sendFile(req, res, file, { download: ctx.query.get('download') === '1', headers });
+    sendFile(req, res, file, { download: ctx.query.get('download') === '1', headers: workspaceFileHeaders(rel, type) });
+  });
+
+  // --- earlier states: what a commit changed, and a file as it was -------------------------
+
+  const requireHistory = (proj) => {
+    if (!git.detect().installed) throw new HttpError(409, 'history_unavailable', 'git is not installed on this machine.', undefined, {});
+    if (!git.isRepo(proj.dir)) throw new HttpError(409, 'history_unavailable', 'This project has no history repository.');
+  };
+
+  get(`${P}/diff`, async (req, res, ctx) => {
+    const proj = project(ctx);
+    requireHistory(proj);
+    const one = ctx.query.get('commit');
+    let from;
+    let to;
+    if (one) {
+      to = await git.resolveCommit(proj.dir, one);
+      if (!to) throw new HttpError(404, 'commit_not_found', 'That commit is not in this project\'s history.');
+      from = await git.parentOf(proj.dir, to);
+    } else {
+      if (!ctx.query.get('from') || !ctx.query.get('to')) {
+        throw new HttpError(400, 'bad_params', 'Give ?commit=<id>, or ?from=<id>&to=<id>.');
+      }
+      from = await git.resolveCommit(proj.dir, ctx.query.get('from'));
+      to = await git.resolveCommit(proj.dir, ctx.query.get('to'));
+      if (!from || !to) throw new HttpError(404, 'commit_not_found', 'That commit is not in this project\'s history.');
+    }
+    const all = (await git.changedBetween(proj.dir, from, to))
+      .filter((c) => c.path.startsWith('production/'))
+      .map((c) => ({ path: c.path.slice('production/'.length), status: c.status }))
+      .filter((c) => !c.path.split('/').some((part) => part.startsWith('.')));
+    const limit = intParam(ctx.query.get('limit'), DIFF_MAX_FILES, 1, DIFF_MAX_FILES);
+    const filesOut = [];
+    for (const change of all.slice(0, limit)) {
+      const ext = path.extname(change.path).toLowerCase();
+      const kind = DIFF_TEXT_EXT.includes(ext) ? 'text' : files.IMAGE_EXT.includes(ext) ? 'image' : 'other';
+      const entry = { path: change.path, status: change.status, kind, before: null, after: null, before_url: null, after_url: null };
+      const sides = [['before', from, change.status !== 'added'], ['after', to, change.status !== 'deleted']];
+      for (const [side, commit, present] of sides) {
+        if (!present || commit === git.EMPTY_TREE) continue;
+        entry[`${side}_url`] = `/api/projects/${proj.id}/at/${commit}/raw/${change.path.split('/').map(encodeURIComponent).join('/')}`;
+        if (kind !== 'text') continue;
+        const got = await git.fileAt(proj.dir, commit, `production/${change.path}`, DIFF_TEXT_BYTES * 8);
+        if (!got) continue;
+        if (got.tooLarge) {
+          entry[side] = { text: '', bytes: got.bytes, truncated: true };
+        } else {
+          const whole = got.buffer.toString('utf8').replace(/\r\n/g, '\n');
+          entry[side] = { text: whole.slice(0, DIFF_TEXT_BYTES), bytes: got.bytes, truncated: whole.length > DIFF_TEXT_BYTES };
+        }
+      }
+      filesOut.push(entry);
+    }
+    return { from: from === git.EMPTY_TREE ? null : from, to, files: filesOut, total: all.length, more: all.length > filesOut.length };
+  });
+
+  router.add('GET', `${P}/at/:commit/raw/*path`, async (req, res, ctx) => {
+    const proj = project(ctx);
+    requireHistory(proj);
+    const rel = ctx.params.path;
+    const parts = rel.split('/');
+    if (!rel || rel.includes('\0') || rel.includes('\\') || parts.some((part) => !part || part === '..' || part.startsWith('.'))) {
+      throw new HttpError(404, 'not_found', 'File not found.');
+    }
+    const commit = await git.resolveCommit(proj.dir, ctx.params.commit);
+    if (!commit) throw new HttpError(404, 'commit_not_found', 'That commit is not in this project\'s history.');
+    const got = await git.fileAt(proj.dir, commit, `production/${rel}`);
+    if (!got) throw new HttpError(404, 'not_found', 'File not found.');
+    if (got.tooLarge) throw new HttpError(413, 'too_large', 'The file is too large to serve from the history.');
+    const type = contentTypeOf(rel);
+    const headers = Object.assign({
+      'Content-Type': type,
+      'Content-Length': got.buffer.length,
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'no-referrer',
+      'Cross-Origin-Resource-Policy': 'same-origin',
+      // A file at a commit never changes.
+      'Cache-Control': 'private, max-age=31536000, immutable',
+    }, workspaceFileHeaders(rel, type));
+    if (ctx.query.get('download') === '1') {
+      headers['Content-Disposition'] = `attachment; filename="${path.basename(rel).replace(/[^A-Za-z0-9._-]+/g, '_')}"`;
+    }
+    res.writeHead(200, headers);
+    res.end(req.method === 'HEAD' ? undefined : got.buffer);
+    return undefined;
   });
 
   // --- uploads ---------------------------------------------------------------------------
@@ -412,7 +521,7 @@ function createApi(services) {
 
   get(`${P}/events`, (req, res, ctx) => {
     const proj = project(ctx);
-    events.subscribe(proj.id, req, res, { project: proj.id, at: nowIso(), jobs: jobs.list(proj, { active: true }) });
+    events.subscribe(proj.id, req, res, { project: proj.id, at: nowIso(), jobs: jobs.list(proj, { active: true }) }, ctx.query.get('lang'));
     return undefined;
   });
 
@@ -471,7 +580,7 @@ function createApi(services) {
       more: start + limit < all.length,
       restore: {
         available: gitOk,
-        reason: gitOk ? null : (git.detect().installed ? 'This project has no history repository.' : 'git is not installed, so earlier states cannot be restored.'),
+        reason: gitOk ? null : msg(git.detect().installed ? 'reason.no_repository' : 'reason.no_git'),
       },
     };
   });
@@ -496,7 +605,7 @@ function createApi(services) {
     const proj = project(ctx);
     const body = await readJsonBody(req, JSON_LIMIT);
     let result;
-    const saved = await history.record(services, proj, { kind: 'approval', title: `Approved ${String(body.candidate || '').split('/').pop()}` }, () => {
+    const saved = await history.record(services, proj, { kind: 'approval', title: msg('activity.approved_asset', { candidate: String(body.candidate || '').split('/').pop() }) }, () => {
       result = approvals.approveAsset(proj, body);
     });
     return Object.assign({}, result, {
@@ -513,7 +622,7 @@ function createApi(services) {
     const result = approvals.approvePlans(proj, body);
     const activity = proj.addActivity({
       kind: 'approval',
-      title: `${body.approved === false ? 'Withdrew the approval of' : 'Approved'} the plan of ${result.pages.map((p) => p.page).join(', ')}`,
+      title: msg(body.approved === false ? 'activity.plan_unapproved' : 'activity.plan_approved', { pages: result.pages.map((p) => p.page) }),
       actor: 'person',
     });
     events.emit(proj.id, 'activity', { entry: activity });
@@ -524,7 +633,7 @@ function createApi(services) {
     const proj = project(ctx);
     const body = await readJsonBody(req, JSON_LIMIT);
     let result;
-    const saved = await history.record(services, proj, { kind: 'approval', title: `Approved page ${String(body.page || '')}` }, () => {
+    const saved = await history.record(services, proj, { kind: 'approval', title: msg('activity.approved_page', { page: String(body.page || '') }) }, () => {
       result = approvals.approvePage(proj, body);
     });
     return Object.assign({}, result, { commit: saved.commit });
@@ -534,7 +643,7 @@ function createApi(services) {
     const proj = project(ctx);
     const body = await readJsonBody(req, JSON_LIMIT);
     let result;
-    const saved = await history.record(services, proj, { kind: 'approval', title: `Approved the cover of ${String(body.issue || 'ISS_001')}` }, () => {
+    const saved = await history.record(services, proj, { kind: 'approval', title: msg('activity.approved_cover', { issue: String(body.issue || 'ISS_001') }) }, () => {
       result = approvals.approveCover(proj, body);
     });
     return Object.assign({}, result, { commit: saved.commit });
@@ -561,7 +670,7 @@ function createApi(services) {
       elements: result.elements,
       errors: result.errors,
       warnings: result.warnings,
-      note: 'Draw this SVG on a canvas at its width and height, export a PNG, and send it to POST /pages/<PAGE_ID>/lettered.',
+      note: msg('note.lettering_svg'),
     };
   });
 
@@ -582,7 +691,7 @@ function createApi(services) {
     }
     if (!['png', 'jpeg'].includes(info.format)) throw new HttpError(415, 'not_an_image', 'Send the lettered page as a PNG or JPEG image.');
     let result;
-    const saved = await history.record(services, proj, { kind: 'lettering', title: `Stored the lettered image of ${pageId}` }, () => {
+    const saved = await history.record(services, proj, { kind: 'lettering', title: msg('activity.lettered', { page: pageId }) }, () => {
       try {
         result = S.registerLetteredFile({ root, page: pageId, render, file: body });
       } catch (err) {

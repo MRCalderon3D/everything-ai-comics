@@ -6,7 +6,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { HttpError, isFile } = require('./util');
+const i18n = require('./i18n');
+const { HttpError, errorText, isFile } = require('./util');
 
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -155,15 +156,23 @@ function sendJson(res, status, value, headers = {}) {
   res.end(res.req && res.req.method === 'HEAD' ? undefined : body);
 }
 
-function sendError(res, err) {
+/**
+ * Send an error as { error: { code, message, params, details? } }. The
+ * message is the dictionary's sentence for the code, in the language of the
+ * request; `params` are the values that went into it.
+ */
+function sendError(res, err, lang = i18n.DEFAULT_LANG) {
   const status = err && err.status ? err.status : 500;
+  const code = (err && err.code && typeof err.code === 'string' && err.status) ? err.code : (status === 500 ? 'internal' : 'error');
+  const text = errorText({ code, message: err && err.message ? err.message : 'Unexpected error.', params: err && err.params, text: err && err.text });
   const body = {
     error: {
-      code: (err && err.code && typeof err.code === 'string' && err.status) ? err.code : (status === 500 ? 'internal' : 'error'),
-      message: err && err.message ? err.message : 'Unexpected error.',
+      code,
+      message: i18n.render(lang, text),
+      params: i18n.plainParams(lang, text.params),
     },
   };
-  if (err && err.details !== undefined) body.error.details = err.details;
+  if (err && err.details !== undefined) body.error.details = i18n.localize(lang, err.details);
   if (res.headersSent) {
     res.end();
     return;

@@ -8,6 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const S = require('../scaffold');
+const { msg } = require('../i18n');
 const pipeline = require('../pipeline');
 const { runAi } = require('../ai');
 const { str, int } = require('./shared');
@@ -16,8 +17,6 @@ const SOURCE = 'story/source/description.md';
 
 module.exports = {
   name: 'project.setup',
-  title: 'Set up the project',
-  summary: 'Fills the project metadata and writes the story bible and the series plan from a description.',
   params: [
     { name: 'description', type: 'string', required: true, description: 'What the comic is about, in the person\'s words.' },
     { name: 'pages', type: 'integer', required: false, description: 'Page budget of the first issue, 1 to 200. Default 4.' },
@@ -29,9 +28,9 @@ module.exports = {
 
   steps() {
     return [
-      { id: 'source', label: 'Save the description' },
-      { id: 'story', label: 'Write the story bible and the series plan' },
-      { id: 'check', label: 'Check the files' },
+      { id: 'source', label: msg('step.project.setup.source') },
+      { id: 'story', label: msg('step.project.setup.story') },
+      { id: 'check', label: msg('step.check.files') },
     ];
   },
 
@@ -58,7 +57,7 @@ module.exports = {
     const check = await ctx.step('check', (h) => {
       const result = pipeline.mechanical(root, null);
       for (const e of result.validation.errors.slice(0, 20)) h.log(`error ${e.file}: ${e.message}`);
-      h.note(result.errors ? `${result.errors} problem(s) to look at` : 'No problems found');
+      h.note(result.errors ? msg('note.problems', { n: result.errors }) : msg('note.no_problems'));
       return { errors: result.validation.errors, warnings: result.validation.warnings.length };
     });
 

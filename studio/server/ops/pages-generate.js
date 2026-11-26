@@ -13,9 +13,10 @@
  */
 
 const S = require('../scaffold');
+const { msg } = require('../i18n');
 const pipeline = require('../pipeline');
 const { OpError } = require('../jobs');
-const { HttpError, nowIso } = require('../util');
+const { HttpError, errorText, nowIso } = require('../util');
 const {
   bool, bad, matching, requireIssue, lookState, renderReviewRepair, rethrowIfFatal, ISSUE_RE, PAGE_RE,
 } = require('./shared');
@@ -26,8 +27,6 @@ function numberOf(pageId) {
 
 module.exports = {
   name: 'pages.generate',
-  title: 'Draw pages',
-  summary: 'Draws pages in order: reference plan, prompt, drawing, automatic check, and automatic repair up to the repair limit.',
   params: [
     { name: 'pages', type: 'string[]', required: false, description: 'Page IDs to draw. Default: every page of the issue that has no passing render.' },
     { name: 'issue', type: 'string', required: false, description: 'Issue ID, used when "pages" is absent. Default ISS_001.' },
@@ -60,7 +59,7 @@ module.exports = {
     const pick = services.drivers.pick('draw', project.settings());
     if (!pick.available || !S.providerIds().includes('codex-cli')) {
       throw new HttpError(409, 'no_draw_tool',
-        `${pick.reason || 'The scaffold has no codex-cli image provider.'} Use the manual handoff (page.manual): the studio prepares the prompt and the references, and you upload the image.`);
+        msg('error.no_draw_tool', { reason: pick.reason || msg('reason.no_codex_provider') }));
     }
     if (!lookState(project).master) {
       throw new HttpError(409, 'look_not_approved', 'Approve a look page first: every page is drawn from the approved look.');
@@ -75,7 +74,7 @@ module.exports = {
       if (pending.length) {
         throw new HttpError(409, 'plan_not_approved',
           `The plan of ${pending.join(', ')} is not approved, or changed after it was. Approve it (POST /approve/plan) or send "approve_plans": true.`,
-          { pages: pending });
+          { pages: pending }, { pages: pending });
       }
     }
     return { pages, approve_plans: approve, regenerate };
@@ -85,9 +84,9 @@ module.exports = {
     const out = [];
     for (const id of params.pages) {
       const n = numberOf(id);
-      out.push({ id: `${id}:prepare`, label: `Page ${n}: references and prompt` });
-      out.push({ id: `${id}:draw`, label: `Page ${n}: draw` });
-      out.push({ id: `${id}:review`, label: `Page ${n}: check` });
+      out.push({ id: `${id}:prepare`, label: msg('step.page.prepare', { n }) });
+      out.push({ id: `${id}:draw`, label: msg('step.page.draw', { n }) });
+      out.push({ id: `${id}:review`, label: msg('step.page.review', { n }) });
     }
     return out;
   },
@@ -96,7 +95,7 @@ module.exports = {
     const { project, params } = ctx;
     const root = project.root;
     const target = pipeline.drawTarget(ctx);
-    if (!target.available) throw new OpError('no_draw_tool', `${target.reason} Use the manual handoff instead.`);
+    if (!target.available) throw new OpError('no_draw_tool', msg('error.no_draw_tool', { reason: target.reason }));
 
     if (params.approve_plans) {
       const approvals = Object.assign({}, project.state().plan_approvals);
@@ -112,12 +111,12 @@ module.exports = {
       const stepIds = [`${pageId}:prepare`, `${pageId}:draw`, `${pageId}:review`];
       const before = S.ws.loadPage(root, pageId);
       if (!before) {
-        for (const id of stepIds) ctx.skipStep(id, 'The page file is gone');
-        results.push({ page: pageId, error: { code: 'page_missing', message: `${pageId} has no page.yaml.` } });
+        for (const id of stepIds) ctx.skipStep(id, msg('skip.page_gone'));
+        results.push({ page: pageId, error: { code: 'page_missing', message: errorText({ code: 'page_missing', message: `${pageId} has no page.yaml.` }) } });
         continue;
       }
       if (!params.regenerate && ['reviewed', 'approved'].includes(before.status)) {
-        for (const id of stepIds) ctx.skipStep(id, 'Already has a render that passed its check');
+        for (const id of stepIds) ctx.skipStep(id, msg('skip.already_passed'));
         results.push({ page: pageId, render: before.current_render, skipped: true });
         continue;
       }
@@ -129,31 +128,31 @@ module.exports = {
           for (const warning of compiled.warnings) h.log(`warning: ${warning}`);
           const page = S.ws.loadPage(root, pageId);
           if (page && ['planned', 'scripted'].includes(page.status)) pipeline.setPageState(root, pageId, { status: 'prompted' });
-          h.note(`${compiled.pkg.references.length} reference image(s)`);
+          h.note(msg('note.references', { n: compiled.pkg.references.length }));
           return { file: compiled.file, package: compiled.rel, references: compiled.pkg.references.map((r) => r.asset_id) };
         });
         const outcome = await renderReviewRepair(ctx, {
           owner: { kind: 'page', id: pageId, issue: S.ws.issueOfPage(pageId) },
           prefix: `${pageId}:`,
-          label: `Page ${n}`,
+          kind: 'page',
+          number: n,
           compileGenerate: () => ({ file: prepared.file }),
           compileRepair: (review) => pipeline.compilePage(root, pageId, target.provider, { repairReview: review, model: target.model || undefined }),
         });
         results.push(Object.assign({ page: pageId }, outcome));
       } catch (err) {
         rethrowIfFatal(err);
-        for (const id of stepIds) ctx.skipStep(id, 'Not reached');
+        for (const id of stepIds) ctx.skipStep(id, msg('skip.not_reached'));
         ctx.log(`${pageId} was not finished: ${err.message}`);
-        results.push({ page: pageId, error: { code: typeof err.code === 'string' ? err.code : 'failed', message: err.message } });
+        results.push({ page: pageId, error: { code: typeof err.code === 'string' ? err.code : 'failed', message: errorText(err) } });
       }
     }
 
     const failed = results.filter((r) => r.error);
     const drawn = results.filter((r) => r.render && !r.skipped);
     if (failed.length && !drawn.length && !results.some((r) => r.skipped)) {
-      throw new OpError(failed[0].error.code, failed.length === 1
-        ? failed[0].error.message
-        : `None of the ${failed.length} pages could be drawn. The first problem: ${failed[0].error.message}`, { pages: failed });
+      // The job fails with the reason of the first page that could not be drawn.
+      throw new OpError(failed[0].error.code, failed[0].error.message, { pages: failed });
     }
     return {
       pages: results,

@@ -8,14 +8,13 @@
 const fs = require('fs');
 const path = require('path');
 const pipeline = require('../pipeline');
+const { msg } = require('../i18n');
 const { runAi } = require('../ai');
 const { safeName } = require('../security');
 const { str, bad } = require('./shared');
 
 module.exports = {
   name: 'story.update',
-  title: 'Update the story',
-  summary: 'Applies a change the person describes, or analyses an uploaded source text, and updates the story bible.',
   params: [
     { name: 'instruction', type: 'string', required: false, description: 'What to change in the story.' },
     { name: 'source_upload', type: 'string', required: false, description: 'Id of an uploaded text file (txt, md, fountain) to use as source.' },
@@ -31,9 +30,9 @@ module.exports = {
 
   steps(params) {
     return [
-      ...(params.source_upload ? [{ id: 'source', label: 'Add the source text' }] : []),
-      { id: 'update', label: 'Update the story bible' },
-      { id: 'check', label: 'Check the files' },
+      ...(params.source_upload ? [{ id: 'source', label: msg('step.story.update.source') }] : []),
+      { id: 'update', label: msg('step.story.update.update') },
+      { id: 'check', label: msg('step.check.files') },
     ];
   },
 
@@ -64,7 +63,7 @@ module.exports = {
     }), { verb: 'plan' });
     const check = await ctx.step('check', (h) => {
       const result = pipeline.mechanical(root, null);
-      h.note(result.errors ? `${result.errors} problem(s) to look at` : 'No problems found');
+      h.note(result.errors ? msg('note.problems', { n: result.errors }) : msg('note.no_problems'));
       return { errors: result.validation.errors, continuity: result.continuity.filter((f) => f.severity === 'error') };
     });
     return {

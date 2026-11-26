@@ -6,14 +6,13 @@
  */
 
 const S = require('../scaffold');
+const { msg } = require('../i18n');
 const pipeline = require('../pipeline');
 const { HttpError } = require('../util');
 const { bad, RENDER_RE, PAGE_RE } = require('./shared');
 
 module.exports = {
   name: 'page.review',
-  title: 'Check a page again',
-  summary: 'Runs the visual review again for one render of a page or a cover.',
   params: [
     { name: 'render', type: 'string', required: false, description: 'Render ID (PG_001_002_V01 or CV_001_V01).' },
     { name: 'page', type: 'string', required: false, description: 'Page ID: reviews its current render. Used when "render" is absent.' },
@@ -36,7 +35,7 @@ module.exports = {
   },
 
   steps() {
-    return [{ id: 'review', label: 'Check the image against the plan' }];
+    return [{ id: 'review', label: msg('step.page.review.again') }];
   },
 
   async run(ctx) {

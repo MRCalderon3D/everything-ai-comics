@@ -14,6 +14,9 @@ const fs = require('fs');
 const path = require('path');
 const S = require('./scaffold');
 const prompts = require('./prompts');
+const i18n = require('./i18n');
+
+const { msg } = i18n;
 const { runAi, TOOL_LABELS } = require('./ai');
 const { OpError } = require('./jobs');
 const { abortError, today, toPosix } = require('./util');
@@ -172,7 +175,7 @@ function drawTarget(ctx) {
   const pick = ctx.services.drivers.pick('draw', settings);
   const hasCodexCli = S.providerIds().includes('codex-cli');
   if (pick.available && !hasCodexCli) {
-    return { available: false, provider: 'manual', tool: null, model: null, reason: 'The scaffold has no codex-cli image provider.' };
+    return { available: false, provider: 'manual', tool: null, model: null, reason: msg('reason.no_codex_provider') };
   }
   return {
     available: pick.available,
@@ -218,17 +221,32 @@ function buildPlan(root, pageId, provider) {
  */
 function pageBlockers(root, pageId, provider) {
   const page = S.ws.loadPage(root, pageId);
-  if (!page) return [{ code: 'page_missing', message: `${pageId} has no page.yaml.` }];
+  if (!page) return [blockerOf('page_missing', `${pageId} has no page.yaml.`, pageId)];
   const out = [];
   if (!S.ws.loadStyleBlock(root)) {
-    out.push({ code: 'style_block_missing', message: 'The style is not defined yet: there is no style block.' });
+    out.push(blockerOf('style_block_missing', 'The style is not defined yet: there is no style block.', pageId));
   }
   try {
     S.buildReferencePlan(root, page, { providerId: provider });
   } catch (err) {
-    out.push({ code: err.code || 'reference_plan_failed', message: pipelineMessage(err) });
+    out.push(blockerOf(err.code || 'reference_plan_failed', pipelineMessage(err), pageId));
   }
   return out;
+}
+
+/**
+ * One blocker: { code, message, detail }. `message` is the sentence the
+ * person reads (blocker.<code> in the dictionary); `detail` keeps the
+ * scaffold script's own text, which names the files and the fix.
+ */
+function blockerOf(code, detail, pageId) {
+  const key = i18n.has(`blocker.${code}`) ? `blocker.${code}` : 'blocker.other';
+  const who = /\b((?:CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*?)(?:_[A-Z]+)?(?:_MASTER)?(?:_V\d{2})?\b/.exec(String(detail || ''));
+  return {
+    code,
+    message: msg(key, { page: pageId || '', entity: who ? who[1] : '', detail: String(detail || '') }),
+    detail: String(detail || ''),
+  };
 }
 
 /** Compile and write the prompt package of a page (a repair when repairReview is given). */
@@ -342,7 +360,7 @@ async function draw(ctx, handle, packageFile, options = {}) {
   const error = record.response && record.response.error;
   if (record.status !== 'succeeded') {
     if (error === 'cancelled' || ctx.signal.aborted) throw abortError();
-    throw new OpError('draw_failed', `The image was not drawn: ${error || `the record ended as ${record.status}`}`);
+    throw new OpError('draw_failed', msg('error.draw_failed', { detail: error || `the record ended as ${record.status}` }));
   }
   const media = (record.media_files || [])[0] || null;
   if (!media || !fs.existsSync(S.ws.abs(root, media))) {
@@ -399,6 +417,8 @@ function composeReview(input) {
     owner, render, supersedes, previous, existing, returned, independent, repairCycle, references, neighbors,
     toolLabel, panelIds, notApplicable,
   } = input;
+  // The words the studio adds to a review file are in the project's interface language.
+  const say = (key, params) => i18n.t(input.lang || 'en', key, params);
   const requests = Array.isArray(input.requests) ? input.requests : [];
   const data = returned && typeof returned === 'object' ? returned : {};
 
@@ -410,12 +430,12 @@ function composeReview(input) {
     if (notApplicable.includes(key) && result !== 'fail') {
       checks[key] = {
         result: 'not_applicable',
-        evidence: cleanText(given && given.evidence, 'A cover has no panel ledger and no sequence for this check to judge.'),
+        evidence: cleanText(given && given.evidence, say('review.evidence.cover_na')),
       };
     } else if (result) {
-      checks[key] = { result, evidence: cleanText(given.evidence, 'The reviewer gave no evidence for this check.') };
+      checks[key] = { result, evidence: cleanText(given.evidence, say('review.evidence.missing')) };
     } else {
-      checks[key] = { result: 'not_performed', evidence: 'The reviewer returned no result for this check.' };
+      checks[key] = { result: 'not_performed', evidence: say('review.evidence.not_returned') };
     }
   }
 
@@ -438,7 +458,7 @@ function composeReview(input) {
         const re = rechecks.get(String(f.id));
         if (re && re.fixed === true) {
           copy.status = 'fixed';
-          copy.recheck = { render, evidence: cleanText(re.evidence, `Rechecked in ${render}.`) };
+          copy.recheck = { render, evidence: cleanText(re.evidence, say('review.recheck.default', { render })) };
         }
       }
       findings.push(copy);
@@ -453,15 +473,15 @@ function composeReview(input) {
       id: nextFindingId(findings),
       panel: null,
       source: 'user_request',
-      expected: 'The requested change shows in the new drawing.',
-      visible: cleanText(re && re.evidence, 'The reviewer did not say whether the change is visible.'),
+      expected: say('review.request.expected'),
+      visible: cleanText(re && re.evidence, say('review.request.visible_missing')),
       severity: 'minor',
-      repair: cleanText(request.text, 'The change the person asked for.'),
+      repair: cleanText(request.text, say('review.request.repair_default')),
       status: 'open',
     };
     if (re && re.fixed === true) {
       finding.status = 'fixed';
-      finding.recheck = { render, evidence: cleanText(re.evidence, `Seen in ${render}.`) };
+      finding.recheck = { render, evidence: cleanText(re.evidence, say('review.recheck.default', { render })) };
     }
     findings.push(finding);
   }
@@ -473,10 +493,10 @@ function composeReview(input) {
       id: nextFindingId(findings),
       panel: f.panel && panelIds.includes(String(f.panel)) ? String(f.panel) : null,
       check: prompts.REVIEW_CHECKS.includes(f.check) ? f.check : 'drawing_clarity',
-      expected: cleanText(f.expected, 'What the plan describes.'),
-      visible: cleanText(f.visible, 'The reviewer did not describe what is visible.'),
+      expected: cleanText(f.expected, say('review.finding.expected_default')),
+      visible: cleanText(f.visible, say('review.finding.visible_default')),
       severity: f.severity === 'minor' ? 'minor' : 'blocking',
-      repair: cleanText(f.repair, 'Correct what the finding describes.'),
+      repair: cleanText(f.repair, say('review.finding.repair_default')),
       status: 'open',
     };
     findings.push(finding);
@@ -490,10 +510,10 @@ function composeReview(input) {
       id: nextFindingId(findings),
       panel: null,
       check: key,
-      expected: `The ${key.replace(/_/g, ' ')} check passes.`,
+      expected: say('review.failed_check.expected', { check: key.replace(/_/g, ' ') }),
       visible: checks[key].evidence,
       severity: 'blocking',
-      repair: 'Correct what the evidence of this check describes.',
+      repair: say('review.failed_check.repair'),
       status: 'open',
     });
   }
@@ -534,9 +554,9 @@ function composeReview(input) {
     reviewed_at: today(),
     human_approval: { status: 'pending', by: null, at: null },
     notes: [
-      `Automated reading by ${toolLabel} through the studio. It is evidence to look at, not a guarantee.`,
+      say('review.note.automated', { tool: toolLabel }),
       input.lineageNote || null,
-      independent ? null : 'Not independent: the tool that reviewed this image is the tool that drew it. Give it a second look before approving.',
+      independent ? null : say('review.note.not_independent'),
     ].filter(Boolean).join(' '),
   };
   return doc;
@@ -564,6 +584,7 @@ async function reviewRender(ctx, handle, options) {
   if (!doc) throw new OpError('plan_missing', `${owner.id} has no plan file to review the image against.`);
   const project = ws.loadProject(root) || {};
   const isCover = owner.kind === 'cover';
+  const lang = i18n.normalize(ctx.project.settings().language) || 'en';
 
   const existing = ws.loadReview(root, render);
   const supersedes = options.supersedes || (existing && existing.supersedes) || null;
@@ -662,7 +683,7 @@ async function reviewRender(ctx, handle, options) {
   });
   const returned = result.data && result.data.review;
   if (!returned || typeof returned !== 'object') {
-    throw new OpError('ai_bad_result', `${TOOL_LABELS[result.tool]} returned no review.`);
+    throw new OpError('ai_bad_result', msg('error.ai_bad_result', { tool: TOOL_LABELS[result.tool], detail: 'no review in the result' }));
   }
 
   const drawer = drawerOf(root, render);
@@ -679,10 +700,11 @@ async function reviewRender(ctx, handle, options) {
     references: refs.map((a) => String(a.asset_id)),
     neighbors: neighbor ? [neighbor.render] : [],
     toolLabel: TOOL_LABELS[result.tool] || result.tool,
+    lang,
     panelIds: isCover ? [] : (Array.isArray(doc.panels) ? doc.panels.map((p) => p && p.id).filter(Boolean) : []),
     notApplicable,
     requests,
-    lineageNote: options.lineageNote || null,
+    lineageNote: options.lineageNote ? i18n.render(lang, options.lineageNote) : null,
   });
   const problems = S.schemaFindings('visual-review', review);
   if (problems.length) {
@@ -698,9 +720,9 @@ async function reviewRender(ctx, handle, options) {
     setPageState(root, owner.id, { status: passes ? 'reviewed' : 'rendered', current_render: render });
   }
   if (passes && supersedes) {
-    markRejected(root, supersedes, `Replaced by ${render} after review.`);
+    markRejected(root, supersedes, i18n.t(lang, 'record.replaced', { render }));
   } else if (passes && options.replaces) {
-    markRejected(root, options.replaces, `Replaced by ${render}, drawn again from an updated plan.`);
+    markRejected(root, options.replaces, i18n.t(lang, 'record.replaced_redraw', { render }));
   }
   const open = review.findings.filter((f) => f.status === 'open');
   const outcome = outcomeOf(review);
@@ -713,10 +735,10 @@ async function reviewRender(ctx, handle, options) {
     (blocking.length > 0 || (gateFailed && open.length > 0));
   let why = null;
   if (!passes && !repairable) {
-    if (returned.repairable === false) why = 'The review says another render would repeat the problem: the cause is in the plan or the references.';
-    else if (open.some((f) => f.source === 'user_request')) why = 'The requested change is not visible in the new version. Send the correction again, or change the plan.';
-    else if (gateFailed) why = 'A gate of the review failed with no finding to repair. Check the page again.';
-    else why = 'The review is incomplete: a check was not made. Check the page again.';
+    if (returned.repairable === false) why = msg('stopped.upstream');
+    else if (open.some((f) => f.source === 'user_request')) why = msg('stopped.request_open');
+    else if (gateFailed) why = msg('stopped.gate_no_finding');
+    else why = msg('stopped.incomplete');
   }
   handle.log(`review of ${render}: ${review.verdict}${open.length ? `, ${open.length} open finding(s), ${blocking.length} blocking` : ''}${independent ? '' : ' (not independent)'}`);
   return {
@@ -765,6 +787,7 @@ module.exports = {
   compileProvider,
   buildPlan,
   pageBlockers,
+  blockerOf,
   compilePage,
   compileSheet,
   compileCover,

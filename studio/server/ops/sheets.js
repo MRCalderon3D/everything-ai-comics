@@ -9,17 +9,12 @@
  */
 
 const pipeline = require('../pipeline');
+const { msg, render } = require('../i18n');
 const { OpError } = require('../jobs');
 const { lookState } = require('./shared');
 
-const LABELS = {
-  turnaround: 'turnaround sheet',
-  expressions: 'expressions sheet',
-  wardrobe: 'wardrobe sheet',
-  plate: 'location plate',
-  prop: 'prop sheet',
-  detail: 'detail study',
-};
+/** Sheet kinds that have step labels of their own in the dictionary. */
+const KINDS = ['turnaround', 'expressions', 'wardrobe', 'plate', 'prop', 'detail'];
 
 function stepIds(kind, prefix = '') {
   return { compile: `${prefix}sheet-compile`, draw: `${prefix}sheet-draw`, kind };
@@ -27,10 +22,11 @@ function stepIds(kind, prefix = '') {
 
 /** The two steps of a sheet, for an operation's step list. */
 function steps(kind, prefix = '', subject = '') {
-  const what = `${LABELS[kind] || 'sheet'}${subject ? ` of ${subject}` : ''}`;
+  const which = KINDS.includes(kind) ? kind : 'turnaround';
+  const of = subject ? '.of' : '';
   return [
-    { id: `${prefix}sheet-compile`, label: `Prepare the ${what}` },
-    { id: `${prefix}sheet-draw`, label: `Draw the ${what}` },
+    { id: `${prefix}sheet-compile`, label: msg(`step.sheet.compile.${which}${of}`, { subject }) },
+    { id: `${prefix}sheet-draw`, label: msg(`step.sheet.draw.${which}${of}`, { subject }) },
   ];
 }
 
@@ -48,18 +44,18 @@ async function draw(ctx, entityId, kind, options = {}) {
   const root = project.root;
   const ids = stepIds(kind, options.prefix || '');
   const skip = (reason) => {
-    if (options.strict) throw new OpError('sheet_blocked', reason);
+    if (options.strict) throw new OpError('sheet_blocked', msg('error.sheet_blocked', { reason }));
     ctx.skipStep(ids.compile, reason);
     ctx.skipStep(ids.draw, reason);
-    ctx.log(`sheet not drawn: ${reason}`);
+    ctx.log(`sheet not drawn: ${render('en', reason)}`);
     return { skipped: true, reason };
   };
   if (!lookState(project).master) {
-    return skip('The look is not approved yet. Draw a look page and approve it, then draw this sheet.');
+    return skip(msg('skip.look_not_approved.sheet'));
   }
   const target = pipeline.drawTarget(ctx);
   if (!target.available) {
-    return skip(`${target.reason} Use the manual handoff to make this sheet by hand.`);
+    return skip(msg('skip.no_draw_tool.sheet', { reason: target.reason }));
   }
   const compiled = await ctx.step(ids.compile, (h) => {
     const result = pipeline.compileSheet(root, entityId, target.provider, {
@@ -87,4 +83,4 @@ async function draw(ctx, entityId, kind, options = {}) {
   };
 }
 
-module.exports = { steps, draw, LABELS };
+module.exports = { steps, draw, KINDS };

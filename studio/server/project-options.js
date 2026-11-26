@@ -8,6 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const S = require('./scaffold');
+const { msg } = require('./i18n');
 const { HttpError } = require('./util');
 
 const FORMATS = ['paged', 'webtoon'];
@@ -19,10 +20,10 @@ const RATINGS = ['all-ages', 'teen', 'mature'];
 
 /** Page sizes offered in the form. Width and height in pixels at the listed ratio. */
 const PAGE_SIZES = [
-  { id: 'comic-2-3', label: 'Comic page 2:3', aspect_ratio: '2:3', width_px: 2000, height_px: 3000, formats: ['paged'] },
-  { id: 'album-3-4', label: 'Album page 3:4', aspect_ratio: '3:4', width_px: 2100, height_px: 2800, formats: ['paged'] },
-  { id: 'square', label: 'Square 1:1', aspect_ratio: '1:1', width_px: 2048, height_px: 2048, formats: ['paged'] },
-  { id: 'scroll-9-16', label: 'Scroll segment 9:16', aspect_ratio: '9:16', width_px: 1080, height_px: 1920, formats: ['webtoon'] },
+  { id: 'comic-2-3', label: msg('page_size.comic-2-3'), aspect_ratio: '2:3', width_px: 2000, height_px: 3000, formats: ['paged'] },
+  { id: 'album-3-4', label: msg('page_size.album-3-4'), aspect_ratio: '3:4', width_px: 2100, height_px: 2800, formats: ['paged'] },
+  { id: 'square', label: msg('page_size.square'), aspect_ratio: '1:1', width_px: 2048, height_px: 2048, formats: ['paged'] },
+  { id: 'scroll-9-16', label: msg('page_size.scroll-9-16'), aspect_ratio: '9:16', width_px: 1080, height_px: 1920, formats: ['webtoon'] },
 ];
 
 function bad(message) {

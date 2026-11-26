@@ -6,14 +6,13 @@
  */
 
 const S = require('../scaffold');
+const { msg } = require('../i18n');
 const { runAi } = require('../ai');
 const { str, bool, matching, requireIssue, ISSUE_RE } = require('./shared');
 const sheets = require('./sheets');
 
 module.exports = {
   name: 'entities.derive',
-  title: 'Write places and objects',
-  summary: 'Writes location and prop files for whatever the planned pages need, and can draw location plates.',
   params: [
     { name: 'issue', type: 'string', required: false, description: 'Limit the scope to one issue (ISS_001). Default: the whole project.' },
     { name: 'text', type: 'string', required: false, description: 'What happens on the pages being planned, when they are not written yet.' },
@@ -27,7 +26,7 @@ module.exports = {
   },
 
   steps() {
-    return [{ id: 'write', label: 'Write the locations and props' }];
+    return [{ id: 'write', label: msg('step.entities.derive.write') }];
   },
 
   async run(ctx) {

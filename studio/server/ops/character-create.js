@@ -6,6 +6,7 @@
  */
 
 const S = require('../scaffold');
+const { msg } = require('../i18n');
 const prompts = require('../prompts');
 const { runAi } = require('../ai');
 const { OpError } = require('../jobs');
@@ -15,8 +16,6 @@ const sheets = require('./sheets');
 
 module.exports = {
   name: 'character.create',
-  title: 'Add a character',
-  summary: 'Writes the character and wardrobe files from a name, a description and optional photos, then draws the turnaround sheet.',
   params: [
     { name: 'name', type: 'string', required: true, description: 'The character\'s name.' },
     { name: 'description', type: 'string', required: false, description: 'Who they are and what they look like.' },
@@ -31,15 +30,15 @@ module.exports = {
     if (!description && !uploads.length) throw bad('Describe the character, upload a photo, or both.');
     const id = `CHAR_${idToken(name)}`;
     if (S.ws.loadCharacter(project.root, id)) {
-      throw new HttpError(409, 'character_exists', `${id} already exists. Change it with character.update, or use another name.`, { character: id });
+      throw new HttpError(409, 'character_exists', `${id} already exists. Change it with character.update, or use another name.`, { character: id }, { character: id });
     }
     return { name, description, uploads, draw: bool(params, 'draw', true), character: id };
   },
 
   steps(params) {
     return [
-      ...(params.uploads.length ? [{ id: 'photos', label: 'File the photos' }] : []),
-      { id: 'write', label: 'Write the character' },
+      ...(params.uploads.length ? [{ id: 'photos', label: msg('step.photos') }] : []),
+      { id: 'write', label: msg('step.character.create.write') },
       ...(params.draw ? sheets.steps('turnaround') : []),
     ];
   },
@@ -54,7 +53,7 @@ module.exports = {
         role: 'identity',
         kind: 'detail',
         approved: true,
-        note: 'Identity reference supplied by the person through the studio.',
+        note: 'asset.note.identity_ref',
       }));
     }
     const written = await ctx.step('write', (h) => runAi(ctx, h, {

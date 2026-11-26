@@ -18,6 +18,7 @@
 const fs = require('fs');
 const S = require('./scaffold');
 const pipeline = require('./pipeline');
+const i18n = require('./i18n');
 const { HttpError, nowIso, today } = require('./util');
 
 function conflict(err, fallback = 'approval_refused') {
@@ -70,7 +71,57 @@ function approvePlans(project, body) {
  * the review rules again.
  * @returns {object} the updated review document
  */
-function overrule(root, renderId, note) {
+/**
+ * The overrule is kept in the review file's `notes`, the one free field the
+ * visual-review schema has, as a tag a program can read followed by a
+ * sentence a person can read:
+ *
+ *   [overruled 2026-11-27: F01!, gate narrative_continuity; note: "Fine as drawn."] Accepted by the person as drawn.
+ *
+ * `F01!` marks a finding the reviewer had recorded as blocking.
+ */
+function overruleTag(items, note) {
+  const text = note ? `; note: ${JSON.stringify(String(note).replace(/\s+/g, ' ').trim().slice(0, 300))}` : '';
+  return `[overruled ${today()}: ${items.join(', ')}${text}]`;
+}
+
+/**
+ * Read the overrule back from a review's notes.
+ * @returns {{overruled: boolean, overruled_at: string|null, overrule_note: string|null, overruled_items: string[]}}
+ */
+function parseOverrule(notes) {
+  const none = { overruled: false, overruled_at: null, overrule_note: null, overruled_items: [] };
+  const text = String(notes || '');
+  const tags = [...text.matchAll(/\[overruled (\d{4}-\d{2}-\d{2}): ([^;\]]*)(?:; note: ("(?:[^"\\]|\\.)*"))?\]/g)];
+  if (tags.length) {
+    const m = tags[tags.length - 1];
+    let note = null;
+    try {
+      note = m[3] ? JSON.parse(m[3]) : null;
+    } catch (err) {
+      note = null;
+    }
+    return {
+      overruled: true,
+      overruled_at: m[1],
+      overrule_note: note,
+      overruled_items: m[2].split(',').map((s) => s.trim()).filter(Boolean),
+    };
+  }
+  // The sentence earlier versions of the studio wrote.
+  const old = /Overruled by the person on (\d{4}-\d{2}-\d{2}): (.*?) accepted as drawn\.(?: Their note: (.*))?$/.exec(text);
+  if (old) {
+    return {
+      overruled: true,
+      overruled_at: old[1],
+      overrule_note: old[3] ? old[3].trim() : null,
+      overruled_items: old[2].split(',').map((s) => s.trim()).filter(Boolean),
+    };
+  }
+  return none;
+}
+
+function overrule(root, renderId, note, lang) {
   const file = S.ws.reviewFile(root, renderId);
   const review = S.ws.loadReview(root, renderId);
   if (!review) throw new HttpError(409, 'no_review', `${renderId} has no review yet. Check it first.`);
@@ -84,7 +135,7 @@ function overrule(root, renderId, note) {
     if (!finding || finding.status !== 'open') continue;
     if (finding.severity === 'blocking') {
       finding.severity = 'minor';
-      overruled.push(`${finding.id} (recorded as blocking by the reviewer)`);
+      overruled.push(`${finding.id}!`);
     } else {
       overruled.push(finding.id);
     }
@@ -104,8 +155,8 @@ function overrule(root, renderId, note) {
       if (check && check.result === 'fail') {
         findings.push({
           id: `F${String(findings.length + 1).padStart(2, '0')}`, panel: null, check: key,
-          expected: `The ${key.replace(/_/g, ' ')} check passes.`, visible: check.evidence,
-          severity: 'minor', repair: 'None: accepted by the person.', status: 'accepted',
+          expected: i18n.t(lang, 'review.failed_check.expected', { check: key.replace(/_/g, ' ') }), visible: check.evidence,
+          severity: 'minor', repair: i18n.t(lang, 'review.accepted.repair'), status: 'accepted',
         });
       }
     }
@@ -113,7 +164,7 @@ function overrule(root, renderId, note) {
     if (findings.length) review.verdict = 'fixed';
   }
   if (overruled.length) {
-    const line = `Overruled by the person on ${today()}: ${overruled.join(', ')} accepted as drawn.${note ? ` Their note: ${String(note).replace(/\s+/g, ' ').slice(0, 300)}` : ''}`;
+    const line = `${overruleTag(overruled, note)} ${i18n.t(lang, 'review.note.overruled')}`;
     review.notes = [review.notes, line].filter(Boolean).join(' ');
   }
   const problems = S.schemaFindings('visual-review', review);
@@ -152,6 +203,7 @@ function setHumanApproval(root, renderId, status) {
 /** Approve a rendered page. `overrule: true` is needed when its review is flagged. */
 function approvePage(project, body) {
   const root = project.root;
+  const lang = i18n.normalize(project.settings().language) || 'en';
   const pageId = String(body.page || '');
   const page = S.ws.ID.page.test(pageId) ? S.ws.loadPage(root, pageId) : null;
   if (!page) throw new HttpError(404, 'page_not_found', `${pageId} does not exist in this project.`);
@@ -167,9 +219,9 @@ function approvePage(project, body) {
       const open = (review.findings || []).filter((f) => f && f.status === 'open');
       throw new HttpError(409, 'review_flagged',
         `The check of ${render} is flagged with ${open.length} open finding(s). Ask for a correction, or approve it anyway with "overrule": true.`,
-        { findings: open.map((f) => ({ id: f.id, severity: f.severity, expected: f.expected, visible: f.visible })) });
+        { findings: open.map((f) => ({ id: f.id, severity: f.severity, expected: f.expected, visible: f.visible })) }, { render, n: open.length });
     }
-    review = overrule(root, render, body.note);
+    review = overrule(root, render, body.note, lang);
     overruled = true;
   }
   const accepted = setHumanApproval(root, render, 'approved');
@@ -180,6 +232,7 @@ function approvePage(project, body) {
 /** Approve a rendered cover (cover.yaml: status approved, approved_render). */
 function approveCover(project, body) {
   const root = project.root;
+  const lang = i18n.normalize(project.settings().language) || 'en';
   const issue = String(body.issue || 'ISS_001');
   if (!S.ws.ID.issue.test(issue) || !S.ws.loadCover(root, issue)) {
     throw new HttpError(404, 'no_cover', `${issue} has no cover in this project.`);
@@ -195,9 +248,9 @@ function approveCover(project, body) {
       const open = (review.findings || []).filter((f) => f && f.status === 'open');
       throw new HttpError(409, 'review_flagged',
         `The check of ${render} is flagged with ${open.length} open finding(s). Ask for a correction, or approve it anyway with "overrule": true.`,
-        { findings: open.map((f) => ({ id: f.id, severity: f.severity, expected: f.expected, visible: f.visible })) });
+        { findings: open.map((f) => ({ id: f.id, severity: f.severity, expected: f.expected, visible: f.visible })) }, { render, n: open.length });
     }
-    review = overrule(root, render, body.note);
+    review = overrule(root, render, body.note, lang);
     overruled = true;
   }
   let result;
@@ -210,4 +263,4 @@ function approveCover(project, body) {
   return { issue, cover: result.cover, render, previous: result.previous, verdict: review.verdict, overruled, accepted_notes: accepted, status: 'approved' };
 }
 
-module.exports = { approveAsset, approvePlans, approvePage, approveCover, overrule };
+module.exports = { approveAsset, approvePlans, approvePage, approveCover, overrule, overruleTag, parseOverrule };

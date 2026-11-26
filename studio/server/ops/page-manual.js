@@ -19,6 +19,7 @@ const path = require('path');
 const S = require('../scaffold');
 const pipeline = require('../pipeline');
 const files = require('../files');
+const { msg, t } = require('../i18n');
 const { OpError } = require('../jobs');
 const { HttpError, SCAFFOLD_ROOT } = require('../util');
 const { bad, bool, requirePage, requireIssue, lookState, ISSUE_RE, PAGE_RE, ENTITY_RE } = require('./shared');
@@ -26,31 +27,30 @@ const { bad, bool, requirePage, requireIssue, lookState, ISSUE_RE, PAGE_RE, ENTI
 const SHEETS = ['turnaround', 'expressions', 'wardrobe', 'plate', 'prop', 'look'];
 
 /** The manual provider with a generate() that returns the uploaded image. */
-function uploadProvider(buffer, format, uploadName) {
+function uploadProvider(buffer, format, uploadName, lang) {
   const manual = S.providers.loadImageProvider('manual');
   const common = require(path.join(SCAFFOLD_ROOT, 'providers', 'lib', 'common.js'));
   return Object.assign({}, manual, {
     async generate(requestSpec) {
       const record = common.makeRecord(requestSpec, { status: 'pending' });
-      common.markSucceeded(record, `One image supplied by a person (${uploadName}).`, [`inline image 1 (${format})`]);
+      common.markSucceeded(record, t(lang, 'record.supplied.summary', { name: uploadName }), [`inline image 1 (${format})`]);
       record._media = [{ data_base64: buffer.toString('base64'), format }];
-      record.notes = 'Supplied by a person: made outside the studio and uploaded through it. ' +
-        'The tool that made it, its model, cost and seed were not reported.';
+      record.notes = t(lang, 'record.supplied.notes');
       return record;
     },
   });
 }
 
-function describeTarget(params) {
-  if (params.page) return `page ${parseInt(params.page.slice(-3), 10)}`;
-  if (params.cover) return 'the cover';
-  return `the ${params.sheet} sheet of ${params.entity}`;
+/** The label of the first step, by what the image is for. */
+function prepareLabel(params, handoff) {
+  const base = handoff ? 'step.manual.handoff' : 'step.manual.prepare';
+  if (params.page) return msg(`${base}.page`, { n: parseInt(params.page.slice(-3), 10) });
+  if (params.cover) return msg(`${base}.cover`);
+  return msg(`${base}.sheet`, { sheet: msg(`sheet.${params.sheet}`), entity: params.entity });
 }
 
 module.exports = {
   name: 'page.manual',
-  title: 'Make an image by hand',
-  summary: 'Prepares the handoff for an image the person makes elsewhere, or stores the image they upload as the next version.',
   params: [
     { name: 'page', type: 'string', required: false, description: 'Page ID. One of page, cover, entity is required.' },
     { name: 'cover', type: 'string', required: false, description: 'Issue ID whose cover this is about.' },
@@ -99,12 +99,11 @@ module.exports = {
   },
 
   steps(params) {
-    const what = describeTarget(params);
-    if (!params.upload) return [{ id: 'prepare', label: `Prepare the handoff for ${what}` }];
+    if (!params.upload) return [{ id: 'prepare', label: prepareLabel(params, true) }];
     return [
-      { id: 'prepare', label: `Prepare ${what}` },
-      { id: 'store', label: 'Store the uploaded image' },
-      ...(params.entity ? [] : [{ id: 'review', label: 'Check the image' }]),
+      { id: 'prepare', label: prepareLabel(params, false) },
+      { id: 'store', label: msg('step.manual.store') },
+      ...(params.entity ? [] : [{ id: 'review', label: msg('step.manual.review') }]),
     ];
   },
 
@@ -177,7 +176,7 @@ module.exports = {
       if (!upload) throw new OpError('upload_missing', 'The uploaded image is no longer there. Upload it again.');
       const buffer = fs.readFileSync(project.uploadFile(upload));
       const info = S.imageInfo(buffer);
-      const result = await pipeline.draw(ctx, h, prepared.file, { providerModule: uploadProvider(buffer, info.format, upload.name) });
+      const result = await pipeline.draw(ctx, h, prepared.file, { providerModule: uploadProvider(buffer, info.format, upload.name, project.settings().language) });
       if (params.page) pipeline.setPageState(root, params.page, { status: 'rendered', current_render: result.render });
       h.note(result.file);
       return result;
@@ -194,7 +193,7 @@ module.exports = {
     }
     const look = ctx.services.drivers.pick('look', project.settings());
     if (!look.available) {
-      ctx.skipStep('review', 'No tool is installed to check the image');
+      ctx.skipStep('review', msg('skip.no_review_tool'));
       return { page: params.page, cover: params.cover, render: stored.render, record: stored.record, supplied_by: 'person', reviewed: false };
     }
     const review = await ctx.step('review', (h) => pipeline.reviewRender(ctx, h, { render: stored.render, supersedes: prepared.from }), { verb: 'look' });

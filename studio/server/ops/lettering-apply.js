@@ -10,6 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 const S = require('../scaffold');
+const { msg } = require('../i18n');
 const prompts = require('../prompts');
 const { runAi } = require('../ai');
 const { OpError } = require('../jobs');
@@ -35,8 +36,6 @@ function needsPlacement(root, pageId) {
 
 module.exports = {
   name: 'lettering.apply',
-  title: 'Letter the pages',
-  summary: 'Overlay lettering: places balloons and captions on each page and builds the SVG overlay.',
   needsPlacement,
   params: [
     { name: 'issue', type: 'string', required: false, description: 'Issue ID. Default ISS_001.' },
@@ -71,8 +70,8 @@ module.exports = {
 
   steps() {
     return [
-      { id: 'place', label: 'Place the balloons and captions' },
-      { id: 'overlay', label: 'Build the lettering overlays' },
+      { id: 'place', label: msg('step.lettering.place') },
+      { id: 'overlay', label: msg('step.lettering.overlay') },
     ];
   },
 
@@ -96,7 +95,7 @@ module.exports = {
         images: pending.map((id) => S.ws.renderFile(root, S.ws.loadPage(root, id).current_render)).filter(Boolean).slice(0, 8),
       }), { verb: 'plan' });
     } else {
-      ctx.skipStep('place', 'Every page already has its lettering placed');
+      ctx.skipStep('place', msg('skip.lettering_placed'));
     }
 
     const built = await ctx.step('overlay', (h) => params.pages.map((id) => {

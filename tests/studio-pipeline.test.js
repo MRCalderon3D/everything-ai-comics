@@ -247,7 +247,8 @@ async function main() {
     const fixed = p2.renders[1].review;
     assert.strictEqual(fixed.supersedes, 'PG_001_002_V01');
     assert.deepStrictEqual([fixed.findings[0].status, fixed.findings[0].recheck.render], ['fixed', 'PG_001_002_V02']);
-    assert.ok(/Automated reading/.test(fixed.notes), 'a review says it is an automated reading');
+    // The project's interface language is Spanish, so the words the studio adds to a review file are Spanish.
+    assert.ok(/Lectura automática hecha por Claude Code/.test(fixed.notes), 'a review says it is an automated reading');
     assert.strictEqual(p2.renders[0].generation.status, 'rejected', 'the replaced render\'s record is marked rejected');
     assert.strictEqual(p2.renders[1].generation.status, 'succeeded');
     const [v1, v2] = await Promise.all(p2.renders.map((x) => s.raw('GET', x.image.url)));
@@ -259,6 +260,11 @@ async function main() {
       'the previous page\'s reviewed render is a reference of the next page');
     r = await s.api('GET', `${P}/pages/PG_001_003`);
     assert.ok(r.body.reference_plan.entries.some((e) => e.asset_id === 'PG_001_002_V02'), 'page 3 follows the repaired render of page 2');
+    // Where each panel sits, as the plan says it: tier and place in the tier. The plan has no measured rectangles, so there is no rect.
+    assert.deepStrictEqual(r.body.plan.tiers, [1, 2]);
+    assert.deepStrictEqual(r.body.plan.panels.map((p) => [p.slot.tier, p.slot.tiers, p.slot.slot, p.slot.of]), [[1, 2, 1, 1], [2, 2, 1, 2], [2, 2, 2, 2]]);
+    assert.ok(r.body.plan.panels.every((p) => p.rect === undefined));
+    assert.deepStrictEqual([r.body.plan.text_code, r.body.plan.text.split('\n')[0].startsWith('Página 3: ')], ['plan.text', true]);
     assert.ok(r.body.prompts[0].references.every((ref) => ref.image && ref.image.url));
     assert.strictEqual(r.body.prompts[0].provider, 'codex-cli');
 
@@ -276,7 +282,7 @@ async function main() {
     assertDone(job, 'page.review');
     assert.strictEqual(job.result.independent, false);
     assert.strictEqual(ws.loadReview(root, 'PG_001_003_V01').independent, false);
-    assert.ok(/Not independent/.test(ws.loadReview(root, 'PG_001_003_V01').notes));
+    assert.ok(/No es independiente/.test(ws.loadReview(root, 'PG_001_003_V01').notes));
     r = await s.api('PUT', `${P}/settings`, { drivers: { look: 'claude' } });
     job = await s.runOp(id, 'page.review', { render: 'PG_001_003_V01' });
     assert.strictEqual(job.result.independent, true);
@@ -291,9 +297,9 @@ async function main() {
     });
     assertDone(job, 'page.correct (edit)');
     assert.strictEqual(job.result.path, 'edit');
-    assert.strictEqual(job.result.path_label, 'edited the existing image');
+    assert.deepStrictEqual([job.result.path_label_code, job.result.path_label], ['path.edit', 'Se editó la imagen que ya existía.']);
     assert.deepStrictEqual(job.steps.map((x) => x.id), ['request', 'compile', 'draw', 'review']);
-    assert.ok(/Edit the existing page/.test(job.steps[2].label));
+    assert.deepStrictEqual([job.steps[2].label_code, job.steps[2].label], ['step.correct.draw.edit.page', 'Editar la página que ya existe']);
     assert.deepStrictEqual([job.result.from, job.result.render, job.result.verdict], ['PG_001_001_V01', 'PG_001_001_V02', 'fixed']);
     const requested = ws.loadReview(root, 'PG_001_001_V01');
     const request = requested.findings.find((f) => f.source === 'user_request');
@@ -314,15 +320,16 @@ async function main() {
     job = await s.runOp(id, 'page.correct', { page: 'PG_001_002', text: 'El chico tiene que llevar la capucha puesta.' });
     assertDone(job, 'page.correct (redraw)');
     assert.strictEqual(job.result.path, 'redraw');
-    assert.strictEqual(job.result.path_label, 'redrew it from an updated plan');
+    assert.deepStrictEqual([job.result.path_label_code, job.result.path_label], ['path.redraw', 'Se dibujó otra vez con el plan cambiado.']);
     assert.deepStrictEqual(job.steps.map((x) => x.id), ['request', 'plan', 'compile', 'draw', 'review']);
-    assert.ok(/Repair limit reached/.test(job.steps[1].label));
-    assert.ok(/Redraw the page from the updated plan/.test(job.steps[3].label));
+    assert.strictEqual(job.steps[1].label_code, 'step.correct.plan.page');
+    assert.ok(/^Límite de arreglos alcanzado/.test(job.steps[1].label));
+    assert.strictEqual(job.steps[3].label_code, 'step.correct.draw.redraw.page');
     assert.deepStrictEqual([job.result.from, job.result.render], ['PG_001_002_V02', 'PG_001_002_V03']);
     assert.strictEqual(job.result.passes, true);
     const redrawn = ws.loadReview(root, 'PG_001_002_V03');
     assert.deepStrictEqual([redrawn.repair_cycle, redrawn.supersedes], [0, null], 'a redraw starts a new lineage');
-    assert.ok(/new lineage/.test(redrawn.notes));
+    assert.ok(/PG_001_002_V02 había llegado al límite de arreglos/.test(redrawn.notes));
     const carried = redrawn.findings.find((f) => f.source === 'user_request');
     assert.deepStrictEqual([carried.status, carried.recheck.render], ['fixed', 'PG_001_002_V03'], 'the requested change is checked in the new drawing');
     const planAfter = fs.readFileSync(path.join(ws.pageDir(root, 'PG_001_002'), 'page.yaml'), 'utf8');
@@ -464,7 +471,7 @@ async function main() {
     if (HAS_GIT) {
       assert.ok(entries.filter((e) => e.files.length).every((e) => e.commit && e.restorable), 'every entry that changed files links to a commit');
       // Back to just before the first publish: the edition leaves the working tree and stays in git.
-      const beforePublish = entries.find((e) => e.kind === 'approval' && /cover/.test(e.title));
+      const beforePublish = entries.find((e) => e.kind === 'approval' && e.title_code === 'activity.approved_cover');
       const exportFile = path.join(root, edition.exports.find((e) => e.format === 'pdf').file);
       assert.ok(fs.existsSync(exportFile));
       r = await s.api('POST', `${P}/history/restore`, { entry: beforePublish.id });

@@ -11,6 +11,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const ws = require('../scripts/lib/workspace');
+const S = require('../studio/server/scaffold');
 const { start } = require('../studio/test-support/harness');
 
 function states(job) {
@@ -190,6 +191,7 @@ async function main() {
     const stuck = job.result.pages[0];
     assert.deepStrictEqual([stuck.render, stuck.verdict, stuck.flagged, stuck.repairs], ['PG_001_004_V03', 'flagged', true, 2]);
     assert.ok(/repair limit of 2/.test(stuck.stopped));
+    assert.deepStrictEqual([stuck.stopped_code, stuck.stopped_params], ['stopped.limit', { limit: 2 }]);
     assert.deepStrictEqual(ws.listRenders(root, 'PG_001_004'), ['PG_001_004_V01', 'PG_001_004_V02', 'PG_001_004_V03'],
       'every version stays on disk');
     assert.deepStrictEqual(['V01', 'V02', 'V03'].map((v) => ws.loadReview(root, `PG_001_004_${v}`).repair_cycle), [0, 1, 2]);
@@ -208,7 +210,8 @@ async function main() {
     job = await s.runOp(seeded, 'pages.plan', { text: 'FLAG UPSTREAM the plan itself is wrong.', pages: 1 });
     job = await s.runOp(seeded, 'pages.generate', { pages: ['PG_001_006'], approve_plans: true }, 60000);
     assert.deepStrictEqual([job.result.pages[0].repairs, job.result.pages[0].flagged], [0, true]);
-    assert.ok(/plan or the references/.test(job.result.pages[0].stopped));
+    assert.strictEqual(job.result.pages[0].stopped_code, 'stopped.upstream');
+    assert.ok(/plan or in the references/.test(job.result.pages[0].stopped));
 
     // A flagged page: approval needs an explicit overrule, and publishing is a draft.
     r = await s.api('POST', `${Q}/approve/page`, { page: 'PG_001_005' });
@@ -220,7 +223,23 @@ async function main() {
     assert.deepStrictEqual([r.body.verdict, r.body.overruled], ['fixed', true]);
     const overruled = ws.loadReview(root, 'PG_001_005_V01');
     assert.deepStrictEqual([overruled.findings[0].status, overruled.findings[0].severity], ['accepted', 'minor']);
-    assert.ok(/Overruled by the person/.test(overruled.notes) && /It is fine as drawn/.test(overruled.notes));
+    // The overrule is data: a tag in the review's notes (the one free field of the schema), read back by the API.
+    assert.ok(/\[overruled \d{4}-\d{2}-\d{2}: F01!, gate narrative_continuity; note: "It is fine as drawn\."\] Accepted by the person/.test(overruled.notes), overruled.notes);
+    assert.deepStrictEqual(S.validateWorkspace(root).errors.filter((e) => /PG_001_005/.test(JSON.stringify(e))), [], 'the review file still fits its schema');
+    r = await s.api('GET', `${Q}/pages/PG_001_005`);
+    const overruledView = r.body.renders[0].review;
+    assert.deepStrictEqual(
+      [overruledView.overruled, /^\d{4}-\d{2}-\d{2}$/.test(overruledView.overruled_at), overruledView.overrule_note, overruledView.overruled_items],
+      [true, true, 'It is fine as drawn.', ['F01!', 'gate narrative_continuity']]);
+    assert.deepStrictEqual([overruledView.open_notes, overruledView.accepted_notes], [0, 1]);
+    assert.strictEqual(r.body.renders[1], undefined);
+    r = await s.api('GET', `${Q}/issues/ISS_001`);
+    const summary = r.body.pages.find((p) => p.id === 'PG_001_005');
+    assert.deepStrictEqual(
+      [summary.overruled, summary.overruled_at, summary.overrule_note, summary.open_notes, summary.accepted_notes],
+      [true, overruledView.overruled_at, 'It is fine as drawn.', 0, 1]);
+    const plain = r.body.pages.find((p) => p.id === 'PG_001_004');
+    assert.deepStrictEqual([plain.overruled, plain.overruled_at, plain.overrule_note], [false, null, null]);
     assert.strictEqual(overruled.checks.identity.result, 'fail', 'the reviewer\'s evidence stays');
 
     r = await s.api('GET', `${Q}/issues/ISS_001/publish`);
@@ -231,6 +250,46 @@ async function main() {
     assert.strictEqual(job.status, 'failed');
     assert.strictEqual(job.error.code, 'not_ready');
     assert.ok(job.error.details.blockers.length >= 2);
+
+    // --- cover.create: writes the cover, or draws the one that is already written -----------------------
+    job = await s.runOp(seeded, 'cover.create', {});
+    assert.strictEqual(job.status, 'done', `${states(job)} ${JSON.stringify(job.error)}`);
+    assert.deepStrictEqual(job.steps.map((x) => x.id), ['write', 'compile', 'draw', 'review'], 'no cover yet and no description: the AI proposes one');
+    assert.deepStrictEqual([job.result.written, job.result.render, job.result.verdict], [true, 'CV_001_V01', 'pass']);
+    const coverFile = path.join(root, 'issues', 'ISS_001', 'cover', 'cover.yaml');
+    // The person edits the cover by hand. With no description the job draws it as written: no write step.
+    const byHand = `${fs.readFileSync(coverFile, 'utf8')}# edited by hand\n`;
+    fs.writeFileSync(coverFile, byHand);
+    job = await s.runOp(seeded, 'cover.create', {});
+    assert.strictEqual(job.status, 'done', `${states(job)} ${JSON.stringify(job.error)}`);
+    assert.deepStrictEqual(job.steps.map((x) => x.id), ['compile', 'draw', 'review'], 'a cover that exists is drawn as written');
+    assert.deepStrictEqual([job.result.written, job.result.summary, job.result.render, job.result.drawn], [false, null, 'CV_001_V02', true]);
+    assert.strictEqual(fs.readFileSync(coverFile, 'utf8'), byHand, 'the AI did not touch the cover file');
+    assert.strictEqual(job.steps.some((x) => x.tool === 'claude' && x.id !== 'review'), false, 'no planning tool ran');
+    r = await s.api('POST', `${Q}/ops`, { op: 'cover.create', params: { draw: false } });
+    assert.deepStrictEqual([r.status, r.body.error.code], [409, 'nothing_to_do'], 'written already and not to be drawn: nothing to do');
+    // With a description the cover is rewritten, then drawn.
+    job = await s.runOp(seeded, 'cover.create', { description: 'FLAGALWAYS Mara at the wheel, at night.' }, 60000);
+    assert.strictEqual(job.status, 'done', `${states(job)} ${JSON.stringify(job.error)}`);
+    assert.deepStrictEqual(job.steps.slice(0, 4).map((x) => x.id), ['write', 'compile', 'draw', 'review']);
+    assert.strictEqual(job.result.written, true);
+    assert.notStrictEqual(fs.readFileSync(coverFile, 'utf8'), byHand, 'a description rewrites the cover');
+    assert.deepStrictEqual([job.result.flagged, job.result.stopped_code], [true, 'stopped.limit']);
+    // The cover summary carries the same review data as a page summary, the overrule included.
+    r = await s.api('GET', `${Q}/issues/ISS_001/cover`);
+    assert.deepStrictEqual([r.body.outcome, r.body.overruled, r.body.overruled_at, r.body.overrule_note, r.body.open_notes, r.body.accepted_notes],
+      ['flagged', false, null, null, 0, 0]);
+    r = await s.api('POST', `${Q}/approve/cover`, { issue: 'ISS_001' });
+    assert.deepStrictEqual([r.status, r.body.error.code], [409, 'review_flagged']);
+    r = await s.api('POST', `${Q}/approve/cover`, { issue: 'ISS_001', overrule: true, note: 'Good enough for a draft.' });
+    assert.strictEqual(r.status, 200, JSON.stringify(r.body));
+    r = await s.api('GET', `${Q}/issues/ISS_001/cover`);
+    assert.deepStrictEqual([r.body.outcome, r.body.overruled, /^\d{4}-\d{2}-\d{2}$/.test(r.body.overruled_at), r.body.overrule_note, r.body.open_notes, r.body.accepted_notes],
+      ['pass', true, true, 'Good enough for a draft.', 0, 1]);
+    const coverReviewView = r.body.renders[r.body.renders.length - 1].review;
+    assert.deepStrictEqual([coverReviewView.overruled, coverReviewView.overrule_note, coverReviewView.overruled_items.length > 0], [true, 'Good enough for a draft.', true]);
+    r = await s.api('GET', Q);
+    assert.deepStrictEqual([r.body.issues[0].cover.overruled, r.body.issues[0].cover.overrule_note], [true, 'Good enough for a draft.']);
 
     // --- stale jobs are marked failed when a server starts -------------------------------------------------
     const jobsDir = path.join(home, seeded, '.studio', 'jobs');

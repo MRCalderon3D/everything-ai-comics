@@ -193,4 +193,68 @@ async function restore(dir, commit) {
   });
 }
 
-module.exports = { detect, isRepo, init, commitAll, head, log, filesOf, restore, GITIGNORE };
+/** The tree every repository has: what a first commit is compared with. */
+const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+
+/** The full id of a commit of this project, or null. Accepts 7 to 40 hex digits only. */
+async function resolveCommit(dir, id) {
+  if (!detect().installed || !isRepo(dir) || !/^[0-9a-f]{7,40}$/.test(String(id))) return null;
+  const res = await git(dir, ['rev-parse', '--verify', '-q', `${id}^{commit}`]);
+  const full = res.stdout.trim();
+  return res.code === 0 && /^[0-9a-f]{40}$/.test(full) ? full : null;
+}
+
+/** The parent of a commit, or the empty tree for the first commit. */
+async function parentOf(dir, commit) {
+  const res = await git(dir, ['rev-parse', '--verify', '-q', `${commit}^`]);
+  const full = res.stdout.trim();
+  return res.code === 0 && /^[0-9a-f]{40}$/.test(full) ? full : EMPTY_TREE;
+}
+
+/** Files that differ between two trees: [{ path, status }], paths relative to the project directory. */
+async function changedBetween(dir, from, to) {
+  const res = await git(dir, ['diff', '--name-status', '--no-renames', '-z', from, to]);
+  if (res.code !== 0) return [];
+  const parts = res.stdout.split('\0').filter((p) => p !== '');
+  const names = { A: 'added', M: 'modified', D: 'deleted', T: 'modified' };
+  const out = [];
+  for (let i = 0; i + 1 < parts.length; i += 2) {
+    out.push({ path: parts[i + 1], status: names[parts[i][0]] || 'modified' });
+  }
+  return out;
+}
+
+/**
+ * A file as it was at a commit. Read-only: `git cat-file` and `git show`.
+ * @returns {Promise<{buffer: Buffer|null, bytes: number, tooLarge: boolean}|null>} null when the commit has no such file
+ */
+function fileAt(dir, commit, repoPath, maxBytes = 64 * 1024 * 1024) {
+  return new Promise((resolve) => {
+    if (!/^[0-9a-f]{40}$/.test(String(commit)) || commit === EMPTY_TREE) {
+      resolve(null);
+      return;
+    }
+    const spec = `${commit}:${repoPath}`;
+    const base = ['--git-dir', gitDir(dir), '--work-tree', dir];
+    const options = { cwd: dir, windowsHide: true, timeout: 60000, env: Object.assign({}, process.env, { GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0' }) };
+    execFile('git', [...base, 'cat-file', '-s', spec], Object.assign({ encoding: 'utf8' }, options), (err, stdout) => {
+      const bytes = err ? NaN : Number.parseInt(String(stdout).trim(), 10);
+      if (!Number.isFinite(bytes)) {
+        resolve(null);
+        return;
+      }
+      if (bytes > maxBytes) {
+        resolve({ buffer: null, bytes, tooLarge: true });
+        return;
+      }
+      execFile('git', [...base, 'show', spec], Object.assign({ encoding: 'buffer', maxBuffer: maxBytes + 1024 }, options), (err2, out) => {
+        resolve(err2 ? null : { buffer: out, bytes, tooLarge: false });
+      });
+    });
+  });
+}
+
+module.exports = {
+  detect, isRepo, init, commitAll, head, log, filesOf, restore, GITIGNORE,
+  EMPTY_TREE, resolveCommit, parentOf, changedBetween, fileAt,
+};

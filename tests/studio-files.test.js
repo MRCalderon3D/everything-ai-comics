@@ -25,7 +25,7 @@ async function projectsAndFiles() {
     // --- projects: create, list, validation ----------------------------------------
     let r = await s.api('POST', '/api/projects', { description: 'no title' });
     assert.strictEqual(r.status, 400);
-    assert.deepStrictEqual(Object.keys(r.body.error), ['code', 'message'], 'the error format is { error: { code, message } }');
+    assert.deepStrictEqual(Object.keys(r.body.error), ['code', 'message', 'params'], 'the error format is { error: { code, message, params } }');
     assert.strictEqual(r.body.error.code, 'bad_params');
     r = await s.api('POST', '/api/projects', { title: 'x', format: 'film' });
     assert.strictEqual(r.status, 400);
@@ -195,7 +195,8 @@ async function manualHandoff() {
     const refused = await s.waitJob(id, r.body.job.id);
     assert.strictEqual(refused.status, 'failed');
     assert.strictEqual(refused.error.code, 'no_draw_tool');
-    assert.ok(/manual handoff/.test(refused.error.message));
+    assert.ok(/make the image yourself/.test(refused.error.message));
+    assert.strictEqual(refused.error.message_code, 'error.no_draw_tool');
 
     // The handoff for the look page, then the person's upload becomes the candidate.
     let job = assertDone(await s.runOp(id, 'page.manual', { entity: 'LOOK_SOFT_PENCIL_WARM', sheet: 'look' }), 'page.manual look handoff');
@@ -213,7 +214,8 @@ async function manualHandoff() {
 
     job = assertDone(await s.runOp(id, 'character.create', { name: 'Nell', description: 'A lighthouse keeper.' }), 'character.create');
     assert.strictEqual(job.result.sheet.skipped, true);
-    assert.ok(/manual handoff/.test(job.result.sheet.reason));
+    assert.strictEqual(job.result.sheet.reason_code, 'skip.no_draw_tool.sheet');
+    assert.ok(/make this sheet yourself/.test(job.result.sheet.reason));
     upload = await s.upload(id, 'nell.png', tiny(2), 'image/png');
     job = assertDone(await s.runOp(id, 'page.manual', { entity: 'CHAR_NELL', sheet: 'turnaround', upload: upload.id }), 'page.manual sheet upload');
     r = await s.api('POST', `${P}/approve/asset`, { candidate: job.result.candidate_id });

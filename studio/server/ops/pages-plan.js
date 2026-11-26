@@ -16,6 +16,7 @@
  */
 
 const S = require('../scaffold');
+const { msg } = require('../i18n');
 const pipeline = require('../pipeline');
 const { runAi } = require('../ai');
 const { OpError } = require('../jobs');
@@ -28,8 +29,6 @@ function pageNumber(pageId) {
 
 module.exports = {
   name: 'pages.plan',
-  title: 'Plan pages',
-  summary: 'Turns a text of what happens into planned pages (script, layout, ledger) and runs the mechanical checks.',
   params: [
     { name: 'text', type: 'string', required: true, description: 'What happens on these pages.' },
     { name: 'pages', type: 'integer', required: false, description: 'How many pages to spend, 1 to 24. Default 1.' },
@@ -52,12 +51,12 @@ module.exports = {
 
   steps() {
     return [
-      { id: 'breakdown', label: 'Break the text into scenes' },
-      { id: 'pages', label: 'Write the page plans' },
-      { id: 'gates', label: 'Check continuity and structure' },
-      { id: 'fix', label: 'Fix what the checks found' },
-      { id: 'recheck', label: 'Check again' },
-      { id: 'ready', label: 'See what each page still needs' },
+      { id: 'breakdown', label: msg('step.pages.plan.breakdown') },
+      { id: 'pages', label: msg('step.pages.plan.pages') },
+      { id: 'gates', label: msg('step.pages.plan.gates') },
+      { id: 'fix', label: msg('step.pages.plan.fix') },
+      { id: 'recheck', label: msg('step.pages.plan.recheck') },
+      { id: 'ready', label: msg('step.pages.plan.ready') },
     ];
   },
 
@@ -102,7 +101,7 @@ module.exports = {
       });
       const missing = pageIds.filter((id) => !S.ws.loadPage(root, id));
       if (missing.length) {
-        throw new OpError('pages_missing', `The plan was not written for ${missing.join(', ')}.`);
+        throw new OpError('pages_missing', `The plan was not written for ${missing.join(', ')}.`, undefined, { pages: missing });
       }
       return { summary: result.summary, decisions: result.decisions, tool: result.tool };
     }, { verb: 'plan' });
@@ -112,7 +111,7 @@ module.exports = {
         h.log(`continuity ${f.code} ${f.panel || f.page || ''}: ${f.message}`);
       }
       for (const e of result.validation.errors.slice(0, 30)) h.log(`structure ${e.code} ${e.file}: ${e.message}`);
-      h.note(result.errors ? `${result.errors} error(s)` : 'No errors');
+      h.note(result.errors ? msg('note.errors', { n: result.errors }) : msg('note.no_errors'));
     };
     let gates = await ctx.step('gates', (h) => {
       const result = pipeline.mechanical(root, issue);
@@ -138,8 +137,8 @@ module.exports = {
         return result;
       });
     } else {
-      ctx.skipStep('fix', 'The checks found no errors');
-      ctx.skipStep('recheck', 'The checks found no errors');
+      ctx.skipStep('fix', msg('skip.no_errors'));
+      ctx.skipStep('recheck', msg('skip.no_errors'));
     }
 
     const ready = await ctx.step('ready', () => pageIds.map((id) => {

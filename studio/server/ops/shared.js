@@ -9,6 +9,9 @@ const fs = require('fs');
 const path = require('path');
 const S = require('../scaffold');
 const pipeline = require('../pipeline');
+const i18n = require('../i18n');
+
+const { msg } = i18n;
 const { OpError, isCancel, NeedsDecision } = require('../jobs');
 const { HttpError, today, toPosix } = require('../util');
 
@@ -162,7 +165,7 @@ function fileReferenceUploads(project, entityId, ids, { role, kind, approved, no
       sha256: crypto.createHash('sha256').update(buffer).digest('hex'),
       approved_by: approved ? 'person' : null,
       approved_at: approved ? today() : null,
-      notes: `${note} Original file name: ${upload.name}. Licence and likeness rights are the person's responsibility and are not recorded here.`,
+      notes: i18n.t(project.settings().language, note, { name: upload.name }),
     });
     out.push({ id: assetId, path: rel });
   }
@@ -205,7 +208,7 @@ function fatalDrawError(err) {
  *
  * @param {object} ctx job context
  * @param {{owner: {kind: 'page'|'cover', id: string, issue: string},
- *          prefix: string, label: string,
+ *          prefix: string, kind: 'page'|'cover'|'correction', number?: number,
  *          compileGenerate: () => {file: string},
  *          compileRepair: (review: object) => {file: string},
  *          first?: {render: string, supersedes?: string|null},
@@ -246,14 +249,13 @@ async function renderReviewRepair(ctx, job) {
     // Only what blocks is repaired (pipeline.reviewRender decides). Minor
     // notes pass and never reach this loop.
     if (!review.repairable) {
-      stopped = review.not_repaired_because ||
-        'The review says another render would repeat the problem: the cause is in the plan or the references.';
+      stopped = review.not_repaired_because || msg('stopped.upstream');
       break;
     }
     const doc = S.ws.loadReview(root, review.render);
     const cycle = doc && Number.isInteger(doc.repair_cycle) ? doc.repair_cycle : 0;
     if (cycle >= limit) {
-      stopped = `The repair limit of ${limit} was reached.`;
+      stopped = msg('stopped.limit', { limit });
       break;
     }
     repairs += 1;
@@ -261,8 +263,10 @@ async function renderReviewRepair(ctx, job) {
     const from = review.render;
     const drawId = stepId(`repair-${n}`);
     const reviewId = stepId(`review-${n}`);
-    ctx.addStep({ id: drawId, label: `${job.label}: repair ${n}` }, { after: n === 1 ? stepId('review') : stepId(`review-${n - 1}`) });
-    ctx.addStep({ id: reviewId, label: `${job.label}: check repair ${n}` }, { after: drawId });
+    // job.kind names what is repaired: page (with job.number), cover, or correction.
+    const kind = ['page', 'cover', 'correction'].includes(job.kind) ? job.kind : 'correction';
+    ctx.addStep({ id: drawId, label: msg(`step.repair.${kind}`, { n: job.number, cycle: n }) }, { after: n === 1 ? stepId('review') : stepId(`review-${n - 1}`) });
+    ctx.addStep({ id: reviewId, label: msg(`step.repair_check.${kind}`, { n: job.number, cycle: n }) }, { after: drawId });
     const drawn = await ctx.step(drawId, async (h) => {
       h.setTool('codex');
       const pkg = job.compileRepair(S.ws.loadReview(root, from));
@@ -295,8 +299,7 @@ function rethrowIfFatal(err) {
 function requireDrawTool(ctx) {
   const target = pipeline.drawTarget(ctx);
   if (!target.available) {
-    throw new OpError('no_draw_tool',
-      `${target.reason} Use the manual handoff instead: the studio prepares the prompt and the references, and you upload the image you made.`);
+    throw new OpError('no_draw_tool', msg('error.no_draw_tool', { reason: target.reason }));
   }
   return target;
 }

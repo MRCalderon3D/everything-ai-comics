@@ -6,6 +6,7 @@
  */
 
 const prompts = require('./prompts');
+const { msg } = require('./i18n');
 const S = require('./scaffold');
 const { NeedsDecision, OpError } = require('./jobs');
 const { SCAFFOLD_ROOT, abortError } = require('./util');
@@ -48,7 +49,7 @@ async function runAi(ctx, handle, call) {
   const settings = project.settings();
   const pick = ctx.services.drivers.pick(call.verb, settings);
   if (!pick.available) {
-    throw new OpError('no_tool', `${pick.reason} Install Claude Code or Codex and sign in, then try again.`);
+    throw new OpError('no_tool', msg('error.no_tool', { reason: pick.reason }));
   }
   handle.setTool(pick.name);
   if (pick.fallback) {
@@ -93,25 +94,25 @@ async function runAi(ctx, handle, call) {
     ctx.job.cost_usd = Math.round(((ctx.job.cost_usd || 0) + result.costUsd) * 10000) / 10000;
   }
   if (!result.ok) {
-    throw new OpError('ai_failed', `${TOOL_LABELS[pick.name]} did not finish this step: ${result.error || 'no reason given'}`);
+    throw new OpError('ai_failed', msg('error.ai_failed', { tool: TOOL_LABELS[pick.name], detail: result.error || 'no reason given' }));
   }
   const out = result.structured;
   if (!out || typeof out !== 'object' || typeof out.status !== 'string') {
     const said = String(result.text || '').replace(/\s+/g, ' ').trim().slice(0, 300);
-    throw new OpError('ai_bad_result',
-      `${TOOL_LABELS[pick.name]} finished without the structured result the studio needs.${said ? ` It said: ${said}` : ''}`);
+    throw new OpError('ai_bad_result', msg('error.ai_bad_result', { tool: TOOL_LABELS[pick.name], detail: said || '-' }));
   }
   handle.log(`${TOOL_LABELS[pick.name]} finished in ${seconds} s: ${String(out.summary || '').replace(/\s+/g, ' ').slice(0, 300)}`);
   for (const decision of Array.isArray(out.decisions) ? out.decisions : []) handle.log(`decided: ${String(decision).slice(0, 300)}`);
   if (out.status === 'needs_decision') {
     const questions = Array.isArray(out.questions) ? out.questions.filter((q) => q && q.question) : [];
     if (!questions.length) {
-      throw new OpError('ai_bad_result', `${TOOL_LABELS[pick.name]} asked for a decision without saying which.`);
+      throw new OpError('ai_bad_result', msg('error.ai_bad_result', { tool: TOOL_LABELS[pick.name], detail: 'needs_decision with no questions' }));
     }
     throw new NeedsDecision(questions, out.summary);
   }
   if (out.status === 'failed') {
-    throw new OpError('ai_reported_failure', String(out.summary || `${TOOL_LABELS[pick.name]} reported that it could not do this.`));
+    // The summary is the tool's own explanation, written in the interface language.
+    throw new OpError('ai_reported_failure', msg('error.ai_reported_failure', { tool: TOOL_LABELS[pick.name], detail: String(out.summary || '-') }));
   }
   return Object.assign({}, out, {
     files_written: Array.isArray(out.files_written) ? out.files_written.map(String) : [],

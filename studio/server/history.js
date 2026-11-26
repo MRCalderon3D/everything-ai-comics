@@ -6,6 +6,7 @@
  */
 
 const git = require('./git');
+const i18n = require('./i18n');
 const { snapshot, diffSnapshots, HttpError } = require('./util');
 
 const IMAGE_RE = /\.(png|jpe?g|webp)$/i;
@@ -27,7 +28,7 @@ async function record(services, project, entry, fn) {
   if (changes.length || entry.always) {
     if (changes.length) {
       try {
-        commit = await git.commitAll(project.dir, entry.title);
+        commit = await git.commitAll(project.dir, i18n.render('en', entry.title));
       } catch (err) {
         commit = null;
       }
@@ -74,9 +75,11 @@ async function restore(services, project, commit) {
     throw new HttpError(status, err.code || 'restore_failed', err.message);
   }
   const changes = diffSnapshots(before, snapshot(project.root, []));
+  // Name the point by its own history entry when there is one, so it reads in any language.
+  const entry = project.activity().find((e) => e.commit === outcome.target);
   const activity = project.addActivity({
     kind: 'restore',
-    title: `Restored to an earlier point: ${outcome.subject}`,
+    title: i18n.msg('activity.restore', { what: entry ? entry.title : outcome.subject }),
     actor: 'person',
     files: changes.slice(0, 200),
     images: [],

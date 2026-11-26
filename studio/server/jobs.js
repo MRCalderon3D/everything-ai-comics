@@ -17,9 +17,12 @@
 const fs = require('fs');
 const path = require('path');
 const git = require('./git');
+const i18n = require('./i18n');
 const {
-  HttpError, newId, nowIso, readJson, writeJsonAtomic, snapshot, diffSnapshots,
+  HttpError, errorText, newId, nowIso, readJson, writeJsonAtomic, snapshot, diffSnapshots,
 } = require('./util');
+
+const { msg } = i18n;
 
 const IMAGE_RE = /\.(png|jpe?g|webp)$/i;
 const ACTIVE = ['queued', 'running', 'needs_decision'];
@@ -34,13 +37,19 @@ class NeedsDecision extends Error {
   }
 }
 
-/** A failure an operation reports on purpose: it becomes the job's error. */
+/**
+ * A failure an operation reports on purpose: it becomes the job's error.
+ * `message` is a technical string or a message descriptor; `params` feed
+ * the dictionary entry of the code (error.<code>).
+ */
 class OpError extends Error {
-  constructor(code, message, details) {
-    super(message);
+  constructor(code, message, details, params) {
+    super(i18n.isMsg(message) ? i18n.t('en', message.$t, message.params) : message);
     this.code = code;
     this.opError = true;
+    if (i18n.isMsg(message)) this.text = message;
     if (details !== undefined) this.details = details;
+    if (params !== undefined) this.params = params;
   }
 }
 
@@ -95,9 +104,7 @@ class JobManager {
         job.ended_at = nowIso();
         job.error = {
           code: 'interrupted',
-          message: wasRunning
-            ? 'The server stopped while this job was running.'
-            : 'The server stopped before this job started.',
+          message: msg(wasRunning ? 'error.interrupted' : 'error.interrupted_queued'),
         };
         for (const step of job.steps || []) {
           if (step.status === 'running') {
@@ -186,7 +193,7 @@ class JobManager {
       id: newId('job'),
       project: project.id,
       op: op.name,
-      title: op.title,
+      title: msg(`op.${op.name}.title`),
       params: clean,
       status: 'queued',
       created_at: nowIso(),
@@ -233,7 +240,7 @@ class JobManager {
   cancel(project, id) {
     const job = this.getRaw(project, id);
     if (FINISHED.includes(job.status)) {
-      throw new HttpError(409, 'job_finished', `This job already ended (${job.status}).`);
+      throw new HttpError(409, 'job_finished', `This job already ended (${job.status}).`, undefined, { status: job.status });
     }
     if (job.status === 'running') {
       job.cancel_requested = true;
@@ -268,7 +275,7 @@ class JobManager {
       return value === undefined || value === null || String(value).trim() === '';
     });
     if (missing.length) {
-      throw new HttpError(400, 'bad_answers', `Every question needs an answer. Missing: ${missing.join(', ')}.`, { missing });
+      throw new HttpError(400, 'bad_answers', msg('error.bad_answers.missing', { missing }), { missing });
     }
     for (const q of job.questions) {
       job.answers[q.id] = { question: q.question, answer: String(answers[q.id]).slice(0, 4000) };
@@ -315,7 +322,7 @@ class JobManager {
       .catch((err) => {
         // run() handles its own errors; this is a last line of defence.
         job.status = 'failed';
-        job.error = { code: 'internal', message: err && err.message ? err.message : String(err) };
+        job.error = { code: 'internal', message: errorText({ code: 'internal', message: err && err.message ? err.message : String(err) }) };
         job.ended_at = nowIso();
         try { this.save(project, job); } catch (e) { /* ignore */ }
       })
@@ -338,7 +345,7 @@ class JobManager {
     job.ended_at = null;
     this.save(project, job);
     this.emit(project, job);
-    this.log(project, job, `${job.title} started`, '-');
+    this.log(project, job, `${i18n.render('en', job.title)} started`, '-');
 
     const manager = this;
     const ctx = {
@@ -375,12 +382,12 @@ class JobManager {
     };
 
     try {
-      if (!op) throw new OpError('unknown_operation', `Operation ${job.op} no longer exists.`);
+      if (!op) throw new OpError('unknown_operation', `Operation ${job.op} no longer exists.`, undefined, { op: job.op });
       const result = await op.run(ctx);
       job.result = result === undefined ? null : result;
       job.status = 'done';
       for (const step of job.steps) if (step.status === 'pending') step.status = 'skipped';
-      this.log(project, job, `${job.title} finished`, '-');
+      this.log(project, job, `${i18n.render('en', job.title)} finished`, '-');
     } catch (err) {
       if (err instanceof NeedsDecision) {
         job.status = 'needs_decision';
@@ -398,13 +405,12 @@ class JobManager {
         this.log(project, job, 'cancelled', '-');
       } else {
         job.status = 'failed';
-        job.error = {
-          code: typeof err.code === 'string' ? err.code : 'failed',
-          message: err && err.message ? err.message : String(err),
-        };
+        const code = typeof err.code === 'string' ? err.code : 'failed';
+        // The technical text stays in the log; the person reads the dictionary's sentence.
+        job.error = { code, message: errorText({ code, message: err && err.message ? err.message : String(err), params: err.params, text: err.text }) };
         if (err && err.details !== undefined) job.error.details = err.details;
         if (!err.opError && !err.code && process.env.STUDIO_DEBUG) console.error(err);
-        this.log(project, job, `failed: ${job.error.message}`, '-');
+        this.log(project, job, `failed: ${err && err.message ? err.message : String(err)}`, '-');
       }
     }
     job.current_step = null;
@@ -441,7 +447,7 @@ class JobManager {
     job.current_step = id;
     this.save(project, job);
     this.emit(project, job);
-    this.log(project, job, `${step.label}`, id);
+    this.log(project, job, `${i18n.render('en', step.label)}`, id);
 
     const before = snapshot(project.root, []);
     const handle = {
@@ -449,7 +455,8 @@ class JobManager {
         step.tool = name;
         if (options.verb) job.tools[options.verb] = name;
       },
-      note: (text) => { step.note = String(text).slice(0, 500); },
+      // A note is a descriptor (i18n.msg) for words, or a plain string for an id or a path.
+      note: (text) => { step.note = i18n.isMsg(text) ? text : String(text).slice(0, 500); },
       log: (line) => this.log(project, job, line, id),
     };
 
@@ -476,12 +483,13 @@ class JobManager {
     }
     if (changes.length) {
       const suffix = failure
-        ? (failure instanceof NeedsDecision ? ' (paused for a decision)' : isCancel(failure) ? ' (cancelled)' : ' (did not finish)')
+        ? (failure instanceof NeedsDecision ? '.paused' : isCancel(failure) ? '.cancelled' : '.unfinished')
         : '';
-      const title = `${job.title}: ${step.label}${suffix}`;
+      const title = msg(`activity.step${suffix}`, { title: job.title, label: step.label });
       let commit = null;
       try {
-        commit = await git.commitAll(project.dir, title);
+        // Commit messages are in English: the person reads the activity log, which is localized.
+        commit = await git.commitAll(project.dir, i18n.render('en', title));
       } catch (err) {
         commit = null;
       }
@@ -508,7 +516,7 @@ class JobManager {
     if (failure) {
       step.status = failure instanceof NeedsDecision ? 'waiting' : isCancel(failure) ? 'cancelled' : 'failed';
       if (!(failure instanceof NeedsDecision) && !isCancel(failure) && !step.note) {
-        step.note = String(failure.message || failure).slice(0, 500);
+        step.note = errorText({ code: typeof failure.code === 'string' ? failure.code : 'failed', message: failure.message || String(failure), params: failure.params, text: failure.text });
       }
       this.save(project, job);
       this.emit(project, job);

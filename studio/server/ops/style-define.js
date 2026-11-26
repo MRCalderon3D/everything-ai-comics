@@ -13,6 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 const S = require('../scaffold');
+const { msg } = require('../i18n');
 const looks = require('../looks');
 const pipeline = require('../pipeline');
 const options = require('../project-options');
@@ -23,8 +24,6 @@ const { str, bool, bad, uploadIds, fileReferenceUploads, lookState } = require('
 
 module.exports = {
   name: 'style.define',
-  title: 'Define the style',
-  summary: 'Writes the style bible and the style block from a preset, a description, uploaded reference images, or a mix.',
   params: [
     { name: 'preset', type: 'string', required: false, description: 'Key of a preset from GET /style (for example "noir-ink").' },
     { name: 'description', type: 'string', required: false, description: 'The style in the person\'s words.' },
@@ -47,9 +46,9 @@ module.exports = {
 
   steps() {
     return [
-      { id: 'prepare', label: 'Apply the preset and file the reference images' },
-      { id: 'bible', label: 'Write the style bible and the style block' },
-      { id: 'check', label: 'Check the files' },
+      { id: 'prepare', label: msg('step.style.define.prepare') },
+      { id: 'bible', label: msg('step.style.define.bible') },
+      { id: 'check', label: msg('step.check.files') },
     ];
   },
 
@@ -70,7 +69,7 @@ module.exports = {
         role: 'style',
         kind: 'look',
         approved: params.attach_references,
-        note: 'Style reference supplied by the person through the studio.',
+        note: 'asset.note.style_ref',
       });
       project.saveState({ look_id: lookId });
       return { look_id: lookId, references };
@@ -103,7 +102,7 @@ module.exports = {
       else if (/^#/m.test(block) || /<[^<>\n]+>/.test(block)) {
         problems.push({ file: 'style/style-block.txt', code: 'STYLE_BLOCK_TEMPLATE', message: 'The style block still has template lines.' });
       }
-      h.note(problems.length ? `${problems.length} problem(s) to look at` : 'No problems found');
+      h.note(problems.length ? msg('note.problems', { n: problems.length }) : msg('note.no_problems'));
       return { errors: problems };
     });
 

@@ -14,8 +14,6 @@ const KINDS = ['turnaround', 'expressions', 'wardrobe'];
 
 module.exports = {
   name: 'character.sheet',
-  title: 'Draw a character sheet',
-  summary: 'Draws a turnaround, expressions or wardrobe sheet candidate for a character.',
   params: [
     { name: 'character', type: 'string', required: true, description: 'Character ID.' },
     { name: 'sheet', type: 'string', required: false, description: 'turnaround (default), expressions, or wardrobe.' },

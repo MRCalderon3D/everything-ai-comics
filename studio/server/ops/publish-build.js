@@ -15,6 +15,7 @@ const fs = require('fs');
 const path = require('path');
 const S = require('../scaffold');
 const pipeline = require('../pipeline');
+const { msg, has, render } = require('../i18n');
 const { OpError } = require('../jobs');
 const { bad, matching, requireIssue, ISSUE_RE } = require('./shared');
 
@@ -24,6 +25,12 @@ const MODES = ['auto', 'draft', 'final'];
 function signature(edition) {
   const cover = edition.cover ? `${edition.cover.render}|${edition.cover.lettered_file || ''}` : '-';
   return [cover, ...(edition.pages || []).map((p) => `${p.page}|${p.render}|${p.lettered_file || ''}`)].join('\n');
+}
+
+/** One blocker, with the sentence the person reads. `detail` is the scaffold's own text. */
+function blocker(page, render, code, detail) {
+  const key = has(`publish.blocker.${code}`) ? `publish.blocker.${code}` : 'publish.blocker.other';
+  return { page, render, code, message: msg(key, { page: page || '', render: render || '', detail: detail || '' }) };
 }
 
 /**
@@ -36,16 +43,16 @@ function readiness(root, issue) {
   try {
     draft = S.draftEdition({ root, issue });
   } catch (err) {
-    out.blockers.push({ page: null, render: null, code: err.code || 'issue_missing', message: err.message });
+    out.blockers.push(blocker(null, null, err.code || 'issue_missing', err.message));
     return out;
   }
   out.edition = draft;
-  out.blockers.push(...(draft.blockers || []));
+  out.blockers.push(...(draft.blockers || []).map((b) => blocker(b.page, b.render, b.code, b.message)));
   const project = S.ws.loadProject(root) || {};
   if (project.lettering && project.lettering.mode === 'overlay') {
     for (const p of draft.pages) {
       if (!p.lettered_file) {
-        out.blockers.push({ page: p.page, render: p.render, code: 'not_lettered', message: `${p.page} has no lettered image yet` });
+        out.blockers.push(blocker(p.page, p.render, 'not_lettered', `${p.page} has no lettered image yet`));
       }
     }
   }
@@ -57,17 +64,16 @@ function readiness(root, issue) {
   }
   out.continuity_errors = findings.length;
   for (const f of findings.slice(0, 20)) {
-    out.blockers.push({ page: f.page || null, render: null, code: 'continuity', message: `${f.code}: ${f.message}` });
+    out.blockers.push(blocker(f.page || null, null, 'continuity', `${f.code}: ${f.message}`));
   }
   return out;
 }
 
 module.exports = {
   name: 'publish.build',
-  title: 'Publish',
-  summary: 'Writes the edition of an issue and builds the chosen formats, as a final edition when every page passed its check and as a marked draft otherwise.',
   readiness,
   signature,
+  blocker,
   params: [
     { name: 'issue', type: 'string', required: false, description: 'Issue ID. Default ISS_001.' },
     { name: 'formats', type: 'string[]', required: false, description: 'Any of pdf, cbz, epub, web, images. Default ["pdf", "cbz"].' },
@@ -92,9 +98,9 @@ module.exports = {
 
   steps() {
     return [
-      { id: 'edition', label: 'Write the edition' },
-      { id: 'gate', label: 'Check continuity and reviews' },
-      { id: 'build', label: 'Build the files' },
+      { id: 'edition', label: msg('step.publish.edition') },
+      { id: 'gate', label: msg('step.publish.gate') },
+      { id: 'build', label: msg('step.publish.build') },
     ];
   },
 
@@ -105,7 +111,7 @@ module.exports = {
 
     const edition = await ctx.step('edition', (h) => {
       const state = readiness(root, issue);
-      if (!state.edition) throw new OpError('not_ready', state.blockers[0] ? state.blockers[0].message : 'The issue cannot be published yet.');
+      if (!state.edition) throw new OpError('not_ready', state.blockers[0] ? state.blockers[0].message : msg('error.not_ready', { n: 1 }));
       const draft = state.edition;
       if (!draft.pages.length) throw new OpError('no_pages', 'No page of this issue has a render yet, so there is nothing to publish.');
       // An unchanged issue builds more formats into its latest edition
@@ -113,7 +119,7 @@ module.exports = {
       const latestId = draft.supersedes;
       const latest = latestId ? S.ws.loadEdition(root, latestId) : null;
       if (latest && signature(latest) === signature(draft)) {
-        h.note(`${latestId}, unchanged since it was written`);
+        h.note(msg('note.edition_unchanged', { edition: latestId }));
         return { id: latestId, file: `editions/${latestId}/edition.yaml`, reused: true, status: latest.status };
       }
       const rel = `editions/${draft.id}/edition.yaml`;
@@ -126,16 +132,14 @@ module.exports = {
 
     const gate = await ctx.step('gate', (h) => {
       const state = readiness(root, issue);
-      for (const b of state.blockers.slice(0, 30)) h.log(`${b.page || issue}: ${b.message}`);
-      h.note(state.blockers.length ? `${state.blockers.length} thing(s) keep this from being final` : 'Nothing blocks a final edition');
+      for (const b of state.blockers.slice(0, 30)) h.log(`${b.page || issue}: ${render('en', b.message)}`);
+      h.note(state.blockers.length ? msg('note.blockers', { n: state.blockers.length }) : msg('note.no_blockers'));
       return { blockers: state.blockers, continuity_errors: state.continuity_errors };
     });
 
     const blocked = gate.blockers.length > 0;
     if (params.mode === 'final' && blocked) {
-      throw new OpError('not_ready',
-        `A final edition is not possible yet: ${gate.blockers.slice(0, 3).map((b) => b.message).join('; ')}${gate.blockers.length > 3 ? '; and more' : ''}.`,
-        { blockers: gate.blockers });
+      throw new OpError('not_ready', msg('error.not_ready', { n: gate.blockers.length }), { blockers: gate.blockers });
     }
     const draft = params.mode === 'draft' || blocked;
 
@@ -155,7 +159,9 @@ module.exports = {
           h.log(`could not mark the edition as reviewed: ${err.message}`);
         }
       }
-      h.note(`${result.written.length} file(s) written${result.skipped.length ? `, ${result.skipped.length} already there` : ''}`);
+      h.note(result.skipped.length
+        ? msg('note.files_written_skipped', { n: result.written.length, skipped: result.skipped.length })
+        : msg('note.files_written', { n: result.written.length }));
       return {
         written: result.written,
         skipped: result.skipped,

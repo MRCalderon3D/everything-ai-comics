@@ -31,8 +31,6 @@ function checkRegion(region) {
 
 module.exports = {
   name: 'page.correct',
-  title: 'Correct a page',
-  summary: 'Records a change the person asks for on a page and produces a new version: an edit of the existing page, or a redraw from an updated plan once the repair limit is reached.',
   checkRegion,
   params: [
     { name: 'page', type: 'string', required: true, description: 'Page ID.' },
@@ -66,7 +64,7 @@ module.exports = {
   },
 
   steps(params) {
-    return correction.steps('the page', params.path);
+    return correction.steps('page', params.path);
   },
 
   async run(ctx) {
@@ -78,7 +76,6 @@ module.exports = {
       panel: params.panel,
       region: params.region,
       lettering: params.lettering,
-      what: 'the page',
     });
     return Object.assign({ page: params.page }, outcome);
   },
