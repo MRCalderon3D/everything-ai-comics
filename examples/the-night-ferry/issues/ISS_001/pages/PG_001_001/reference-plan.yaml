@@ -1,31 +1,27 @@
-# Schema: schemas/reference-plan.schema.json
-
 page: PG_001_001
 provider: harness-native
 budget: 4
-
 required:
   - asset_id: LOOK_NOIR_INK_MASTER_V01
     entity: LOOK_NOIR_INK
     role: style
     priority: critical
-    reason: Fixed drawing style for every request.
-    omission_risk: Style drifts toward the model's default.
+    reason: "Fixed drawing style, attached to every request."
+    omission_risk: "Line, tone, and rendering drift toward the model default."
   - asset_id: CHAR_MARA_TURN_MASTER_V01
     entity: CHAR_MARA
     role: identity
     priority: critical
-    reason: Mara is drawn in panels 1, 2 and 4.
-    omission_risk: The broken nose and the cropped hair change from panel to panel.
-
+    reason: "Identity master of Mara, drawn in 3 panel(s)."
+    omission_risk: Mara is drawn off-model or with another character's face.
 optional:
   - asset_id: LOC_FERRY_DECK_PLATE_MASTER_V01
     entity: LOC_FERRY_DECK
     role: spatial_continuity
     priority: high
-    reason: Panel 1 establishes the ferry, with the wheelhouse aft and the crates near the bow.
-    omission_risk: The wheelhouse and the crates end up on the wrong sides.
-
-exclude: [CHAR_OSKAR_TURN_MASTER_V01]
-created_at: "2026-11-26"
-notes: Oskar is off-panel in all four panels. His sheet is left out so the model has no reason to draw him.
+    reason: "Location plate of Ferry deck: architecture, landmarks, and light."
+    omission_risk: Ferry deck changes layout between pages.
+exclude:
+  - CHAR_OSKAR_TURN_MASTER_V01
+created_at: 2026-11-26
+notes: "CHAR_OSKAR_TURN_MASTER_V01 left out: Oskar is off panel on this whole page. PROP_TARPAULIN is plot-relevant and on this page but has no registered reference: the prompt describes it in words only. PROP_FLARE_GUN is plot-relevant and on this page but has no registered reference: the prompt describes it in words only."
