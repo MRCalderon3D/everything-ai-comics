@@ -1,0 +1,31 @@
+# production/issues/ISS_001/pages/PG_001_001/lettering.yaml: overlay geometry
+# Schema: schemas/lettering.schema.json
+# Only in overlay lettering mode. letter-pages.js reads the boxes from here.
+# The text always comes from page.yaml and must equal it word for word.
+
+page: PG_001_001
+render: PG_001_001_V01                 # the render this overlay sits on
+canvas: { width_px: 2000, height_px: 3000 }
+
+font:
+  family: Comic Neue
+  size_px: 34
+  line_height: 1.15
+
+elements:
+  - id: L01                            # matches a lettering id in page.yaml
+    panel: PN_001_001_01
+    type: caption                      # same value as in page.yaml
+    text: "TODO: exact words."
+    box: { x: 120, y: 110, width: 520, height: 90 }   # px on the canvas
+    shape: rect                        # rect | ellipse | burst | cloud | none
+    tail: null                         # captions have no tail
+    style: { fill: "#FFFFFF", stroke: "#000000", text: "#000000" }
+  - id: L02
+    panel: PN_001_001_02
+    type: balloon
+    text: "TODO: exact words."
+    box: { x: 1180, y: 1640, width: 560, height: 220 }
+    shape: ellipse
+    tail: { x: 1320, y: 1960 }         # tip of the tail, pointing at the speaker's mouth
+    style: { fill: "#FFFFFF", stroke: "#000000", text: "#000000" }

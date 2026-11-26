@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://everything-ai-comics.dev/schemas/character.schema.json",
+  "title": "Character",
+  "description": "Character bible (production/characters/<CHAR_ID>/character.yaml): identity, canonical description, the features that separate this character from the rest of the cast, and reference assets.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "description", "references"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^CHAR_[A-Z][A-Z0-9_]*$",
+      "description": "Character ID, e.g. CHAR_MARA. Matches the directory name."
+    },
+    "name": { "type": "string", "minLength": 1, "description": "Name as used in the script." },
+    "aliases": {
+      "type": "array",
+      "description": "Other names the script uses for the character.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "role": {
+      "enum": ["protagonist", "antagonist", "supporting", "background"],
+      "description": "Narrative function."
+    },
+    "description": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "distinguishing_features"],
+      "description": "Canonical physical description. Prompts are compiled from these fields.",
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Canonical appearance in one or two sentences."
+        },
+        "age": { "type": "string", "description": "Apparent age, e.g. fifties." },
+        "build": { "type": "string", "description": "Body build and posture." },
+        "hair": { "type": "string", "description": "Hair color and cut." },
+        "face": { "type": "string", "description": "Face shape and features." },
+        "skin": { "type": "string", "description": "Skin tone and texture." },
+        "distinguishing_features": {
+          "type": "array",
+          "description": "What separates this character from any other in the cast. Must survive every render.",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "prompt_summary": { "type": "string", "description": "One generation-ready sentence used verbatim in prompts." },
+    "visually_adjacent_to": {
+      "type": "array",
+      "description": "Characters this one could be confused with; prompts must state the difference.",
+      "items": { "type": "string", "pattern": "^CHAR_[A-Z][A-Z0-9_]*$" }
+    },
+    "personality": { "type": "string", "description": "Temperament and behavior; informs acting." },
+    "voice": { "type": "string", "description": "How the character speaks; informs dialogue." },
+    "arc": { "type": "string", "description": "How the character changes across the story." },
+    "first_appearance": {
+      "type": "string",
+      "pattern": "^PG_\\d{3}_\\d{3}$",
+      "description": "Page of first appearance."
+    },
+    "default_wardrobe": {
+      "type": "string",
+      "pattern": "^WARD_[A-Z][A-Z0-9_]*$",
+      "description": "Wardrobe state worn unless a panel says otherwise."
+    },
+    "wardrobe_file": {
+      "type": "string",
+      "description": "Path of this character's wardrobe.yaml, relative to the character directory."
+    },
+    "references": {
+      "type": "array",
+      "description": "Asset IDs registered in references/manifest.yaml.",
+      "items": { "type": "string", "pattern": "^(CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*_V\\d{2}$" }
+    },
+    "status": {
+      "enum": ["draft", "review", "approved"],
+      "description": "Approval status of the bible entry."
+    },
+    "notes": { "type": "string", "description": "Free-form notes for people. Never read by scripts." }
+  }
+}

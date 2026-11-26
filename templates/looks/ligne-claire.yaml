@@ -1,0 +1,50 @@
+# LOOK preset: ligne claire. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+
+id: LOOK_LIGNE_CLAIRE_V01
+name: Ligne claire
+intent: "Adventure and travel stories where the setting matters as much as the cast. Everything is drawn with the same calm clarity, so the reader never has to guess what an object is."
+status: draft
+
+line: "One even line weight for figures and backgrounds alike. Contours always close. No line variation for depth."
+inking: "No hatching and almost no solid black. Black appears as flat local color (hair, a coat), never as shadow."
+tone: "None. Form comes from contour and flat color."
+color_mode: full_color
+palette:
+  - "local colors, slightly muted, one flat value per object"
+  - "one flat darker hue for the rare cast shadow"
+rendering: "Cartoon-simplified faces on correctly proportioned bodies, set against detailed and accurate architecture, vehicles, and objects. Even, shadowless daylight in most panels."
+lettering_style: "Upper case in rectangular balloons with slightly rounded corners and a thin outline. Captions in pale yellow boxes. Sound effects small and restrained."
+
+style_block: |
+  Full-color comic book page in a ligne claire style.
+  Line: a single even line weight for figures and backgrounds, every contour closed, no line variation.
+  Blacks and shadow: no hatching, no spotted shadows; black only as the flat local color of an object.
+  Tone: none.
+  Color: flat, slightly muted local colors, one value per object, no gradients and no modelling.
+  Rendering: simplified cartoon faces on naturally proportioned figures, detailed and accurate backgrounds, even light.
+  Panels: thin black borders, regular grid, narrow white gutters.
+  Lettering: upper-case text in rectangular balloons with rounded corners, captions in pale yellow boxes.
+
+prompt_vocabulary:
+  - clear even line
+  - closed contours
+  - flat local color
+  - no shading
+  - detailed accurate backgrounds
+  - regular panel grid
+  - even daylight
+
+negative_vocabulary:
+  - cross-hatching
+  - heavy black shadows
+  - gradients
+  - painterly brushwork
+  - sketchy broken line
+  - dramatic rim light
+  - photorealistic rendering
+
+pairs_with:
+  comic_formats: [paged]
+  publications: [one-shot, miniseries, graphic-novel, ongoing]
+  typical_genres: [adventure, mystery, historical, all-ages]

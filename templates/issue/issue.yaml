@@ -1,0 +1,14 @@
+# production/issues/ISS_001/issue.yaml: one publication unit
+# Schema: schemas/issue.schema.json
+# Written by /issue-breakdown.
+
+id: ISS_001                            # matches the directory name
+number: 1
+title: "TODO: issue title"
+source_span: story/source/source.txt#p1-p9
+summary: "TODO: what happens in this issue."
+scenes: [SC_001_01]                    # in story order
+page_count: 1
+panel_count: 2
+opens_from: null                       # continuity state file of the previous issue, e.g. continuity/ISS_001.final-state.yaml
+status: planning                       # planning | scripting | production | review | published

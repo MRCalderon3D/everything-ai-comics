@@ -1,0 +1,37 @@
+# production/locations/LOC_EXAMPLE/map.yaml: location geometry
+# Schema: schemas/location-map.schema.json
+# Panel positions name a level, a side, and optionally a landmark from this file.
+
+location: LOC_EXAMPLE
+
+levels:                                # named vertical levels, bottom to top
+  - id: ground                         # lowercase tag
+    description: Street level.
+  - id: upper
+    description: Gallery reached by the stairs.
+
+sides:                                 # the fixed side convention. Decide it once and keep it
+  convention: The door is screen left and the stairs are screen right when facing the back wall.
+  left: door
+  right: stairs
+
+landmarks:
+  - id: door
+    level: ground                      # one of levels[].id
+    side: left                         # left | right | center
+    description: Street door.
+  - id: stairs
+    level: ground
+    side: right
+    description: Open stairs up to the gallery.
+
+exits:
+  - id: street_door
+    level: ground
+    side: left
+    leads_to: null                     # LOC id, or null
+
+connections:                           # how characters get between levels
+  - from: ground
+    to: upper
+    via: stairs

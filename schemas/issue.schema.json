@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://everything-ai-comics.dev/schemas/issue.schema.json",
+  "title": "Issue",
+  "description": "One publication unit (production/issues/<ISS_ID>/issue.yaml): scenes, page and panel counts, and status. A chapter or a webtoon episode is an issue.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "number", "title", "summary", "scenes", "page_count", "status"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^ISS_\\d{3}$",
+      "description": "Issue ID, e.g. ISS_001. Matches the directory name."
+    },
+    "number": { "type": "integer", "minimum": 1, "description": "Issue number." },
+    "title": { "type": "string", "minLength": 1, "description": "Issue title." },
+    "source_span": { "type": "string", "description": "Part of the source this issue adapts." },
+    "summary": { "type": "string", "minLength": 1, "description": "What happens in the issue." },
+    "scenes": {
+      "type": "array",
+      "description": "Scene IDs in story order.",
+      "items": { "type": "string", "pattern": "^SC_\\d{3}_\\d{2}$" }
+    },
+    "page_count": { "type": "integer", "minimum": 0, "description": "Number of pages in the issue." },
+    "panel_count": { "type": "integer", "minimum": 0, "description": "Number of panels across all pages." },
+    "opens_from": {
+      "type": ["string", "null"],
+      "description": "Continuity state file of the previous issue, relative to the workspace root, or null."
+    },
+    "status": {
+      "enum": ["planning", "scripting", "production", "review", "published"],
+      "description": "Production status of the issue."
+    },
+    "notes": { "type": "string", "description": "Free-form notes for people. Never read by scripts." }
+  }
+}

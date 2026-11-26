@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://everything-ai-comics.dev/schemas/location-map.schema.json",
+  "title": "Location Map",
+  "description": "Geometry of one location (production/locations/<LOC_ID>/map.yaml): levels, the fixed side convention, landmarks, exits, and connections. Panel positions resolve against it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["location", "levels", "landmarks"],
+  "properties": {
+    "location": {
+      "type": "string",
+      "pattern": "^LOC_[A-Z][A-Z0-9_]*$",
+      "description": "Location this map describes."
+    },
+    "levels": {
+      "type": "array",
+      "description": "Named vertical levels, bottom to top.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "description": "Level ID, e.g. deck."
+          },
+          "description": { "type": "string", "description": "What the level is." }
+        }
+      }
+    },
+    "sides": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The fixed side convention for this location.",
+      "properties": {
+        "convention": { "type": "string", "description": "The rule that fixes left and right for this location." },
+        "left": { "type": "string", "description": "What is at screen left." },
+        "right": { "type": "string", "description": "What is at screen right." }
+      }
+    },
+    "landmarks": {
+      "type": "array",
+      "description": "Fixed points a panel position can name.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "level"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "description": "Landmark ID, e.g. crates."
+          },
+          "level": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "description": "Level the landmark sits on; one of levels[].id."
+          },
+          "side": {
+            "enum": ["left", "right", "center"],
+            "description": "Side of the location the landmark sits on."
+          },
+          "description": { "type": "string", "description": "What the landmark is." }
+        }
+      }
+    },
+    "exits": {
+      "type": "array",
+      "description": "Ways in and out of the location.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "description": "Exit ID, e.g. gangway."
+          },
+          "level": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "description": "Level the exit is on; one of levels[].id."
+          },
+          "side": {
+            "enum": ["left", "right", "center"],
+            "description": "Side of the location the exit is on."
+          },
+          "leads_to": {
+            "type": ["string", "null"],
+            "pattern": "^LOC_[A-Z][A-Z0-9_]*$",
+            "description": "Location the exit leads to, or null."
+          }
+        }
+      }
+    },
+    "connections": {
+      "type": "array",
+      "description": "How characters get between levels.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "description": "Level the connection starts on."
+          },
+          "to": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "description": "Level the connection reaches."
+          },
+          "via": { "type": "string", "description": "Landmark or structure used, e.g. ladder." }
+        }
+      }
+    },
+    "notes": { "type": "string", "description": "Free-form notes for people. Never read by scripts." }
+  }
+}

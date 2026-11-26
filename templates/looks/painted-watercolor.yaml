@@ -1,0 +1,51 @@
+# LOOK preset: painted watercolor. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+
+id: LOOK_PAINTED_WATERCOLOR_V01
+name: Painted watercolor
+intent: "Quiet, memory-driven, or fairy-tale stories. Use it when atmosphere and weather do part of the telling and hard outlines would feel too loud."
+status: draft
+
+line: "Soft graphite pencil, left visible under the paint. Lines break and fade; no inked outline."
+inking: "No ink. Darks are built from layered washes, never from solid black."
+tone: "Transparent washes, wet into wet for skies and distance, drier strokes for faces and hands. Rough paper grain shows through."
+color_mode: limited
+palette:
+  - "three or four hues per scene, chosen in color-script.md"
+  - "paper white kept for the lightest lights"
+  - "one warm accent against a cool field, or the reverse"
+rendering: "Edges soft in the distance and firmer on the focal figure. Faces small and simple. Backgrounds dissolve into wash where they are not needed."
+lettering_style: "Sentence case, hand-lettered. Balloons with a thin pencil-grey outline over a pale wash. Captions written directly on quiet areas of the painting or in unbordered pale boxes."
+
+style_block: |
+  Painted comic book page in transparent watercolor over pencil.
+  Line: soft visible graphite pencil lines, broken and fading, no inked outlines.
+  Blacks and shadow: no solid black; darks built from layered washes.
+  Tone: transparent washes with wet-into-wet blooms and granulation, rough cold-press paper grain showing through.
+  Color: a limited palette of three or four muted hues, paper white for the lightest lights.
+  Rendering: soft edges in the distance, firmer edges on the focal figure, small simple faces, backgrounds dissolving into wash.
+  Panels: soft-edged panels with wide off-white gutters, no hard black borders.
+  Lettering: hand-lettered sentence-case text in pale balloons with a thin grey pencil outline.
+
+prompt_vocabulary:
+  - transparent watercolor wash
+  - visible pencil underdrawing
+  - wet-into-wet blooms
+  - pigment granulation
+  - cold-press paper texture
+  - limited muted palette
+  - soft lost edges
+
+negative_vocabulary:
+  - black ink outline
+  - flat digital color
+  - cel shading
+  - saturated neon color
+  - hard-edged vector shapes
+  - glossy rendering
+  - screentone
+
+pairs_with:
+  comic_formats: [paged, webtoon]
+  publications: [one-shot, graphic-novel]
+  typical_genres: [memoir, fairy tale, literary drama, children]

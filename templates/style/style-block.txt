@@ -1,0 +1,20 @@
+# FROZEN STYLE BLOCK
+# This file is the style prompt of the whole comic. Every request reuses it word for word.
+# Write it once with /style-bible, get it approved, then leave it alone: a changed word
+# changes every page that follows. If the look has to change, write a new block, generate
+# a new look master, and record the change in style-bible.md.
+#
+# Describe the drawing: medium, line, blacks, tone, color, texture, borders, lettering.
+# Name no character, place, or prop here. Repeating a style word in a page prompt does not
+# replace this block, and this block does not replace the look master image.
+#
+# Replace each <...> below, then delete every line that starts with "#".
+
+Comic book page, <medium: brush and nib ink / digital ink and flat color / watercolor>, <paged layout / vertical scroll>.
+Line: <weight, variation, how contours close>.
+Blacks and shadow: <how much solid black, hard or soft shadow edges, hatching or none>.
+Tone: <none / screentone dots / grey wash / dry-brush texture>.
+Color: <monochrome / limited palette with named hues / full color, flat or modelled>.
+Rendering: <how faces, hands, and backgrounds are simplified; what stays readable at thumbnail size>.
+Panels: <border weight, gutter color and width>.
+Lettering: <case, balloon shape and outline, caption boxes, sound effect treatment>.

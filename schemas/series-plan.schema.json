@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://everything-ai-comics.dev/schemas/series-plan.schema.json",
+  "title": "Series Plan",
+  "description": "Division of the story into issues (production/story/series-plan.yaml): source span, page budget, and status per issue.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "issues"],
+  "properties": {
+    "title": { "type": "string", "minLength": 1, "description": "Title of the series or story." },
+    "issues": {
+      "type": "array",
+      "description": "Issues in publication order.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "number", "title", "page_budget", "status"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^ISS_\\d{3}$", "description": "Issue ID, e.g. ISS_001." },
+          "number": { "type": "integer", "minimum": 1, "description": "Issue number." },
+          "title": { "type": "string", "minLength": 1, "description": "Issue title." },
+          "source_span": {
+            "type": "string",
+            "description": "Part of the source this issue adapts, e.g. story/source/night-ferry.txt#p1-p9."
+          },
+          "summary": { "type": "string", "description": "What happens in the issue." },
+          "page_budget": { "type": "integer", "minimum": 1, "description": "Planned number of pages." },
+          "status": {
+            "enum": ["planning", "scripting", "production", "review", "published"],
+            "description": "Production status of the issue."
+          }
+        }
+      }
+    },
+    "notes": { "type": "string", "description": "Free-form notes for people. Never read by scripts." }
+  }
+}

@@ -1,0 +1,48 @@
+# LOOK preset: newspaper strip. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+
+id: LOOK_NEWSPAPER_STRIP_V01
+name: Newspaper strip
+intent: "Gag strips and short daily episodes. Three or four panels have to read at a small size, so drawing and lettering are both kept large and simple."
+status: draft
+
+line: "Bold brush or marker line of nearly even weight. Few lines, each one doing a job."
+inking: "Small flat areas of black for hair, shoes, and night. No hatching beyond a few texture marks."
+tone: "None for a daily strip. An optional flat grey or coarse dot tone on one or two shapes per panel."
+color_mode: monochrome
+palette: []
+rendering: "Cartoon proportions with large heads and simple hands. Expressions readable from across a room. Backgrounds reduced to a horizon line and one or two props; often left out after the first panel."
+lettering_style: "Large hand-lettered upper case. Round balloons that may take a third of the panel, short tails. Sound effects drawn in open block letters."
+
+style_block: |
+  Black-and-white newspaper comic strip.
+  Line: bold brush line of nearly even weight, very few lines, simple closed shapes.
+  Blacks and shadow: small flat black areas for hair, shoes, and night; no hatching.
+  Tone: none, or one flat coarse dot tone on a single shape per panel.
+  Color: black ink on white paper.
+  Rendering: cartoon proportions with large heads, simple hands, broad readable expressions, minimal backgrounds.
+  Panels: one horizontal tier of equal-height panels with even black borders and narrow white gutters.
+  Lettering: large hand-lettered upper-case text in round balloons with short tails.
+
+prompt_vocabulary:
+  - bold simple cartoon line
+  - large heads and simple hands
+  - minimal background
+  - single tier of equal panels
+  - flat spot blacks
+  - large hand lettering
+  - broad readable expression
+
+negative_vocabulary:
+  - detailed realistic anatomy
+  - cross-hatching
+  - gradients
+  - painterly color
+  - dense backgrounds
+  - dramatic cinematic lighting
+  - small fine lettering
+
+pairs_with:
+  comic_formats: [paged]
+  publications: [strip]
+  typical_genres: [humor, slice of life, satire, all-ages]

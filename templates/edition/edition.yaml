@@ -1,0 +1,24 @@
+# production/editions/ED_001_01/edition.yaml: one edition of an issue
+# Schema: schemas/edition.schema.json
+# Lists the exact render of every page. build-edition.js fills exports and never overwrites a file.
+
+id: ED_001_01                          # ED_<issue>_##. Matches the directory name
+issue: ISS_001
+title: "TODO: title of the edition"
+label: first edition
+status: draft                          # draft | reviewed | published
+supersedes: null                       # previous edition ID, or null
+changes: []                            # what changed since the superseded edition
+
+pages:                                 # reading order, once each, no gaps
+  - page: PG_001_001
+    render: PG_001_001_V01             # the exact render that ships
+    file: issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V01.png   # relative to the workspace root
+    lettered_file: null                # overlay mode: the lettered output. Else null
+
+exports: []                            # filled by build-edition.js
+#  - format: cbz                        # pdf | cbz | web
+#    file: editions/ED_001_01/exports/title-ed01.cbz
+#    built_at: null
+
+created_at: "2026-01-01"

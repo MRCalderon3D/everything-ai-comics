@@ -1,0 +1,34 @@
+# production/characters/CHAR_EXAMPLE/character.yaml: character bible
+# Schema: schemas/character.schema.json
+# Prompts are compiled from description.* and prompt_summary. Never contradict them in a panel.
+
+id: CHAR_EXAMPLE                       # matches the directory name
+name: Example
+aliases: []
+role: protagonist                      # protagonist | antagonist | supporting | background
+
+description:
+  summary: "TODO: who this is in one or two sentences, written as a drawing brief."
+  age: thirties
+  build: "TODO: build and posture"
+  hair: "TODO: color and cut"
+  face: "TODO: face shape, eyes, nose"
+  skin: "TODO: tone and texture"
+  distinguishing_features:             # at least one. What separates this character from anyone else in the cast
+    - "TODO: a feature that reads at thumbnail size"
+    - "TODO: a second one, in case the first is hidden"
+
+prompt_summary: "TODO: one sentence used verbatim in prompts. Lead with the distinguishing features."
+visually_adjacent_to: []               # characters this one could be confused with. Prompts must state the difference
+
+personality: "TODO: how they behave under pressure."
+voice: "TODO: how they talk. Sentence length, habits."
+arc: "TODO: how they change."
+first_appearance: PG_001_001
+default_wardrobe: WARD_EXAMPLE_DEFAULT # defined in wardrobe.yaml
+wardrobe_file: wardrobe.yaml
+
+references:                            # asset IDs registered in references/manifest.yaml
+  - CHAR_EXAMPLE_TURN_MASTER_V01
+
+status: draft                          # draft | review | approved

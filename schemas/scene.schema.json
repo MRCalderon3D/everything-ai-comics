@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://everything-ai-comics.dev/schemas/scene.schema.json",
+  "title": "Scene",
+  "description": "One scene of an issue (production/issues/<ISS_ID>/scenes/<SC_ID>.yaml): location, cast, fixed geography, beats, and the pages that carry it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "issue", "location", "cast", "summary", "beats", "pages"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^SC_\\d{3}_\\d{2}$",
+      "description": "Scene ID, e.g. SC_001_01. Matches the file name."
+    },
+    "issue": { "type": "string", "pattern": "^ISS_\\d{3}$", "description": "Issue the scene belongs to." },
+    "location": {
+      "type": "string",
+      "pattern": "^LOC_[A-Z][A-Z0-9_]*$",
+      "description": "Location of the scene."
+    },
+    "time_of_day": { "enum": ["dawn", "day", "dusk", "night"], "description": "Time of day." },
+    "cast": {
+      "type": "array",
+      "description": "Characters present, drawn or off-panel.",
+      "items": { "type": "string", "pattern": "^CHAR_[A-Z][A-Z0-9_]*$" }
+    },
+    "summary": { "type": "string", "minLength": 1, "description": "What happens in the scene." },
+    "geography": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Screen geography that holds for every panel of the scene.",
+      "properties": {
+        "travel_direction": {
+          "enum": ["left_to_right", "right_to_left", "toward_reader", "away_from_reader", "none"],
+          "description": "Screen direction of the main movement, fixed for the scene."
+        },
+        "threat_direction": {
+          "enum": ["left_to_right", "right_to_left", "toward_reader", "away_from_reader", "none"],
+          "description": "Screen direction the threat comes from, fixed for the scene."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Anything else that stays put: who is on which side, where the threat enters."
+        }
+      }
+    },
+    "beats": {
+      "type": "array",
+      "description": "Beats in story order, each with its page budget.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "summary", "pages"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^BT_\\d{3}_\\d{2}_\\d{2}$",
+            "description": "Beat ID, e.g. BT_001_01_01."
+          },
+          "summary": { "type": "string", "minLength": 1, "description": "What changes in the beat." },
+          "pages": {
+            "type": "array",
+            "description": "Pages that carry the beat.",
+            "items": { "type": "string", "pattern": "^PG_\\d{3}_\\d{3}$" }
+          }
+        }
+      }
+    },
+    "pages": {
+      "type": "array",
+      "description": "Pages of the scene in reading order.",
+      "items": { "type": "string", "pattern": "^PG_\\d{3}_\\d{3}$" }
+    },
+    "notes": { "type": "string", "description": "Free-form notes for people. Never read by scripts." }
+  }
+}

@@ -1,0 +1,51 @@
+# LOOK preset: modern superhero. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+
+id: LOOK_SUPERHERO_MODERN_V01
+name: Modern superhero
+intent: "Action stories with powered or larger-than-life characters. Use it when anatomy, motion, and color should hit hard on every page."
+status: draft
+
+line: "Confident ink line that goes from thick to thin. Heavy outer contour on figures, finer lines for muscle and cloth."
+inking: "Spotted blacks under jaws, arms, and capes. Feathering and short hatching where a form turns. Black holds the figure together under strong color."
+tone: "Carried by color: cel steps plus soft gradient modelling, rim lights, glows on energy effects."
+color_mode: full_color
+palette:
+  - "saturated costume primaries, kept consistent per character"
+  - "cooler, lower-saturation backgrounds so figures separate"
+  - "one glow color per power or light source"
+rendering: "Idealised athletic anatomy, strong foreshortening, low angles, figures overlapping or breaking panel borders. Backgrounds simplified during action, detailed in establishing panels."
+lettering_style: "Upper-case digital comic lettering with bold for stress. White balloons with a black outline, colored caption boxes per narrator, large colored sound effects with a contrasting outline."
+
+style_block: |
+  Full-color modern superhero comic book page.
+  Line: confident thick-to-thin ink line, heavy outer contours on figures, finer interior lines.
+  Blacks and shadow: spotted blacks on the shadow side of forms, feathering and short hatching where forms turn.
+  Tone: digital color with cel-shaded steps and soft gradient modelling, rim lighting, glow effects on energy.
+  Color: saturated costume colors against cooler, less saturated backgrounds.
+  Rendering: idealised athletic anatomy, strong foreshortening, dynamic low angles, figures overlapping panel borders.
+  Panels: black borders, white gutters, dynamic layouts with angled and inset panels.
+  Lettering: upper-case comic lettering in white balloons with black outlines, colored caption boxes, large outlined sound effects.
+
+prompt_vocabulary:
+  - dynamic foreshortened pose
+  - thick-to-thin ink line
+  - spotted blacks and feathering
+  - cel shading with gradient modelling
+  - rim light
+  - saturated costume colors
+  - figure breaking the panel border
+
+negative_vocabulary:
+  - flat shadowless color
+  - thin uniform line
+  - watercolor wash
+  - muted pastel palette
+  - stiff symmetrical pose
+  - photographic rendering
+  - screentone
+
+pairs_with:
+  comic_formats: [paged]
+  publications: [ongoing, miniseries, one-shot]
+  typical_genres: [superhero, action, science fiction, fantasy]

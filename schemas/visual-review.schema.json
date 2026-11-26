@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://everything-ai-comics.dev/schemas/visual-review.schema.json",
+  "title": "Visual Review",
+  "description": "Evidence-based review of one render (production/issues/<ISS_ID>/pages/<PG_ID>/reviews/<RENDER_ID>.review.yaml): fourteen named checks with pixel evidence, findings with expected / visible / repair / recheck, two gates, and a verdict. validate-workspace.js enforces the review rules.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "page", "render", "reviewer", "independent", "compared_against", "checks", "findings", "gates",
+    "verdict", "repair_cycle", "reviewed_at"
+  ],
+  "properties": {
+    "page": { "type": "string", "pattern": "^PG_\\d{3}_\\d{3}$", "description": "Page under review." },
+    "render": {
+      "type": "string",
+      "pattern": "^PG_\\d{3}_\\d{3}_V\\d{2}$",
+      "description": "The render under review."
+    },
+    "supersedes": {
+      "type": ["string", "null"],
+      "pattern": "^PG_\\d{3}_\\d{3}_V\\d{2}$",
+      "description": "The render this one replaces, or null."
+    },
+    "reviewer": { "type": "string", "minLength": 1, "description": "Agent name, or \"human\"." },
+    "independent": { "type": "boolean", "description": "true = the reviewer did not generate the image." },
+    "compared_against": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What the pixels were compared to.",
+      "properties": {
+        "references": {
+          "type": "array",
+          "description": "Reference assets the pixels were compared to.",
+          "items": { "type": "string", "pattern": "^(CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*_V\\d{2}$" }
+        },
+        "neighbors": {
+          "type": "array",
+          "description": "Renders of neighboring pages that were opened alongside.",
+          "items": { "type": "string", "pattern": "^PG_\\d{3}_\\d{3}_V\\d{2}$" }
+        }
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity", "cast_count", "position", "movement", "role_causality", "object_identity",
+        "object_custody", "physical_state", "wardrobe", "spatial_logic", "drawing_clarity",
+        "lettering", "page_structure", "style_fidelity"
+      ],
+      "description": "Every check, each with a result and evidence that describes pixels, not the prompt.",
+      "properties": {
+        "identity": { "$ref": "#/$defs/check" },
+        "cast_count": { "$ref": "#/$defs/check" },
+        "position": { "$ref": "#/$defs/check" },
+        "movement": { "$ref": "#/$defs/check" },
+        "role_causality": { "$ref": "#/$defs/check" },
+        "object_identity": { "$ref": "#/$defs/check" },
+        "object_custody": { "$ref": "#/$defs/check" },
+        "physical_state": { "$ref": "#/$defs/check" },
+        "wardrobe": { "$ref": "#/$defs/check" },
+        "spatial_logic": { "$ref": "#/$defs/check" },
+        "drawing_clarity": { "$ref": "#/$defs/check" },
+        "lettering": { "$ref": "#/$defs/check" },
+        "page_structure": { "$ref": "#/$defs/check" },
+        "style_fidelity": { "$ref": "#/$defs/check" }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "description": "Defects found. May be empty.",
+      "items": { "$ref": "#/$defs/finding" }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["style_fidelity", "narrative_continuity"],
+      "description": "The two gates, recorded separately.",
+      "properties": {
+        "style_fidelity": {
+          "enum": ["pass", "fail"],
+          "description": "Does the render match the look master and the style bible?"
+        },
+        "narrative_continuity": {
+          "enum": ["pass", "fail"],
+          "description": "Do identity, position, custody, state, and causality hold?"
+        }
+      }
+    },
+    "verdict": {
+      "enum": ["pass", "fixed", "flagged"],
+      "description": "pass: no findings. fixed: findings repaired and rechecked. flagged: a blocking finding is open or a gate fails."
+    },
+    "repair_cycle": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "0 for a first render; +1 per repair. Never exceeds project.repair_policy.max_cycles."
+    },
+    "reviewed_at": { "type": "string", "minLength": 1, "description": "Date of the review." },
+    "human_approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Human approval, recorded apart from the verdict.",
+      "properties": {
+        "status": {
+          "enum": ["pending", "approved", "rejected"],
+          "description": "Human decision, separate from the verdict."
+        },
+        "by": { "type": ["string", "null"], "description": "Who decided, or null." },
+        "at": { "type": ["string", "null"], "description": "When, or null." }
+      }
+    },
+    "notes": { "type": "string", "description": "Free-form notes for people. Never read by scripts." }
+  },
+  "$defs": {
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result", "evidence"],
+      "description": "One named check.",
+      "properties": {
+        "result": { "enum": ["pass", "fail", "not_applicable"], "description": "Outcome of the check." },
+        "evidence": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What is visible in the render that supports the result."
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "check", "expected", "visible", "severity", "repair", "status"],
+      "description": "One defect with its evidence and repair.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^F\\d{2}$",
+          "description": "Finding ID, unique within the review, e.g. F01."
+        },
+        "panel": {
+          "type": ["string", "null"],
+          "pattern": "^PN_\\d{3}_\\d{3}_\\d{2}$",
+          "description": "Panel ID, or null for a page-level finding."
+        },
+        "check": {
+          "enum": [
+            "identity", "cast_count", "position", "movement", "role_causality", "object_identity",
+            "object_custody", "physical_state", "wardrobe", "spatial_logic", "drawing_clarity",
+            "lettering", "page_structure", "style_fidelity"
+          ],
+          "description": "The check the finding belongs to."
+        },
+        "expected": { "type": "string", "minLength": 1, "description": "What canon or the plan calls for." },
+        "visible": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Pixel-based observation of what the render shows."
+        },
+        "severity": {
+          "enum": ["blocking", "minor"],
+          "description": "blocking: identity ambiguity, duplicates, impossible positions, broken causality, missing critical state transitions."
+        },
+        "repair": { "type": "string", "minLength": 1, "description": "The smallest useful change." },
+        "status": {
+          "enum": ["open", "fixed", "accepted"],
+          "description": "open: unresolved. fixed: repaired and rechecked. accepted: a minor defect left as is."
+        },
+        "recheck": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["render", "evidence"],
+          "description": "Recheck of the repair. Required when status is fixed.",
+          "properties": {
+            "render": {
+              "type": "string",
+              "pattern": "^PG_\\d{3}_\\d{3}_V\\d{2}$",
+              "description": "The corrected render that was reopened."
+            },
+            "evidence": {
+              "type": "string",
+              "minLength": 1,
+              "description": "What is visible in the corrected render."
+            }
+          }
+        }
+      },
+      "anyOf": [
+        {
+          "properties": {
+            "status": { "enum": ["open", "accepted"] }
+          }
+        },
+        { "required": ["recheck"] }
+      ]
+    }
+  }
+}

@@ -1,0 +1,84 @@
+# production/issues/ISS_001/pages/PG_001_001/reviews/PG_001_001_V01.review.yaml: visual review
+# Schema: schemas/visual-review.schema.json
+# Open the image. Evidence describes pixels, never the prompt or the caption.
+# This template is a first-render review with one open blocking finding, so the verdict is flagged.
+
+page: PG_001_001
+render: PG_001_001_V01                 # the render under review
+supersedes: null                       # the render this one replaces, or null
+reviewer: visual-reviewer              # agent name, or human
+independent: true                      # true = the reviewer did not generate the image
+
+compared_against:
+  references: [LOOK_EXAMPLE_MASTER_V01, CHAR_EXAMPLE_TURN_MASTER_V01]
+  neighbors: []                        # renders of neighboring pages opened alongside
+
+checks:                                # all fourteen, each with result (pass | fail | not_applicable) and evidence
+  identity:
+    result: fail
+    evidence: "TODO: face, hair, build, and costume against the sheet, panel by panel."
+  cast_count:
+    result: pass
+    evidence: "TODO: count each named character in each panel."
+  position:
+    result: pass
+    evidence: "TODO: level, side, and landmark against the ledger."
+  movement:
+    result: pass
+    evidence: "TODO: is each change of position shown or covered by an ellipsis?"
+  role_causality:
+    result: pass
+    evidence: "TODO: does the planned character perform the planned action?"
+  object_identity:
+    result: pass
+    evidence: "TODO: does each prop keep its shape and type?"
+  object_custody:
+    result: pass
+    evidence: "TODO: which hand holds what, against the ledger."
+  physical_state:
+    result: not_applicable
+    evidence: "No state tags on this page."
+  wardrobe:
+    result: pass
+    evidence: "TODO: layers, accessories, and hands against wardrobe.yaml."
+  spatial_logic:
+    result: pass
+    evidence: "TODO: sides, travel direction, and threat direction against the scene geography."
+  drawing_clarity:
+    result: pass
+    evidence: "TODO: hands, limbs, and silhouettes separate and readable."
+  lettering:
+    result: pass
+    evidence: "TODO: every string exact, every tail on the right speaker, reading order intact."
+  page_structure:
+    result: pass
+    evidence: "TODO: panel count and grid against the layout."
+  style_fidelity:
+    result: pass
+    evidence: "TODO: line, blacks, and tone against the look master."
+
+findings:                              # may be empty
+  - id: F01                            # F##, unique within this file
+    panel: PN_001_001_02               # panel ID, or null for a page-level finding
+    check: identity                    # one of the check keys
+    expected: "TODO: what canon or the plan calls for."
+    visible: "TODO: what the pixels show instead."
+    severity: blocking                 # blocking | minor. Identity ambiguity is always blocking
+    repair: "TODO: the smallest change that fixes it."
+    status: open                       # open | fixed | accepted. A blocking finding cannot be accepted
+#    recheck:                           # required once status is fixed
+#      render: PG_001_001_V02           # the corrected render that was reopened
+#      evidence: What the corrected pixels show.
+
+gates:                                 # recorded separately
+  style_fidelity: pass                 # pass | fail
+  narrative_continuity: fail           # pass | fail
+
+verdict: flagged                       # pass: no findings. fixed: repaired and rechecked. flagged: open blocking finding or failed gate
+repair_cycle: 0                        # 0 for a first render, +1 per repair
+reviewed_at: "2026-01-01"
+
+human_approval:                        # a separate decision from the verdict
+  status: pending                      # pending | approved | rejected
+  by: null
+  at: null

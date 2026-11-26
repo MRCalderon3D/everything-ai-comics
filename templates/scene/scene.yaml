@@ -1,0 +1,22 @@
+# production/issues/ISS_001/scenes/SC_001_01.yaml: one scene
+# Schema: schemas/scene.schema.json
+# Geography is fixed here once, so every panel of the scene can be checked against it.
+
+id: SC_001_01                          # SC_<issue>_##. Matches the file name
+issue: ISS_001
+location: LOC_EXAMPLE
+time_of_day: night                     # dawn | day | dusk | night
+cast: [CHAR_EXAMPLE]                   # everyone present, drawn or off-panel
+summary: "TODO: what happens in the scene."
+
+geography:
+  travel_direction: left_to_right      # left_to_right | right_to_left | toward_reader | away_from_reader | none
+  threat_direction: right_to_left
+  notes: "TODO: what stays on which side for the whole scene."
+
+beats:
+  - id: BT_001_01_01                   # BT_<issue>_<scene>_##
+    summary: "TODO: what changes in this beat."
+    pages: [PG_001_001]
+
+pages: [PG_001_001]                    # in reading order

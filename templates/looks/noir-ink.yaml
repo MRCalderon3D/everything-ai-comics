@@ -1,0 +1,48 @@
+# LOOK preset: noir ink. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+
+id: LOOK_NOIR_INK_V01
+name: Noir ink
+intent: "Crime, night, and bad decisions. Use it when the story lives in shadow and a page should read as black shapes before it reads as detail."
+status: draft
+
+line: "Brush and nib. Heavy contours that swell and thin; lines disappear where a form turns into shadow."
+inking: "Solid spotted blacks cover roughly half of most panels. Shadows are flat black shapes with hard edges. No cross-hatching used as grey."
+tone: "None. Sparse dry-brush strokes are the only texture."
+color_mode: monochrome
+palette: []
+rendering: "Faces reduced to planes of light and shadow, eyes often lost in black. Light is the untouched white of the paper. Silhouettes stay readable at thumbnail size."
+lettering_style: "Hand-lettered upper case. White balloons with a thin black outline, white caption boxes, sound effects drawn as heavy black or reversed white letters inside the art."
+
+style_block: |
+  Black-and-white comic book page in a high-contrast ink noir style.
+  Line: brush and nib inking, heavy variable-weight contours that vanish where forms fall into shadow.
+  Blacks and shadow: large areas of solid spotted black; shadows drawn as flat black shapes with hard edges.
+  Tone: no grey tones, no gradients, no screentone; texture only from sparse dry-brush strokes.
+  Color: pure black ink on white paper.
+  Rendering: faces simplified into planes of light and shadow, light described by untouched white paper, clear silhouettes.
+  Panels: clean black borders of even weight, white gutters.
+  Lettering: hand-lettered upper-case text in white balloons with a thin black outline, white caption boxes.
+
+prompt_vocabulary:
+  - high-contrast black-and-white ink
+  - heavy spotted blacks
+  - hard-edged cast shadows drawn as flat black shapes
+  - brush and nib line with variable weight
+  - rim light left as white paper
+  - dry-brush texture
+  - strong readable silhouettes
+
+negative_vocabulary:
+  - grey wash
+  - soft airbrushed shading
+  - gradients
+  - screentone dots
+  - color
+  - photorealistic rendering
+  - thin uniform line
+
+pairs_with:
+  comic_formats: [paged, webtoon]
+  publications: [one-shot, miniseries, graphic-novel]
+  typical_genres: [noir, crime, horror, thriller]

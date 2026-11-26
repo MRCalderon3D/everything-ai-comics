@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://everything-ai-comics.dev/schemas/edition.schema.json",
+  "title": "Edition",
+  "description": "One edition of an issue (production/editions/<ED_ID>/edition.yaml): the exact render of every page and the exports built from them. Only renders reviewed pass or fixed enter a non-draft edition; exports are never overwritten.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "issue", "title", "label", "status", "pages", "exports"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^ED_\\d{3}_\\d{2}$",
+      "description": "Edition ID, e.g. ED_001_01. Matches the directory name."
+    },
+    "issue": { "type": "string", "pattern": "^ISS_\\d{3}$", "description": "Issue the edition publishes." },
+    "title": { "type": "string", "minLength": 1, "description": "Title of the edition." },
+    "label": { "type": "string", "minLength": 1, "description": "Human label, e.g. first edition." },
+    "status": { "enum": ["draft", "reviewed", "published"], "description": "Lifecycle of the edition." },
+    "supersedes": {
+      "type": ["string", "null"],
+      "pattern": "^ED_\\d{3}_\\d{2}$",
+      "description": "Previous edition ID, or null."
+    },
+    "changes": {
+      "type": "array",
+      "description": "What changed since the superseded edition.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "pages": {
+      "type": "array",
+      "description": "Pages in reading order, once each, with no gaps.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["page", "render", "file"],
+        "properties": {
+          "page": { "type": "string", "pattern": "^PG_\\d{3}_\\d{3}$", "description": "Page ID." },
+          "render": {
+            "type": "string",
+            "pattern": "^PG_\\d{3}_\\d{3}_V\\d{2}$",
+            "description": "The exact render that ships."
+          },
+          "file": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Path of the render file, relative to the workspace root."
+          },
+          "lettered_file": {
+            "type": ["string", "null"],
+            "description": "Overlay mode: path of the lettered output. Else null."
+          }
+        }
+      }
+    },
+    "exports": {
+      "type": "array",
+      "description": "Exports built from this edition. May be empty before the first build.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["format", "file"],
+        "properties": {
+          "format": { "enum": ["pdf", "cbz", "web"], "description": "Export format." },
+          "file": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Path of the export, relative to the workspace root."
+          },
+          "built_at": { "type": ["string", "null"], "description": "When the export was built, or null." }
+        }
+      }
+    },
+    "created_at": { "type": "string", "description": "Date the edition was created." },
+    "notes": { "type": "string", "description": "Free-form notes for people. Never read by scripts." }
+  }
+}

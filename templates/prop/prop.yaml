@@ -1,0 +1,17 @@
+# production/props/PROP_EXAMPLE/prop.yaml: prop bible
+# Schema: schemas/prop.schema.json
+# Custody is tracked panel by panel in page.yaml, not here.
+
+id: PROP_EXAMPLE                       # matches the directory name
+name: Example prop
+
+description:
+  summary: "TODO: the object in one sentence. Type, size, color."
+  distinguishing_features:
+    - "TODO: the shape detail that keeps it the same object in every panel"
+
+prompt_summary: "TODO: one sentence used verbatim in prompts."
+hands_required: 1                      # 1 | 2. Counted against the two-hand budget
+plot_relevant: true                    # true = the story depends on where this prop is
+references: []                         # asset IDs registered in references/manifest.yaml. May be empty
+status: draft                          # draft | review | approved

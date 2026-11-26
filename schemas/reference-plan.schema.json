@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://everything-ai-comics.dev/schemas/reference-plan.schema.json",
+  "title": "Reference Plan",
+  "description": "Reference selection for one page and one provider (production/issues/<ISS_ID>/pages/<PG_ID>/reference-plan.yaml). One role per entry, and an asset appears once; a style entry is never also identity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["page", "provider", "required"],
+  "properties": {
+    "page": { "type": "string", "pattern": "^PG_\\d{3}_\\d{3}$", "description": "Page the plan is for." },
+    "provider": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Provider the plan is budgeted for."
+    },
+    "budget": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "The provider's reference image limit at planning time."
+    },
+    "required": {
+      "type": "array",
+      "description": "Images the request must carry, in priority order.",
+      "items": { "$ref": "#/$defs/entry" }
+    },
+    "optional": {
+      "type": "array",
+      "description": "Images added when the budget allows.",
+      "items": { "$ref": "#/$defs/entry" }
+    },
+    "exclude": {
+      "type": "array",
+      "description": "Asset IDs deliberately left out, with the reason in notes.",
+      "items": {
+        "type": "string",
+        "pattern": "^((CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*_V\\d{2}|PG_\\d{3}_\\d{3}_V\\d{2})$"
+      }
+    },
+    "created_at": { "type": "string", "description": "Date the plan was written." },
+    "notes": { "type": "string", "description": "Free-form notes for people. Never read by scripts." }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset_id", "role", "priority", "reason"],
+      "description": "One reference image with exactly one role.",
+      "properties": {
+        "asset_id": {
+          "type": "string",
+          "pattern": "^((CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*_V\\d{2}|PG_\\d{3}_\\d{3}_V\\d{2})$",
+          "description": "Asset ID, or a render ID when a previous page is attached."
+        },
+        "entity": {
+          "type": ["string", "null"],
+          "pattern": "^(CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*$",
+          "description": "Entity the asset belongs to; null for a render."
+        },
+        "role": {
+          "enum": [
+            "style", "identity", "wardrobe", "spatial_continuity", "prop_consistency", "composition",
+            "edit_target"
+          ],
+          "description": "The single role this image plays in the request."
+        },
+        "priority": {
+          "enum": ["critical", "high", "medium", "low"],
+          "description": "What to keep when the provider budget is short."
+        },
+        "reason": { "type": "string", "minLength": 1, "description": "Why the page needs this image." },
+        "omission_risk": { "type": "string", "description": "What goes wrong if it is left out." }
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+# production/story/series-plan.yaml: the story divided into issues
+# Schema: schemas/series-plan.schema.json
+# Written by /series-plan. An issue is the publication unit: a chapter or a webtoon episode.
+
+title: "{{TITLE}}"
+
+issues:
+  - id: ISS_001                        # ISS_###
+    number: 1
+    title: "TODO: issue title"
+    source_span: story/source/source.txt#p1-p9   # the part of the source this issue adapts
+    summary: "TODO: what happens, in one or two sentences."
+    page_budget: 8                     # planned pages, at least 1
+    status: planning                   # planning | scripting | production | review | published

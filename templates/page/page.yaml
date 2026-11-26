@@ -1,0 +1,125 @@
+# production/issues/ISS_001/pages/PG_001_001/page.yaml: one page
+# Schema: schemas/page.schema.json
+# Layout, panel script, panel ledger, and lettering text live in this one file.
+# check-continuity.js audits the ledger rows (cast, props, transfers) panel by panel.
+
+id: PG_001_001                         # PG_<issue>_###. Matches the directory name
+issue: ISS_001
+number: 1                              # page number within the issue
+scene: SC_001_01
+side: right                            # paged only. left | right | single
+spread_with: null                      # facing page of a double-page spread, or null
+purpose: "TODO: what this page does for the story, in one sentence."
+page_turn: none                        # none | continuation | reveal | cliffhanger
+
+layout:
+  grid: "two tiers, 1 / 1"             # human-readable grid
+  tiers: [1, 1]                        # panels per tier, top to bottom. Sums to the number of panels
+  reading_order: [1, 2]                # permutation of the panels' order values
+  notes: ""
+
+panels:
+  - id: PN_001_001_01                  # PN_<issue>_<page>_##
+    order: 1                           # reading position, 1-based
+    tier: 1
+    size: wide                         # splash | wide | large | medium | small | inset
+    framing:
+      shot_size: wide                  # extreme_wide | wide | full | medium_wide | medium | medium_close_up | close_up | extreme_close_up | insert | over_the_shoulder
+      angle: eye_level                 # eye_level | high_angle | low_angle | overhead | worms_eye | dutch
+      view: three_quarter              # front | three_quarter | profile | three_quarter_back | back
+      composition: "TODO: where the subject sits in the frame."
+    moment: "TODO: the one thing that happens in this panel. If you need the word 'then', split the panel."
+    location: LOC_EXAMPLE
+    transition_in: null                # null for the first panel of a scene. Else moment | action | subject | scene | aspect | non_sequitur
+    ellipsis: null                     # what the gutter skips before this panel, or null
+    background: "TODO: what is behind the cast."
+    cast:                              # one ledger row per character
+      - character: CHAR_EXAMPLE
+        off_panel: false               # true = not drawn here, but the row keeps their state
+        position:
+          level: ground                # a level of the location map
+          side: left                   # left | right | center
+          landmark: door               # a landmark of the location map, or null
+        facing: right                  # left | right | toward_reader | away_from_reader
+        action: Stands in the doorway. # the visible action
+        acting: "TODO: posture, hands, eyes. Behavior, not an emotion label."
+        wardrobe: WARD_EXAMPLE_DEFAULT
+        state: []                      # persistent tags: injuries, blood, soaked, bound. A tag stays until resolved
+        state_changes:
+          adds: []
+          resolves: []
+        holding: []                    # PROP ids in hand
+        carrying: null                 # CHAR id carried or supported (two hands), or null
+        moved: null                    # how they got here since their previous appearance, or null
+        wardrobe_change: null          # why the wardrobe differs from the previous appearance, or null
+    props:                             # props that nobody holds
+      - prop: PROP_EXAMPLE
+        position: { level: ground, side: right, landmark: stairs }
+        state: []
+        visible: true                  # drawn in this panel?
+    transfers: []                      # custody changes in this panel
+    lettering:                         # exact text, in reading order
+      - id: L01                        # L##, unique within the page
+        type: caption                  # caption | narration | balloon | thought | whisper | shout | radio | sfx | sign
+        speaker: null                  # CHAR id for spoken types, else null
+        text: "TODO: exact words."
+        order: 1                       # reading order within the page
+    notes: ""
+
+  - id: PN_001_001_02
+    order: 2
+    tier: 2
+    size: wide
+    framing:
+      shot_size: medium
+      angle: eye_level
+      view: profile
+      composition: "TODO"
+    moment: "TODO: the next single moment."
+    location: LOC_EXAMPLE
+    transition_in: action
+    ellipsis: null
+    background: "TODO"
+    cast:
+      - character: CHAR_EXAMPLE
+        off_panel: false
+        position: { level: ground, side: right, landmark: stairs }
+        facing: right
+        action: Picks the prop up from the bottom stair.
+        acting: "TODO"
+        wardrobe: WARD_EXAMPLE_DEFAULT
+        state: []
+        state_changes: { adds: [], resolves: [] }
+        holding: [PROP_EXAMPLE]        # in hand now, so it leaves the props list below
+        carrying: null
+        moved: Crossed the room from the door to the stairs.
+        wardrobe_change: null
+    props: []
+    transfers:                         # every change of holder needs an entry
+      - prop: PROP_EXAMPLE
+        from: null                     # CHAR id, or null when picked up from a surface
+        to: CHAR_EXAMPLE               # CHAR id, or null when dropped or set down
+        how: pickup                    # handoff | pickup | drop | set_down | draw | holster | throw | take
+    lettering:
+      - id: L02
+        type: balloon
+        speaker: CHAR_EXAMPLE          # must have a row in this panel's cast
+        text: "TODO: exact words."
+        order: 2
+    notes: ""
+
+references:                            # asset IDs this page needs. Input to the reference plan
+  required: [LOOK_EXAMPLE_MASTER_V01, CHAR_EXAMPLE_TURN_MASTER_V01]
+  optional: [LOC_EXAMPLE_PLATE_MASTER_V01]
+
+continuity:
+  enters_from: null                    # previous page ID, or null for the first page of the issue
+  exits_to: null                       # next page ID, or null for the last page
+  attach_previous_render: true         # attach the previous reviewed page as a spatial reference
+
+generation:
+  provider: harness-native
+  mode: full_page                      # full_page | per_panel
+
+status: planned                        # planned | scripted | prompted | rendered | reviewed | approved
+current_render: null                   # render ID, e.g. PG_001_001_V01, or null

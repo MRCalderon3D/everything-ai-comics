@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://everything-ai-comics.dev/schemas/generation-record.schema.json",
+  "title": "Generation Record",
+  "description": "Provenance of one generation attempt (production/generations/<scope>/GEN_*.yaml): provider, model, prompt package, output, cost, and outcome. Metadata the tool does not report is recorded as unreported or null, never invented.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "page", "provider", "model", "kind", "prompt_package", "cost", "status", "created_at"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^GEN_(PG_\\d{3}_\\d{3}|(CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*)_\\d{2}$",
+      "description": "Record ID: GEN_<page or asset id>_<attempt##>, e.g. GEN_PG_001_001_01."
+    },
+    "page": {
+      "type": ["string", "null"],
+      "pattern": "^PG_\\d{3}_\\d{3}$",
+      "description": "Page the attempt was for, or null for an asset-scoped record."
+    },
+    "asset": {
+      "type": ["string", "null"],
+      "pattern": "^(CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*$",
+      "description": "Entity ID for asset-scoped records, else null."
+    },
+    "provider": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Provider that handled the request."
+    },
+    "model": { "type": "string", "minLength": 1, "description": "The reported model, or \"unreported\"." },
+    "kind": { "enum": ["image"], "description": "Kind of media generated." },
+    "prompt_package": {
+      "type": "string",
+      "pattern": "^PP_(PG_\\d{3}_\\d{3}|(CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*)_[A-Z0-9][A-Z0-9_-]*$",
+      "description": "Prompt package the attempt was generated from."
+    },
+    "output_render": {
+      "type": ["string", "null"],
+      "pattern": "^PG_\\d{3}_\\d{3}_V\\d{2}$",
+      "description": "Render ID produced, or null."
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary"],
+      "description": "What was sent.",
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What was sent, in one line. Never store API keys here."
+        },
+        "endpoint": {
+          "type": ["string", "null"],
+          "description": "Provider endpoint, or null for manual and harness-native handoffs."
+        },
+        "payload_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{8,64}$",
+          "description": "Hash of the full request payload."
+        }
+      }
+    },
+    "response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary"],
+      "description": "What came back.",
+      "properties": {
+        "summary": { "type": "string", "minLength": 1, "description": "What came back, in one line." },
+        "provider_job_id": { "type": ["string", "null"], "description": "Provider-side job ID, or null." },
+        "error": { "type": ["string", "null"], "description": "Provider error message, or null." }
+      }
+    },
+    "media_files": {
+      "type": "array",
+      "description": "Produced files, relative to the workspace root.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currency", "amount", "estimated", "reported"],
+      "description": "What the attempt cost.",
+      "properties": {
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$", "description": "ISO 4217 code, e.g. USD." },
+        "amount": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Cost, or null when the tool does not report it."
+        },
+        "estimated": { "type": "boolean", "description": "true = an estimate, e.g. for a dry run." },
+        "reported": { "type": "boolean", "description": "false = the tool gave no billing data." }
+      }
+    },
+    "seed": {
+      "type": ["integer", "null"],
+      "description": "Seed, or null when the tool does not report it."
+    },
+    "metadata_unavailable": {
+      "type": "array",
+      "description": "Which of model, cost, and seed the tool did not report.",
+      "items": { "enum": ["model", "cost", "seed"] }
+    },
+    "status": {
+      "enum": ["pending", "dry_run", "submitted", "succeeded", "failed", "rejected", "approved"],
+      "description": "Outcome of the attempt."
+    },
+    "created_at": { "type": "string", "minLength": 1, "description": "Timestamp of the attempt." },
+    "notes": { "type": "string", "description": "Free-form notes for people. Never read by scripts." }
+  }
+}

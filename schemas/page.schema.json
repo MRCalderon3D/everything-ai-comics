@@ -1,0 +1,387 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://everything-ai-comics.dev/schemas/page.schema.json",
+  "title": "Page",
+  "description": "One page (production/issues/<ISS_ID>/pages/<PG_ID>/page.yaml): layout, panel script, panel ledger, and exact lettering text in a single file, so plan, script, and ledger cannot drift apart. check-continuity.js audits the ledger rows.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "issue", "number", "scene", "purpose", "layout", "panels", "continuity", "status"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^PG_\\d{3}_\\d{3}$",
+      "description": "Page ID, e.g. PG_001_004. Matches the directory name."
+    },
+    "issue": { "type": "string", "pattern": "^ISS_\\d{3}$", "description": "Issue the page belongs to." },
+    "number": { "type": "integer", "minimum": 1, "description": "Page number within the issue." },
+    "scene": {
+      "type": "string",
+      "pattern": "^SC_\\d{3}_\\d{2}$",
+      "description": "Scene the page belongs to."
+    },
+    "side": {
+      "enum": ["left", "right", "single"],
+      "description": "Paged format only: which side of the open book the page falls on."
+    },
+    "spread_with": {
+      "type": ["string", "null"],
+      "pattern": "^PG_\\d{3}_\\d{3}$",
+      "description": "Page ID of the facing page in a double-page spread, or null."
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1,
+      "description": "What the page does for the story, in one sentence."
+    },
+    "page_turn": {
+      "enum": ["none", "continuation", "reveal", "cliffhanger"],
+      "description": "What the turn to the next page does."
+    },
+    "layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["grid", "tiers", "reading_order"],
+      "description": "Panel grid and reading order.",
+      "properties": {
+        "grid": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable grid, e.g. \"three tiers, 1 / 2 / 1\"."
+        },
+        "tiers": {
+          "type": "array",
+          "description": "Panels per tier, top to bottom. Sums to the number of panels.",
+          "minItems": 1,
+          "items": { "type": "integer", "minimum": 1 }
+        },
+        "reading_order": {
+          "type": "array",
+          "description": "Permutation of the panels' order values, in the order the reader meets them.",
+          "minItems": 1,
+          "items": { "type": "integer", "minimum": 1 }
+        },
+        "notes": { "type": "string", "description": "Layout notes." }
+      }
+    },
+    "panels": {
+      "type": "array",
+      "description": "Panels of the page. At least one.",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/panel" }
+    },
+    "references": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Asset IDs this page needs; input to the reference plan.",
+      "properties": {
+        "required": {
+          "type": "array",
+          "description": "Asset IDs the page cannot be generated without.",
+          "items": { "type": "string", "pattern": "^(CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*_V\\d{2}$" }
+        },
+        "optional": {
+          "type": "array",
+          "description": "Asset IDs that help when the provider budget allows.",
+          "items": { "type": "string", "pattern": "^(CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*_V\\d{2}$" }
+        }
+      }
+    },
+    "continuity": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Neighbors of the page. enters_from and exits_to form one unbroken chain per issue.",
+      "properties": {
+        "enters_from": {
+          "type": ["string", "null"],
+          "pattern": "^PG_\\d{3}_\\d{3}$",
+          "description": "Previous page ID, or null for the first page of the issue."
+        },
+        "exits_to": {
+          "type": ["string", "null"],
+          "pattern": "^PG_\\d{3}_\\d{3}$",
+          "description": "Next page ID, or null for the last page of the issue."
+        },
+        "attach_previous_render": {
+          "type": "boolean",
+          "description": "true = attach the previous reviewed page as a spatial reference."
+        }
+      }
+    },
+    "generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Generation settings for this page.",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Image provider for this page."
+        },
+        "mode": {
+          "enum": ["full_page", "per_panel"],
+          "description": "Generate the whole page in one request, or panel by panel."
+        }
+      }
+    },
+    "status": {
+      "enum": ["planned", "scripted", "prompted", "rendered", "reviewed", "approved"],
+      "description": "Pipeline status. reviewed and approved need a review of current_render with verdict pass or fixed."
+    },
+    "current_render": {
+      "type": ["string", "null"],
+      "pattern": "^PG_\\d{3}_\\d{3}_V\\d{2}$",
+      "description": "Render ID currently standing for the page, or null."
+    },
+    "notes": { "type": "string", "description": "Free-form notes for people. Never read by scripts." }
+  },
+  "$defs": {
+    "position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level"],
+      "description": "Where something is on the location map.",
+      "properties": {
+        "level": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "A level of the location map (levels[].id), e.g. deck or wheelhouse."
+        },
+        "side": {
+          "enum": ["left", "right", "center"],
+          "description": "Side of the location, using the map's fixed side convention."
+        },
+        "landmark": {
+          "type": ["string", "null"],
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "A landmark of the location map (landmarks[].id), or null."
+        }
+      }
+    },
+    "stateTags": {
+      "type": "array",
+      "description": "Persistent physical state tags, e.g. cut_left_hand, soaked, bound.",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }
+    },
+    "panel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "order", "size", "framing", "moment", "location"],
+      "description": "One panel: framing, moment, ledger rows, and lettering.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^PN_\\d{3}_\\d{3}_\\d{2}$",
+          "description": "Panel ID, e.g. PN_001_004_03."
+        },
+        "order": { "type": "integer", "minimum": 1, "description": "Reading position on the page, 1-based." },
+        "tier": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Tier the panel sits in, 1-based from the top."
+        },
+        "size": {
+          "enum": ["splash", "wide", "large", "medium", "small", "inset"],
+          "description": "Relative size of the panel."
+        },
+        "framing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["shot_size"],
+          "description": "Framing of the panel.",
+          "properties": {
+            "shot_size": {
+              "enum": [
+                "extreme_wide", "wide", "full", "medium_wide", "medium", "medium_close_up",
+                "close_up", "extreme_close_up", "insert", "over_the_shoulder"
+              ],
+              "description": "How much of the subject the panel shows."
+            },
+            "angle": {
+              "enum": ["eye_level", "high_angle", "low_angle", "overhead", "worms_eye", "dutch"],
+              "description": "Viewing angle."
+            },
+            "view": {
+              "enum": ["front", "three_quarter", "profile", "three_quarter_back", "back"],
+              "description": "Side of the subject the reader sees."
+            },
+            "composition": {
+              "type": "string",
+              "description": "Where the subject sits in the frame and what surrounds it."
+            }
+          }
+        },
+        "moment": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The one drawable main moment of the panel."
+        },
+        "location": {
+          "type": "string",
+          "pattern": "^LOC_[A-Z][A-Z0-9_]*$",
+          "description": "Location shown in the panel."
+        },
+        "transition_in": {
+          "enum": [null, "moment", "action", "subject", "scene", "aspect", "non_sequitur"],
+          "description": "Transition from the previous panel. null for the first panel of a scene."
+        },
+        "ellipsis": {
+          "type": ["string", "null"],
+          "description": "What the gutter intentionally skips before this panel, or null."
+        },
+        "background": { "type": "string", "description": "What is behind the cast." },
+        "cast": {
+          "type": "array",
+          "description": "Ledger rows for characters, one per character. May be empty.",
+          "items": { "$ref": "#/$defs/castRow" }
+        },
+        "props": {
+          "type": "array",
+          "description": "Ledger rows for props that are NOT in anyone's hands.",
+          "items": { "$ref": "#/$defs/propRow" }
+        },
+        "transfers": {
+          "type": "array",
+          "description": "Custody changes that happen in this panel.",
+          "items": { "$ref": "#/$defs/transfer" }
+        },
+        "lettering": {
+          "type": "array",
+          "description": "Exact lettering text of the panel, in reading order.",
+          "items": { "$ref": "#/$defs/letteringElement" }
+        },
+        "notes": { "type": "string", "description": "Panel notes." }
+      }
+    },
+    "castRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["character", "position", "action", "wardrobe", "state"],
+      "description": "Ledger row for one character in one panel.",
+      "properties": {
+        "character": {
+          "type": "string",
+          "pattern": "^CHAR_[A-Z][A-Z0-9_]*$",
+          "description": "Character this row tracks."
+        },
+        "off_panel": {
+          "type": "boolean",
+          "description": "true = not drawn in this panel, but the row keeps the character's state."
+        },
+        "position": { "$ref": "#/$defs/position", "description": "Where the character is." },
+        "facing": {
+          "enum": ["left", "right", "toward_reader", "away_from_reader"],
+          "description": "Direction the character faces."
+        },
+        "action": { "type": "string", "minLength": 1, "description": "The visible action." },
+        "acting": { "type": "string", "description": "Drawable behavior: posture, hands, eyes." },
+        "wardrobe": {
+          "type": "string",
+          "pattern": "^WARD_[A-Z][A-Z0-9_]*$",
+          "description": "Wardrobe state worn in this panel."
+        },
+        "state": {
+          "$ref": "#/$defs/stateTags",
+          "description": "Persistent physical state tags carried in this panel. A tag leaves only through state_changes.resolves."
+        },
+        "state_changes": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Every tag gained or lost in this panel.",
+          "properties": {
+            "adds": { "$ref": "#/$defs/stateTags", "description": "Tags gained in this panel." },
+            "resolves": { "$ref": "#/$defs/stateTags", "description": "Tags lost in this panel." }
+          }
+        },
+        "holding": {
+          "type": "array",
+          "description": "Props in hand. Each uses its hands_required.",
+          "items": { "type": "string", "pattern": "^PROP_[A-Z][A-Z0-9_]*$" }
+        },
+        "carrying": {
+          "type": ["string", "null"],
+          "pattern": "^CHAR_[A-Z][A-Z0-9_]*$",
+          "description": "Character carried or supported (uses two hands), or null."
+        },
+        "moved": {
+          "type": ["string", "null"],
+          "description": "How the character reached this position since their previous appearance, or null."
+        },
+        "wardrobe_change": {
+          "type": ["string", "null"],
+          "description": "Why the wardrobe differs from the previous appearance, or null."
+        }
+      }
+    },
+    "propRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prop", "position"],
+      "description": "Ledger row for one prop that nobody holds.",
+      "properties": {
+        "prop": {
+          "type": "string",
+          "pattern": "^PROP_[A-Z][A-Z0-9_]*$",
+          "description": "Prop this row tracks."
+        },
+        "position": { "$ref": "#/$defs/position", "description": "Where the prop rests." },
+        "state": { "$ref": "#/$defs/stateTags", "description": "State tags of the prop." },
+        "visible": { "type": "boolean", "description": "true = drawn in this panel." }
+      }
+    },
+    "transfer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prop", "how"],
+      "description": "One custody change.",
+      "properties": {
+        "prop": {
+          "type": "string",
+          "pattern": "^PROP_[A-Z][A-Z0-9_]*$",
+          "description": "Prop that changes custody."
+        },
+        "from": {
+          "type": ["string", "null"],
+          "pattern": "^CHAR_[A-Z][A-Z0-9_]*$",
+          "description": "Character giving it up, or null when picked up from a surface."
+        },
+        "to": {
+          "type": ["string", "null"],
+          "pattern": "^CHAR_[A-Z][A-Z0-9_]*$",
+          "description": "Character receiving it, or null when dropped or set down."
+        },
+        "how": {
+          "enum": ["handoff", "pickup", "drop", "set_down", "draw", "holster", "throw", "take"],
+          "description": "How custody changes."
+        }
+      }
+    },
+    "letteringElement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "text", "order"],
+      "description": "One balloon, caption, or sound effect.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^L\\d{2}$",
+          "description": "Lettering element ID, unique within the page, e.g. L01."
+        },
+        "type": {
+          "enum": ["caption", "narration", "balloon", "thought", "whisper", "shout", "radio", "sfx", "sign"],
+          "description": "Kind of lettering element."
+        },
+        "speaker": {
+          "type": ["string", "null"],
+          "pattern": "^CHAR_[A-Z][A-Z0-9_]*$",
+          "description": "Speaking character for spoken types, else null. Must be in the panel's cast."
+        },
+        "text": { "type": "string", "minLength": 1, "description": "Exact words, exact accents." },
+        "order": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Reading order within the page; unique within the page."
+        }
+      }
+    }
+  }
+}

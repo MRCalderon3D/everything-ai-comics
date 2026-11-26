@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://everything-ai-comics.dev/schemas/prompt-package.schema.json",
+  "title": "Prompt Package",
+  "description": "Provider-ready request for one page or one asset (production/issues/<ISS_ID>/pages/<PG_ID>/prompts/<provider>.yaml). Compiled from the page file, the bibles, the frozen style block, and the reference plan; never written by hand. Providers' compile() consumes this shape.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "page", "provider", "model", "mode", "prompt", "parameters", "status", "source_hashes"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^PP_(PG_\\d{3}_\\d{3}|(CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*)_[A-Z0-9][A-Z0-9_-]*$",
+      "description": "Package ID: PP_<page or asset id>_<PROVIDER>, e.g. PP_PG_001_001_HARNESS-NATIVE."
+    },
+    "page": {
+      "type": ["string", "null"],
+      "pattern": "^PG_\\d{3}_\\d{3}$",
+      "description": "Page this package generates, or null for an asset-scoped package."
+    },
+    "asset": {
+      "type": ["string", "null"],
+      "pattern": "^(CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*$",
+      "description": "Entity ID for asset-scoped packages, else null."
+    },
+    "provider": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "description": "Target provider ID." },
+    "model": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Model identifier pinned by provider.compile()."
+    },
+    "mode": {
+      "enum": ["generate", "repair"],
+      "description": "generate: a new render. repair: a sibling version edited from edit_target."
+    },
+    "prompt": { "type": "string", "minLength": 1, "description": "Full prompt text." },
+    "negative_prompt": { "type": "string", "description": "Negative prompt for providers that support one." },
+    "parameters": {
+      "type": "object",
+      "description": "Generation parameters. Provider-specific extras are allowed.",
+      "properties": {
+        "aspect_ratio": {
+          "type": "string",
+          "pattern": "^\\d+:\\d+$",
+          "description": "Aspect ratio as width:height."
+        },
+        "resolution": { "type": "string", "pattern": "^\\d+x\\d+$", "description": "Resolution as WIDTHxHEIGHT." },
+        "seed": { "type": ["integer", "null"], "description": "Seed, or null when none is set." }
+      }
+    },
+    "references": {
+      "type": "array",
+      "description": "Reference images in attachment order.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["asset_id", "role", "image_path"],
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "pattern": "^((CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*_V\\d{2}|PG_\\d{3}_\\d{3}_V\\d{2})$",
+            "description": "Asset ID, or a render ID for a previous page."
+          },
+          "role": {
+            "enum": [
+              "style", "identity", "wardrobe", "spatial_continuity", "prop_consistency",
+              "composition", "edit_target"
+            ],
+            "description": "The single role this image plays; same enum as the reference plan."
+          },
+          "image_path": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Path of the image, relative to the workspace root."
+          }
+        }
+      }
+    },
+    "edit_target": {
+      "type": ["string", "null"],
+      "description": "Image path of the render being repaired (mode: repair), else null."
+    },
+    "repair": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Repair instructions. mode: repair only.",
+      "properties": {
+        "of_render": {
+          "type": "string",
+          "pattern": "^PG_\\d{3}_\\d{3}_V\\d{2}$",
+          "description": "Render being repaired."
+        },
+        "findings": {
+          "type": "array",
+          "description": "Review findings the repair addresses.",
+          "items": { "type": "string", "pattern": "^F\\d{2}$" }
+        },
+        "changes": {
+          "type": "array",
+          "description": "Exact changes requested.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "locked": {
+          "type": "array",
+          "description": "Elements that must not change.",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "lettering_text": {
+      "type": "array",
+      "description": "The exact strings the image must contain (in_image mode), kept for review.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "status": { "enum": ["draft", "compiled", "submitted"], "description": "Lifecycle of the package." },
+    "source_hashes": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Hashes of the compile inputs. A mismatch means recompile, never hand-edit.",
+      "properties": {
+        "page": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{8,64}$",
+          "description": "Hash of page.yaml at compile time."
+        },
+        "reference_plan": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{8,64}$",
+          "description": "Hash of reference-plan.yaml at compile time."
+        },
+        "style_block": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{8,64}$",
+          "description": "Hash of the frozen style block at compile time."
+        }
+      }
+    },
+    "notes": { "type": "string", "description": "Free-form notes for people. Never read by scripts." }
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://everything-ai-comics.dev/schemas/continuity-state.schema.json",
+  "title": "Continuity State",
+  "description": "State of every tracked character and prop at the end of an issue (production/continuity/<ISS_ID>.final-state.yaml). The next issue opens from it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["issue", "after_page", "characters", "last_validated"],
+  "properties": {
+    "issue": { "type": "string", "pattern": "^ISS_\\d{3}$", "description": "Issue this state closes." },
+    "after_page": {
+      "type": "string",
+      "pattern": "^PG_\\d{3}_\\d{3}$",
+      "description": "The last page this state reflects."
+    },
+    "characters": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "State of each character, keyed by CHAR id.",
+      "patternProperties": {
+        "^CHAR_[A-Z][A-Z0-9_]*$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["location", "wardrobe", "state", "holding"],
+          "properties": {
+            "location": {
+              "type": "string",
+              "pattern": "^LOC_[A-Z][A-Z0-9_]*$",
+              "description": "Location the character is in."
+            },
+            "position": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["level"],
+              "description": "Where the character is on the location map.",
+              "properties": {
+                "level": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$",
+                  "description": "A level of the location map (levels[].id), e.g. deck or wheelhouse."
+                },
+                "side": {
+                  "enum": ["left", "right", "center"],
+                  "description": "Side of the location, using the map's fixed side convention."
+                },
+                "landmark": {
+                  "type": ["string", "null"],
+                  "pattern": "^[a-z][a-z0-9_]*$",
+                  "description": "A landmark of the location map (landmarks[].id), or null."
+                }
+              }
+            },
+            "wardrobe": {
+              "type": "string",
+              "pattern": "^WARD_[A-Z][A-Z0-9_]*$",
+              "description": "Wardrobe state worn."
+            },
+            "state": {
+              "type": "array",
+              "description": "Persistent physical state tags still carried.",
+              "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }
+            },
+            "holding": {
+              "type": "array",
+              "description": "Props in hand.",
+              "items": { "type": "string", "pattern": "^PROP_[A-Z][A-Z0-9_]*$" }
+            },
+            "notes": { "type": "string", "description": "Anything the next issue needs to know." }
+          }
+        }
+      }
+    },
+    "props": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "State of each tracked prop, keyed by PROP id.",
+      "patternProperties": {
+        "^PROP_[A-Z][A-Z0-9_]*$": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "custody": {
+              "type": ["string", "null"],
+              "pattern": "^CHAR_[A-Z][A-Z0-9_]*$",
+              "description": "Character holding the prop, or null."
+            },
+            "location": {
+              "type": "string",
+              "pattern": "^LOC_[A-Z][A-Z0-9_]*$",
+              "description": "Location the prop is in."
+            },
+            "state": {
+              "type": "array",
+              "description": "State tags of the prop.",
+              "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }
+            }
+          }
+        }
+      }
+    },
+    "open_threads": {
+      "type": "array",
+      "description": "Story threads the next issue picks up.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "open_issues": {
+      "type": "array",
+      "description": "Unresolved continuity problems.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "description"],
+        "properties": {
+          "severity": { "enum": ["blocking", "minor"], "description": "How serious the continuity problem is." },
+          "page": {
+            "type": ["string", "null"],
+            "pattern": "^PG_\\d{3}_\\d{3}$",
+            "description": "Page concerned, or null."
+          },
+          "description": { "type": "string", "minLength": 1, "description": "What is unresolved." }
+        }
+      }
+    },
+    "last_validated": { "type": "string", "minLength": 1, "description": "Date of the last continuity check." },
+    "notes": { "type": "string", "description": "Free-form notes for people. Never read by scripts." }
+  }
+}

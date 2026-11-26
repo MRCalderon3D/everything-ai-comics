@@ -1,0 +1,48 @@
+# LOOK preset: manga screentone. Copy the style block into style/style-block.txt, adapt it,
+# then promote the look as described in templates/looks/README.md. No schema.
+# Reading direction is not part of a look: set reading_direction in project.yaml.
+
+id: LOOK_MANGA_SCREENTONE_V01
+name: Manga screentone
+intent: "Long serial storytelling in black and white, where pace changes from page to page and greys come from tone sheets."
+status: draft
+
+line: "Fine pen line with pressure variation: thicker on the outer contour of a figure, hair-thin inside. Straight ruled lines for architecture."
+inking: "Solid black for hair, night skies, and dramatic panels. Speed lines and focus lines carry motion and emphasis."
+tone: "Screentone dot patterns for mid-greys, graded tone for skies and shadow, tone scraped back to white for highlights."
+color_mode: monochrome
+palette: []
+rendering: "Simplified faces with expressive eyes, detailed and often ruled backgrounds, backgrounds dropped entirely in emotional close-ups. Panels vary a lot in size and shape; figures may break the border."
+lettering_style: "Sentence or upper case in tall oval balloons, jagged balloons for shouting. Sound effects hand-drawn large and built into the composition."
+
+style_block: |
+  Black-and-white manga page with screentone.
+  Line: fine pen line with pressure variation, heavier outer contours, hair-thin interior lines, ruled lines for buildings.
+  Blacks and shadow: solid black for hair and night, speed lines and radiating focus lines for motion and emphasis.
+  Tone: mid-greys made of screentone dot patterns, graded tone for skies and shadows, no grey wash.
+  Color: black ink and dot tone on white paper.
+  Rendering: simplified faces with expressive eyes, detailed backgrounds, empty or toned backgrounds in emotional close-ups.
+  Panels: varied panel sizes with thin black borders, white gutters, occasional figure breaking the border.
+  Lettering: text in tall oval balloons, spiked balloons for shouts, hand-drawn sound effects built into the art.
+
+prompt_vocabulary:
+  - screentone dot shading
+  - fine pen line with pressure variation
+  - speed lines
+  - radiating focus lines
+  - solid black hair
+  - graded tone sky
+  - hand-drawn sound effects integrated in the panel
+
+negative_vocabulary:
+  - color
+  - grey watercolor wash
+  - soft airbrushed gradients
+  - thick uniform cartoon outline
+  - painterly rendering
+  - western superhero anatomy
+
+pairs_with:
+  comic_formats: [paged, webtoon]
+  publications: [ongoing, miniseries, webtoon-series]
+  typical_genres: [drama, action, romance, horror, slice of life]

@@ -1,0 +1,56 @@
+# production/project.yaml: workspace configuration
+# Schema: schemas/project.schema.json
+# Project: {{PROJECT_ID}}
+# Every command reads its defaults from this file. Change a value here, not in a prompt.
+
+title: "{{TITLE}}"                     # working title
+comic_format: paged                    # paged | webtoon. Selects rules/paged/ or rules/webtoon/
+publication: one-shot                  # strip | one-shot | miniseries | ongoing | graphic-novel | webtoon-series
+logline: "TODO: one sentence. Who wants what, and what stands in the way."
+genre: drama                           # primary genre label
+language: en                           # language of the lettering
+reading_direction: ltr                 # ltr | rtl
+
+page:                                  # geometry shared by every page
+  aspect_ratio: "2:3"                  # width:height. Quote it so YAML keeps it a string
+  width_px: 2000                       # render size. A webtoon segment is usually 800 x 1280
+  height_px: 3000
+  trim_mm: { width: 168, height: 260 } # printed trim size. Drop the print fields for screen-only work
+  bleed_mm: 3
+  safe_margin_mm: 6                    # lettering stays inside this margin
+
+color_mode: full_color                 # monochrome | limited | full_color
+spot_colors: []                        # one entry per spot color, each with a single use
+#  - name: signal red
+#    hex: "#C0392B"
+#    use: Flare light only.
+
+lettering:
+  mode: in_image                       # in_image: the generator draws the text. overlay: letter-pages.js sets it
+  font_family: Comic Neue
+  case: upper                          # upper | sentence
+  max_words_per_balloon: 25
+  max_words_per_panel: 50
+
+style:                                 # global anchors. The detail lives in style/style-bible.md
+  look_refs: []                        # approved LOOK_* masters, e.g. LOOK_EXAMPLE_MASTER_V01. Attached to every request
+  style_block: style/style-block.txt   # frozen prompt block, reused verbatim
+  influences: []
+  notes: ""
+
+default_providers:
+  image: harness-native                # fal | replicate | comfyui | gemini | harness-native | manual
+
+deliverables:
+  - target: pdf                        # pdf | cbz | web | social-carousel | print
+    notes: Reading copy.
+
+content:
+  rating: teen                         # all-ages | teen | mature
+  violence_treatment: "TODO: say how violence is shown, e.g. implied, never anatomical."
+
+repair_policy:
+  max_cycles: 2                        # repairs per page before the plan or the references get fixed instead
+
+created_at: "{{DATE}}"                 # set by create-project.js
+version: "0.1.0"                       # workspace metadata version

@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://everything-ai-comics.dev/schemas/lettering.schema.json",
+  "title": "Lettering",
+  "description": "Overlay geometry for one page (production/issues/<ISS_ID>/pages/<PG_ID>/lettering.yaml), used only in overlay lettering mode by letter-pages.js. The text itself comes from page.yaml and must equal it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["page", "render", "canvas", "elements"],
+  "properties": {
+    "page": {
+      "type": "string",
+      "pattern": "^PG_\\d{3}_\\d{3}$",
+      "description": "Page the overlay belongs to."
+    },
+    "render": {
+      "type": "string",
+      "pattern": "^PG_\\d{3}_\\d{3}_V\\d{2}$",
+      "description": "Render this overlay sits on."
+    },
+    "canvas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width_px", "height_px"],
+      "description": "Pixel size of the render the boxes are measured on.",
+      "properties": {
+        "width_px": { "type": "integer", "minimum": 1, "description": "Canvas width in pixels." },
+        "height_px": { "type": "integer", "minimum": 1, "description": "Canvas height in pixels." }
+      }
+    },
+    "font": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Default font of the overlay.",
+      "properties": {
+        "family": { "type": "string", "description": "Font family." },
+        "size_px": { "type": "number", "exclusiveMinimum": 0, "description": "Font size in pixels." },
+        "line_height": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Line height as a multiple of the font size."
+        }
+      }
+    },
+    "elements": {
+      "type": "array",
+      "description": "Lettering elements with their geometry.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "panel", "type", "text", "box"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^L\\d{2}$",
+            "description": "Matches a lettering id in page.yaml."
+          },
+          "panel": {
+            "type": "string",
+            "pattern": "^PN_\\d{3}_\\d{3}_\\d{2}$",
+            "description": "Panel the element belongs to."
+          },
+          "type": {
+            "enum": ["caption", "narration", "balloon", "thought", "whisper", "shout", "radio", "sfx", "sign"],
+            "description": "Kind of lettering element; same value as in page.yaml."
+          },
+          "text": { "type": "string", "minLength": 1, "description": "Exact words; must equal page.yaml." },
+          "box": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["x", "y", "width", "height"],
+            "description": "Box of the element on the canvas, in pixels.",
+            "properties": {
+              "x": { "type": "number", "minimum": 0, "description": "Left edge in pixels." },
+              "y": { "type": "number", "minimum": 0, "description": "Top edge in pixels." },
+              "width": { "type": "number", "exclusiveMinimum": 0, "description": "Width in pixels." },
+              "height": { "type": "number", "exclusiveMinimum": 0, "description": "Height in pixels." }
+            }
+          },
+          "shape": {
+            "enum": ["rect", "ellipse", "burst", "cloud", "none"],
+            "description": "Outline of the balloon or caption box."
+          },
+          "tail": {
+            "anyOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["x", "y"],
+                "properties": {
+                  "x": { "type": "number", "description": "Tail tip x in pixels." },
+                  "y": { "type": "number", "description": "Tail tip y in pixels." }
+                }
+              }
+            ],
+            "description": "Tip of the balloon tail on the canvas, or null."
+          },
+          "style": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Colors of the element.",
+            "properties": {
+              "fill": { "type": "string", "description": "Fill color." },
+              "stroke": { "type": "string", "description": "Outline color." },
+              "text": { "type": "string", "description": "Text color." }
+            }
+          }
+        }
+      }
+    },
+    "notes": { "type": "string", "description": "Free-form notes for people. Never read by scripts." }
+  }
+}

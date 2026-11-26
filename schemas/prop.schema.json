@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://everything-ai-comics.dev/schemas/prop.schema.json",
+  "title": "Prop",
+  "description": "Prop bible (production/props/<PROP_ID>/prop.yaml): canonical description, hands needed to hold it, and reference assets. Custody is tracked in the panel ledger.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "description", "references"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^PROP_[A-Z][A-Z0-9_]*$",
+      "description": "Prop ID, e.g. PROP_FLARE_GUN. Matches the directory name."
+    },
+    "name": { "type": "string", "minLength": 1, "description": "Name of the prop." },
+    "description": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary"],
+      "description": "Canonical description. Prompts are compiled from these fields.",
+      "properties": {
+        "summary": { "type": "string", "minLength": 1, "description": "The prop in one sentence." },
+        "distinguishing_features": {
+          "type": "array",
+          "description": "Shape and details that keep it the same object across panels.",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "prompt_summary": { "type": "string", "description": "One generation-ready sentence used verbatim in prompts." },
+    "hands_required": {
+      "enum": [1, 2],
+      "description": "Hands needed to hold it; counted against the two-hand budget."
+    },
+    "plot_relevant": { "type": "boolean", "description": "true = the story depends on where this prop is." },
+    "references": {
+      "type": "array",
+      "description": "Asset IDs registered in references/manifest.yaml. May be empty.",
+      "items": { "type": "string", "pattern": "^(CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*_V\\d{2}$" }
+    },
+    "status": {
+      "enum": ["draft", "review", "approved"],
+      "description": "Approval status of the bible entry."
+    },
+    "notes": { "type": "string", "description": "Free-form notes for people. Never read by scripts." }
+  }
+}

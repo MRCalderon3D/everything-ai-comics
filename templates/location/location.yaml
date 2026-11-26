@@ -1,0 +1,21 @@
+# production/locations/LOC_EXAMPLE/location.yaml: location bible
+# Schema: schemas/location.schema.json
+# Geometry (levels, sides, landmarks) lives in map.yaml next to this file.
+
+id: LOC_EXAMPLE                        # matches the directory name
+name: Example location
+
+description:
+  summary: "TODO: the place in one or two sentences."
+  architecture: "TODO: fixed structure. Surfaces, levels, openings."
+  dressing: "TODO: movable things that recur and must stay put between panels."
+  light: "TODO: where the light comes from and how it behaves."
+
+prompt_summary: "TODO: one sentence used verbatim in prompts."
+time_of_day_states: [night]
+map_file: map.yaml
+
+references:                            # asset IDs registered in references/manifest.yaml
+  - LOC_EXAMPLE_PLATE_MASTER_V01
+
+status: draft                          # draft | review | approved

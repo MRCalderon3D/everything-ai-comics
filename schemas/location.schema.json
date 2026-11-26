@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://everything-ai-comics.dev/schemas/location.schema.json",
+  "title": "Location",
+  "description": "Location bible (production/locations/<LOC_ID>/location.yaml): canonical description, time-of-day states, and reference assets. Geometry lives in the sibling map.yaml.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "description", "references"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^LOC_[A-Z][A-Z0-9_]*$",
+      "description": "Location ID, e.g. LOC_FERRY_DECK. Matches the directory name."
+    },
+    "name": { "type": "string", "minLength": 1, "description": "Name of the location." },
+    "description": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary"],
+      "description": "Canonical description. Prompts are compiled from these fields.",
+      "properties": {
+        "summary": { "type": "string", "minLength": 1, "description": "The location in one or two sentences." },
+        "architecture": { "type": "string", "description": "Fixed structure: surfaces, levels, openings." },
+        "dressing": { "type": "string", "description": "Movable dressing that recurs across panels." },
+        "light": { "type": "string", "description": "Light sources and how they behave." }
+      }
+    },
+    "prompt_summary": { "type": "string", "description": "One generation-ready sentence used verbatim in prompts." },
+    "time_of_day_states": {
+      "type": "array",
+      "description": "Times of day the location is shown in.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "map_file": {
+      "type": "string",
+      "description": "Path of this location's map.yaml, relative to the location directory."
+    },
+    "references": {
+      "type": "array",
+      "description": "Asset IDs registered in references/manifest.yaml.",
+      "items": { "type": "string", "pattern": "^(CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*_V\\d{2}$" }
+    },
+    "status": {
+      "enum": ["draft", "review", "approved"],
+      "description": "Approval status of the bible entry."
+    },
+    "notes": { "type": "string", "description": "Free-form notes for people. Never read by scripts." }
+  }
+}

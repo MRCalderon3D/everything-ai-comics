@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://everything-ai-comics.dev/schemas/story-bible.schema.json",
+  "title": "Story Bible",
+  "description": "Canon of the story (production/story/story-bible.yaml): premise, world rules, the fact registry tagged by provenance, character arcs, timeline, and open questions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "premise", "facts", "characters"],
+  "properties": {
+    "title": { "type": "string", "minLength": 1, "description": "Title of the story." },
+    "premise": { "type": "string", "minLength": 1, "description": "One paragraph stating the story." },
+    "tone": { "type": "string", "description": "Tone in a few words." },
+    "world_rules": {
+      "type": "array",
+      "description": "Rules of the world that every page obeys.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "facts": {
+      "type": "array",
+      "description": "The canon registry. Every fact carries its provenance.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "statement", "provenance"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^FACT_\\d{3}$", "description": "Fact ID, e.g. FACT_001." },
+          "statement": { "type": "string", "minLength": 1, "description": "One checkable statement of canon." },
+          "provenance": {
+            "enum": ["source", "user_change", "addition"],
+            "description": "source: stated by the source text. user_change: an explicit change requested by the user. addition: invented for the adaptation."
+          },
+          "source_ref": {
+            "type": "string",
+            "description": "Where the source states it, e.g. story/source/night-ferry.txt#p2."
+          },
+          "replaces": {
+            "type": ["string", "null"],
+            "pattern": "^FACT_\\d{3}$",
+            "description": "FACT id superseded by a user_change, or null."
+          },
+          "affects": {
+            "type": "array",
+            "description": "Entities to update when this fact changes.",
+            "items": { "type": "string", "pattern": "^(CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*$" }
+          }
+        }
+      }
+    },
+    "characters": {
+      "type": "array",
+      "description": "Characters of the story and their arcs.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^CHAR_[A-Z][A-Z0-9_]*$", "description": "Character ID." },
+          "role": {
+            "enum": ["protagonist", "antagonist", "supporting", "background"],
+            "description": "Narrative function."
+          },
+          "arc": { "type": "string", "description": "How the character changes across the story." }
+        }
+      }
+    },
+    "timeline": {
+      "type": "array",
+      "description": "Events in story order.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["order", "event"],
+        "properties": {
+          "order": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Position of the event in story time, 1-based."
+          },
+          "event": { "type": "string", "minLength": 1, "description": "What happens." },
+          "issue": {
+            "type": "string",
+            "pattern": "^ISS_\\d{3}$",
+            "description": "Issue that shows the event."
+          }
+        }
+      }
+    },
+    "open_questions": {
+      "type": "array",
+      "description": "Unresolved canon questions.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["question", "blocking"],
+        "properties": {
+          "question": { "type": "string", "minLength": 1, "description": "What the source leaves undecided." },
+          "blocking": { "type": "boolean", "description": "true = resolve before generation." },
+          "resolution": { "type": ["string", "null"], "description": "The decision taken, or null while open." }
+        }
+      }
+    },
+    "notes": { "type": "string", "description": "Free-form notes for people. Never read by scripts." }
+  }
+}

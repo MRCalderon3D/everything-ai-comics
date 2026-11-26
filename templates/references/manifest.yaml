@@ -1,0 +1,15 @@
+# production/references/manifest.yaml: registry of all reference material
+# No schema. Scripts read the fields below. An asset that is not listed here does not exist
+# for the pipeline, whatever is on disk.
+
+assets: []
+#  - id: CHAR_EXAMPLE_TURN_MASTER_V01   # versioned asset ID. Approved masters carry _MASTER
+#    entity: CHAR_EXAMPLE               # the entity the asset belongs to
+#    kind: turnaround                   # turnaround | expressions | wardrobe | plate | look | prop | detail
+#    path: characters/CHAR_EXAMPLE/refs/CHAR_EXAMPLE_TURN_MASTER_V01.png   # relative to the workspace root
+#    status: draft                      # draft | review | approved | superseded
+#    default_role: identity             # the one role this asset plays when attached
+#    sha256: null
+#    approved_by: null
+#    approved_at: null
+#    notes: ""

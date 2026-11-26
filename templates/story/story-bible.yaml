@@ -1,0 +1,38 @@
+# production/story/story-bible.yaml: the canon
+# Schema: schemas/story-bible.schema.json
+# Written by /source-analyze and /story-bible. Every fact carries its provenance.
+
+title: "{{TITLE}}"
+premise: "TODO: one paragraph. Who, where, what changes, and what it costs."
+tone: "TODO: three or four plain words."
+
+world_rules:                           # rules every page obeys
+  - "TODO: one rule of this world that a panel could break by accident."
+
+facts:                                 # the canon registry
+  - id: FACT_001                       # FACT_###
+    statement: "TODO: one checkable statement. Who does what, where."
+    provenance: source                 # source | user_change | addition
+    source_ref: story/source/source.txt#p1   # where the source says it
+    replaces: null                     # FACT id superseded by a user_change, or null
+    affects: []                        # entity IDs to update when this fact changes, e.g. [CHAR_EXAMPLE]
+#  - id: FACT_002
+#    statement: The pilot is a woman in her fifties.
+#    provenance: user_change            # the user asked for this change
+#    replaces: FACT_001                 # the source fact it overrides
+#    affects: [CHAR_EXAMPLE]            # wardrobe, dialogue, references, and prompts change together
+
+characters: []                         # add one row per character once the character bible exists
+#  - id: CHAR_EXAMPLE
+#    role: protagonist                  # protagonist | antagonist | supporting | background
+#    arc: From avoiding trouble to choosing it.
+
+timeline:
+  - order: 1
+    event: "TODO: the first event in story time."
+    issue: ISS_001
+
+open_questions:
+  - question: "TODO: something the source leaves undecided."
+    blocking: false                    # true = resolve before generation
+    resolution: null

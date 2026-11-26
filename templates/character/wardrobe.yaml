@@ -1,0 +1,14 @@
+# production/characters/CHAR_EXAMPLE/wardrobe.yaml: wardrobe states
+# Schema: schemas/wardrobe.schema.json
+# Every panel ledger row names one of these outfits. A change inside a scene needs a reason.
+
+character: CHAR_EXAMPLE
+
+outfits:
+  - id: WARD_EXAMPLE_DEFAULT           # WARD_<CHARACTER>_<NAME>
+    description: "TODO: the outfit in one sentence, with the detail that makes it recognisable."
+    layers: [coat, jumper, trousers, boots]   # outermost first
+    accessories: []
+    hands: bare                        # bare | gloved | bandaged
+    references: [CHAR_EXAMPLE_TURN_MASTER_V01]
+    used_in: [ISS_001]

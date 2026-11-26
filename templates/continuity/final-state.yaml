@@ -1,0 +1,31 @@
+# production/continuity/ISS_001.final-state.yaml: state at the end of an issue
+# Schema: schemas/continuity-state.schema.json
+# Written by /continuity-review. The next issue opens from this file.
+
+issue: ISS_001
+after_page: PG_001_001                 # the last page this state reflects
+
+characters:                            # keyed by CHAR id
+  CHAR_EXAMPLE:
+    location: LOC_EXAMPLE
+    position: { level: ground, side: right, landmark: stairs }
+    wardrobe: WARD_EXAMPLE_DEFAULT
+    state: []                          # tags still carried into the next issue
+    holding: [PROP_EXAMPLE]
+    notes: ""
+
+props:                                 # keyed by PROP id
+  PROP_EXAMPLE:
+    custody: CHAR_EXAMPLE              # CHAR id, or null
+    location: LOC_EXAMPLE
+    state: []
+
+open_threads:
+  - "TODO: a story thread the next issue picks up."
+
+open_issues:
+  - severity: minor                    # blocking | minor
+    page: null
+    description: "TODO: a continuity question nobody has answered yet."
+
+last_validated: "2026-01-01"

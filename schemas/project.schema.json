@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://everything-ai-comics.dev/schemas/project.schema.json",
+  "title": "Project",
+  "description": "Workspace configuration (production/project.yaml): comic format, page geometry, color mode, lettering mode, style anchors, default provider, and repair policy. Every command reads its defaults from here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "title", "comic_format", "publication", "language", "reading_direction", "page", "color_mode",
+    "lettering", "default_providers"
+  ],
+  "properties": {
+    "title": { "type": "string", "minLength": 1, "description": "Working title of the comic." },
+    "comic_format": {
+      "enum": ["paged", "webtoon"],
+      "description": "Selects the format rule layer: rules/paged/ or rules/webtoon/. In webtoon format a page is one scroll segment."
+    },
+    "publication": {
+      "enum": ["strip", "one-shot", "miniseries", "ongoing", "graphic-novel", "webtoon-series"],
+      "description": "Publication shape; drives issue planning and page budgets."
+    },
+    "logline": { "type": "string", "description": "One-sentence statement of the story." },
+    "genre": { "type": "string", "description": "Primary genre label." },
+    "language": { "type": "string", "minLength": 1, "description": "Language of the lettering (e.g. en, es)." },
+    "reading_direction": { "enum": ["ltr", "rtl"], "description": "Reading direction of panels and balloons." },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["aspect_ratio", "width_px", "height_px"],
+      "description": "Page geometry shared by every page of the project.",
+      "properties": {
+        "aspect_ratio": {
+          "type": "string",
+          "pattern": "^\\d+:\\d+$",
+          "description": "Page aspect ratio as width:height (e.g. \"2:3\"). Quote it in YAML."
+        },
+        "width_px": { "type": "integer", "minimum": 1, "description": "Render width in pixels." },
+        "height_px": { "type": "integer", "minimum": 1, "description": "Render height in pixels." },
+        "trim_mm": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Trim size of the printed page.",
+          "properties": {
+            "width": { "type": "number", "exclusiveMinimum": 0, "description": "Trim width in millimetres." },
+            "height": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Trim height in millimetres."
+            }
+          }
+        },
+        "bleed_mm": { "type": "number", "minimum": 0, "description": "Bleed beyond the trim, in millimetres." },
+        "safe_margin_mm": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Margin inside the trim that lettering stays within, in millimetres."
+        }
+      }
+    },
+    "color_mode": {
+      "enum": ["monochrome", "limited", "full_color"],
+      "description": "Color strategy for the whole comic."
+    },
+    "spot_colors": {
+      "type": "array",
+      "description": "Spot colors allowed on top of the color mode.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "description": "Name of the spot color." },
+          "hex": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "description": "Hex value, e.g. \"#C0392B\". Quote it in YAML."
+          },
+          "use": { "type": "string", "description": "The one thing this color is used for." }
+        }
+      }
+    },
+    "lettering": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "description": "Lettering mode and text budgets.",
+      "properties": {
+        "mode": {
+          "enum": ["in_image", "overlay"],
+          "description": "in_image: the generator draws the text. overlay: letter-pages.js sets the text from lettering.yaml."
+        },
+        "font_family": {
+          "type": "string",
+          "description": "Font family used for overlay lettering and stated in prompts."
+        },
+        "case": { "enum": ["upper", "sentence"], "description": "Letter case of balloons and captions." },
+        "max_words_per_balloon": { "type": "integer", "minimum": 1, "description": "Word budget per balloon or caption." },
+        "max_words_per_panel": { "type": "integer", "minimum": 1, "description": "Word budget per panel." }
+      }
+    },
+    "style": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Global visual anchors.",
+      "properties": {
+        "look_refs": {
+          "type": "array",
+          "description": "Approved LOOK_* masters attached to every request as the style reference.",
+          "items": { "type": "string", "pattern": "^LOOK_[A-Z][A-Z0-9_]*_V\\d{2}$" }
+        },
+        "style_block": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path of the frozen style prompt block, relative to the workspace root."
+        },
+        "influences": {
+          "type": "array",
+          "description": "Artists, movements, or works that anchor the look.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "notes": {
+          "type": "string",
+          "description": "Short style reminders; the detail lives in style/style-bible.md."
+        }
+      }
+    },
+    "default_providers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["image"],
+      "description": "Default generation backend per kind.",
+      "properties": {
+        "image": {
+          "enum": ["fal", "replicate", "comfyui", "gemini", "harness-native", "manual"],
+          "description": "Default image provider; one of the provider roster."
+        }
+      }
+    },
+    "deliverables": {
+      "type": "array",
+      "description": "Planned delivery targets.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["target"],
+        "properties": {
+          "target": {
+            "enum": ["pdf", "cbz", "web", "social-carousel", "print"],
+            "description": "Delivery target."
+          },
+          "notes": { "type": "string", "description": "What this deliverable is for." }
+        }
+      }
+    },
+    "content": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Content boundaries every page respects.",
+      "properties": {
+        "rating": { "enum": ["all-ages", "teen", "mature"], "description": "Audience rating." },
+        "violence_treatment": { "type": "string", "description": "How violence is shown on the page." }
+      }
+    },
+    "repair_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Limits on repair loops.",
+      "properties": {
+        "max_cycles": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 2,
+          "description": "Maximum repair cycles per page before the plan or the references are fixed instead. Default 2."
+        }
+      }
+    },
+    "created_at": { "type": "string", "description": "Creation date, set by create-project.js." },
+    "version": { "type": "string", "description": "Workspace metadata version." },
+    "notes": { "type": "string", "description": "Free-form notes for people. Never read by scripts." }
+  }
+}
