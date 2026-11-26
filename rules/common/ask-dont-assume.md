@@ -82,6 +82,9 @@ questioning the user about detail that can be derived.
 
 - `story-bible.schema.json` requires `question` and `blocking` on every open
   question, so each gap is on record with its weight.
+- `scripts/validate-workspace.js` warns about a blocking question with no
+  resolution, and fails it once any page has a `current_render`
+  (`BLOCKING_QUESTION_OPEN`).
 - `production-qa` reads `open_questions` at the gate before generation. A
   blocking question with no resolution holds the pages that depend on it.
 - Self-evaluation (`self-review.md`): an artifact built on a project-shaping

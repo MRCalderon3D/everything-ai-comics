@@ -107,7 +107,8 @@ reference plays when it is attached to a request.
 - `scripts/validate-workspace.js` runs those schemas, checks that the ID
   inside a file matches its path, and rejects a page, reference plan, or
   page prompt package that cites an unregistered asset or a render that is
-  not on disk.
+  not on disk. In `references/manifest.yaml` it rejects a repeated asset ID
+  and an `entity` that is not the prefix of the asset ID.
 - `scripts/check-continuity.js` fails when a page names a character, prop,
   location, wardrobe state, level, or landmark that does not exist in the
   workspace (ledger rule 11).

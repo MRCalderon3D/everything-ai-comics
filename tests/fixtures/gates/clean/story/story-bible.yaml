@@ -1,0 +1,45 @@
+title: The Night Ferry
+premise: A ferry pilot finds a stowaway the harbour patrol is hunting and decides not to hand him over.
+tone: Dry, tense, quiet.
+world_rules:
+  - The ferry runs without lights after curfew.
+facts:
+  - id: FACT_001
+    statement: Mara pilots the last night ferry alone.
+    provenance: source
+    source_ref: story/source/night-ferry.txt#p2
+    replaces: null
+    affects: [CHAR_MARA]
+  - id: FACT_002
+    statement: The boy hides in a chain locker under a hatch.
+    provenance: source
+    source_ref: story/source/night-ferry.txt#p6
+    replaces: null
+    affects: [CHAR_OSKAR, LOC_FERRY_DECK]
+  - id: FACT_003
+    statement: The boy hides behind the two crates on the open deck.
+    provenance: user_change
+    replaces: FACT_002
+    affects: [CHAR_OSKAR, LOC_FERRY_DECK]
+  - id: FACT_004
+    statement: The flare pistol is orange with a wide barrel.
+    provenance: addition
+    replaces: null
+    affects: [PROP_FLARE_GUN, LOOK_NOIR_INK]
+characters:
+  - id: CHAR_MARA
+    role: protagonist
+    arc: From avoiding trouble to choosing it.
+  - id: CHAR_OSKAR
+    role: supporting
+timeline:
+  - order: 1
+    event: Mara leaves the east dock.
+    issue: ISS_001
+open_questions:
+  - question: Does the patrol know the name of the boy?
+    blocking: false
+    resolution: null
+  - question: Is the flare gun loaded?
+    blocking: true
+    resolution: Yes, one flare.

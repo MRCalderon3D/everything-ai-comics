@@ -92,9 +92,10 @@ character sheet and a set of prompts that still draw the uniform.
 - `story-bible.schema.json` requires `provenance` on every fact and restricts
   it to the three tags.
 - `scripts/validate-workspace.js` schema-checks the bible, including the
-  `FACT_###` pattern of every fact ID. It does not resolve the IDs the bible
-  cites in `affects` and `replaces`; the self-evaluation of `/story-bible`
-  checks those.
+  `FACT_###` pattern of every fact ID. It resolves the IDs the bible cites:
+  an `affects` entry must be an entity the workspace defines
+  (`FACT_AFFECTS_UNKNOWN`), and `replaces` must name another fact of the
+  same file (`FACT_REPLACES_UNKNOWN`, `FACT_REPLACES_SELF`).
 - Prompt packages record `source_hashes`, so a package compiled before a page
   or reference plan changed can be identified as stale.
 - No script can tell whether a change reached every dependent artifact: the

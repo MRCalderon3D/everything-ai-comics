@@ -63,7 +63,7 @@ t.test('hooks.json wires the four hooks with workspace-name-independent globs', 
 
 const MARA_SHEET = 'characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V01.png';
 const LOOK_MASTER = 'references/style/LOOK_NOIR_INK_MASTER_V01.png';
-const DECK_PLATE = 'locations/LOC_FERRY_DECK/refs/LOC_FERRY_DECK_PLATE_MASTER_V01.png';
+const GUN_DETAIL = 'props/PROP_FLARE_GUN/refs/PROP_FLARE_GUN_DETAIL_V01.png';
 const RENDERS_P2 = 'issues/ISS_001/pages/PG_001_002/renders';
 
 t.test('protect: writes to approved reference assets are blocked', () => {
@@ -78,7 +78,7 @@ t.test('protect: writes to approved reference assets are blocked', () => {
 
 t.test('protect: unapproved assets, new assets, and the manifest stay writable', () => {
   const w = makeWorkspace();
-  allowed(runHook('protect-approved-assets', { file: w.abs(DECK_PLATE) }), 'status review is not approved');
+  allowed(runHook('protect-approved-assets', { file: w.abs(GUN_DETAIL) }), 'status review is not approved');
   allowed(runHook('protect-approved-assets', { file: w.abs('characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V02.png') }));
   allowed(runHook('protect-approved-assets', { file: w.abs('references/manifest.yaml') }));
   allowed(runHook('protect-approved-assets', { file: w.abs('characters/CHAR_MARA/character.yaml') }));
@@ -316,7 +316,7 @@ t.test('each handler exports handle(event) returning the exit code', () => {
   const write = process.stderr.write;
   process.stderr.write = () => true;
   expect('protect-approved-assets', { file: w.abs(MARA_SHEET) }, 2);
-  expect('protect-approved-assets', { file: w.abs(DECK_PLATE) }, 0);
+  expect('protect-approved-assets', { file: w.abs(GUN_DETAIL) }, 0);
   expect('require-cost-confirmation', { command: 'node scripts/generate-assets.js --live' }, 2);
   expect('detect-continuity-drift', { file: w.abs(PAGE_1) }, 0);
   expect('validate-after-write', { file: w.abs('references/manifest.yaml') }, 0);

@@ -8,7 +8,11 @@
  *      scripts/lib/artifacts.js). A missing schema file is a warning.
  *   b. Cross-references: IDs match paths, issue/scene/page lists agree, page
  *      and panel counts match the files, referenced assets are registered,
- *      current renders exist on disk.
+ *      current renders exist on disk. Bibles: an entity's references belong
+ *      to it, default wardrobes and adjacent characters exist, story-bible
+ *      facts point at real things, blocking open questions are resolved
+ *      before generation, the reference manifest matches the disk, and the
+ *      series plan matches the issue directories.
  *   c. Review rules (docs/data-model.md, "Review rules").
  *   d. Edition rules ("Edition rules"), except building exports.
  *   e. Generation records: metadata_unavailable agrees with the fields.
@@ -308,6 +312,224 @@ function checkEntities(ctx) {
   }
 }
 
+const ENTITY_FILES = {
+  CHAR: ['characters', 'character.yaml'],
+  LOC: ['locations', 'location.yaml'],
+  PROP: ['props', 'prop.yaml'],
+};
+
+/** Does a CHAR_/LOC_/PROP_ entity have its bible file? */
+function entityExists(ctx, id) {
+  const m = /^(CHAR|LOC|PROP)_/.exec(String(id));
+  return !!m && ctx.exists(`${ENTITY_FILES[m[1]][0]}/${id}/${ENTITY_FILES[m[1]][1]}`);
+}
+
+/** Directory names under characters/, locations/ or props/. */
+function entityDirs(ctx, dir) {
+  return listNames(ctx.abs(dir)).filter((id) => isDir(ctx.abs(`${dir}/${id}`)));
+}
+
+/** Outfit IDs of one character's wardrobe.yaml, or null when the file is absent or unreadable. */
+function outfitIds(ctx, charId) {
+  const rel = `characters/${charId}/wardrobe.yaml`;
+  const doc = ctx.exists(rel) ? ctx.loadMap(rel) : null;
+  if (!doc) return null;
+  return arr(doc.outfits).filter(isObj).map((o) => o.id).filter(hasText);
+}
+
+/** A bible's references[]: every asset is registered, and registered for that entity. */
+function checkEntityAssets(ctx, rel, where, ids, entityId) {
+  for (const id of arr(ids)) {
+    if (!hasText(id)) continue;
+    const asset = ctx.assets().get(id);
+    if (!asset) {
+      ctx.err(rel, 'UNKNOWN_ASSET',
+        `${where} lists asset ${id}; expected an entry in references/manifest.yaml and there is none.`);
+    } else if (asset.entity !== entityId) {
+      ctx.err(rel, 'ASSET_ENTITY_MISMATCH',
+        `${where} lists ${id}, which references/manifest.yaml registers for ${show(asset.entity)}; expected an asset of ${entityId}.`);
+    }
+  }
+}
+
+/** Character, wardrobe, location, and prop bibles: what they point at exists. */
+function checkEntityReferences(ctx) {
+  for (const charId of entityDirs(ctx, 'characters')) {
+    const rel = `characters/${charId}/character.yaml`;
+    const doc = ctx.exists(rel) ? ctx.loadMap(rel) : null;
+    const outfits = outfitIds(ctx, charId);
+    const wardrobeRel = `characters/${charId}/wardrobe.yaml`;
+    const wardrobe = outfits ? ctx.loadMap(wardrobeRel) : null;
+    for (const outfit of arr(wardrobe && wardrobe.outfits).filter(isObj)) {
+      checkEntityAssets(ctx, wardrobeRel, `outfit ${show(outfit.id)} references`, outfit.references, charId);
+    }
+    if (!doc) continue;
+    checkEntityAssets(ctx, rel, 'references', doc.references, charId);
+    if (hasText(doc.default_wardrobe) && !(outfits && outfits.includes(doc.default_wardrobe))) {
+      ctx.err(rel, 'UNKNOWN_WARDROBE',
+        `default_wardrobe is ${doc.default_wardrobe}; expected an outfit of ${wardrobeRel} ` +
+        `(${outfits ? show(outfits) : 'the file is missing'}).`);
+    }
+    for (const other of arr(doc.visually_adjacent_to)) {
+      if (!hasText(other)) continue;
+      if (other === charId) {
+        ctx.err(rel, 'ADJACENT_CHARACTER_SELF',
+          `visually_adjacent_to lists ${charId} itself; expected only other characters this one could be confused with.`);
+      } else if (!ctx.exists(`characters/${other}/character.yaml`)) {
+        ctx.err(rel, 'ADJACENT_CHARACTER_UNKNOWN',
+          `visually_adjacent_to lists ${other}; expected characters/${other}/character.yaml and it does not exist.`);
+      }
+    }
+    const first = doc.first_appearance;
+    if (hasText(first) && ws.ID.page.test(first)) {
+      const issueId = ws.issueOfPage(first);
+      if (ctx.allIssues.includes(issueId) && !ctx.exists(`issues/${issueId}/pages/${first}/page.yaml`)) {
+        ctx.err(rel, 'FIRST_APPEARANCE_UNKNOWN',
+          `first_appearance is ${first}; expected issues/${issueId}/pages/${first}/page.yaml and ${issueId} has no such page.`);
+      }
+    }
+  }
+  for (const [dir, file] of [['locations', 'location.yaml'], ['props', 'prop.yaml']]) {
+    for (const id of entityDirs(ctx, dir)) {
+      const rel = `${dir}/${id}/${file}`;
+      const doc = ctx.exists(rel) ? ctx.loadMap(rel) : null;
+      if (doc) checkEntityAssets(ctx, rel, 'references', doc.references, id);
+    }
+  }
+}
+
+/** references/manifest.yaml: files on disk, unique IDs, entity prefixes, master status. */
+function checkManifest(ctx) {
+  const rel = 'references/manifest.yaml';
+  if (!ctx.exists(rel)) return;
+  const doc = ctx.loadMap(rel);
+  const seen = new Map();
+  for (const asset of arr(doc && doc.assets).filter(isObj)) {
+    const id = asset.id;
+    if (!hasText(id)) continue;
+    seen.set(id, (seen.get(id) || 0) + 1);
+    if (seen.get(id) === 2) {
+      ctx.err(rel, 'ASSET_DUPLICATE_ID', `Asset ${id} is registered more than once; expected one entry per asset ID.`);
+    }
+    if (seen.get(id) > 1) continue;
+    if (hasText(asset.entity) && !id.startsWith(`${asset.entity}_`)) {
+      ctx.err(rel, 'ASSET_ENTITY_ID_MISMATCH',
+        `Asset ${id} has entity ${asset.entity}; expected the entity the ID starts with (an ID of ${asset.entity} begins ${asset.entity}_).`);
+    }
+    const file = hasText(asset.path) ? asset.path.replace(/\\/g, '/') : null;
+    if (!file || !ctx.exists(file)) {
+      const message = `Asset ${id} (${show(asset.status)}) has path ${show(asset.path)}; expected that file on disk and it is not there.`;
+      if (asset.status === 'approved') ctx.err(rel, 'ASSET_FILE_MISSING', message);
+      else ctx.warn(rel, 'ASSET_FILE_MISSING', message);
+    }
+    if (/_MASTER(_|$)/.test(id) && asset.status !== 'approved' && asset.status !== 'superseded') {
+      ctx.err(rel, 'MASTER_NOT_APPROVED',
+        `Asset ${id} carries _MASTER with status ${show(asset.status)}; expected approved or superseded, ` +
+        'because only an approved asset is a master. Drop _MASTER from the ID until it is approved.');
+    }
+  }
+}
+
+/** Issue IDs of story/series-plan.yaml as a Map id -> entry, or null when there is no plan. */
+function plannedIssues(ctx) {
+  const rel = 'story/series-plan.yaml';
+  const doc = ctx.exists(rel) ? ctx.loadMap(rel) : null;
+  if (!doc) return null;
+  return new Map(arr(doc.issues).filter(isObj).filter((i) => hasText(i.id)).map((i) => [i.id, i]));
+}
+
+/** story/story-bible.yaml: facts point at things that exist; blocking questions are resolved before generation. */
+function checkStoryBible(ctx) {
+  const rel = 'story/story-bible.yaml';
+  const doc = ctx.exists(rel) ? ctx.loadMap(rel) : null;
+  if (!doc) return;
+
+  const facts = arr(doc.facts).filter(isObj);
+  const factIds = new Set(facts.map((f) => f.id).filter(hasText));
+  const planned = plannedIssues(ctx);
+  let wardrobes = null;
+  const affectsExists = (id) => {
+    if (/^(CHAR|LOC|PROP)_/.test(id)) return entityExists(ctx, id);
+    if (/^LOOK_/.test(id)) return [...ctx.assets().values()].some((a) => a.entity === id);
+    if (/^ISS_/.test(id)) return ctx.allIssues.includes(id) || !!(planned && planned.has(id));
+    if (/^WARD_/.test(id)) {
+      if (!wardrobes) {
+        wardrobes = new Set();
+        for (const charId of entityDirs(ctx, 'characters')) {
+          for (const outfit of outfitIds(ctx, charId) || []) wardrobes.add(outfit);
+        }
+      }
+      return wardrobes.has(id);
+    }
+    return false;
+  };
+  for (const fact of facts) {
+    const label = fact.id || 'A fact';
+    for (const id of arr(fact.affects)) {
+      if (hasText(id) && !affectsExists(id)) {
+        ctx.err(rel, 'FACT_AFFECTS_UNKNOWN',
+          `${label} affects ${id}; expected an existing character, location, prop, look, wardrobe, or issue ID and the workspace has none by that name.`);
+      }
+    }
+    if (fact.replaces === null || fact.replaces === undefined) continue;
+    if (fact.replaces === fact.id) {
+      ctx.err(rel, 'FACT_REPLACES_SELF', `${label} replaces itself; expected the ID of the earlier fact it supersedes, or null.`);
+    } else if (!factIds.has(fact.replaces)) {
+      ctx.err(rel, 'FACT_REPLACES_UNKNOWN',
+        `${label} (${show(fact.provenance)}) replaces ${show(fact.replaces)}; expected a FACT id of this file and there is none.`);
+    }
+  }
+
+  for (const entry of arr(doc.characters).filter(isObj)) {
+    if (hasText(entry.id) && !ctx.exists(`characters/${entry.id}/character.yaml`)) {
+      ctx.warn(rel, 'BIBLE_CHARACTER_MISSING',
+        `characters lists ${entry.id}; expected characters/${entry.id}/character.yaml, which is not written yet.`);
+    }
+  }
+
+  const open = arr(doc.open_questions).filter(isObj)
+    .filter((q) => q.blocking === true && !hasText(q.resolution));
+  if (!open.length) return;
+  let rendered = null;
+  for (const issueId of ctx.allIssues) {
+    rendered = ctx.pages(issueId).find((p) => p.doc && hasText(p.doc.current_render)) || null;
+    if (rendered) break;
+  }
+  for (const q of open) {
+    const question = JSON.stringify(String(q.question || '').slice(0, 80));
+    if (rendered) {
+      ctx.err(rel, 'BLOCKING_QUESTION_OPEN',
+        `Blocking question ${question} has no resolution and ${rendered.id} already has a render ` +
+        `(${rendered.doc.current_render}); expected every blocking question resolved before generation.`);
+    } else {
+      ctx.warn(rel, 'BLOCKING_QUESTION_OPEN',
+        `Blocking question ${question} has no resolution; expected one before any page is generated.`);
+    }
+  }
+}
+
+/** story/series-plan.yaml against the issue directories. Both differences are warnings. */
+function checkSeriesPlan(ctx) {
+  const rel = 'story/series-plan.yaml';
+  const planned = plannedIssues(ctx);
+  if (!planned) return;
+  for (const issueId of ctx.issues) {
+    const entry = planned.get(issueId);
+    if (!entry) {
+      ctx.warn(rel, 'ISSUE_NOT_IN_SERIES_PLAN',
+        `issues/${issueId}/ exists; expected ${issueId} in the series plan, which lists ${show([...planned.keys()])}.`);
+      continue;
+    }
+    const issueRel = `issues/${issueId}/issue.yaml`;
+    const issue = ctx.exists(issueRel) ? ctx.loadMap(issueRel) : null;
+    if (issue && typeof entry.page_budget === 'number' && typeof issue.page_count === 'number' &&
+        entry.page_budget !== issue.page_count) {
+      ctx.warn(rel, 'PAGE_BUDGET_MISMATCH',
+        `${issueId} has page_budget ${entry.page_budget}; expected it to match page_count ${issue.page_count} in ${issueRel}.`);
+    }
+  }
+}
+
 function checkIssueReferences(ctx, issueId) {
   const issueRel = `issues/${issueId}/issue.yaml`;
   const issue = ctx.loadMap(issueRel);
@@ -433,9 +655,17 @@ function checkIssueReferences(ctx, issueId) {
       if (!page) {
         ctx.err(scene.rel, 'SCENE_PAGES_MISMATCH',
           `pages lists ${show(pageId)}; expected issues/${issueId}/pages/${show(pageId)}/ and it does not exist.`);
-      } else if (page.doc && page.doc.scene !== scene.id && sceneById.has(page.doc.scene)) {
+      } else if (page.doc && page.doc.scene !== scene.id) {
         ctx.err(scene.rel, 'SCENE_PAGES_MISMATCH',
           `pages lists ${pageId}; expected that page to name ${scene.id} as its scene, and ${page.rel} says ${show(page.doc.scene)}.`);
+      }
+    }
+    for (const beat of arr(scene.doc.beats).filter(isObj)) {
+      for (const pageId of arr(beat.pages)) {
+        if (!pageById.has(pageId)) {
+          ctx.err(scene.rel, 'BEAT_PAGES_UNKNOWN',
+            `Beat ${show(beat.id)} lists page ${show(pageId)}; expected a page of ${issueId} (${show(pages.map((p) => p.id))}).`);
+        }
       }
     }
   }
@@ -459,7 +689,15 @@ function checkIssueReferences(ctx, issueId) {
 }
 
 function checkCrossReferences(ctx) {
-  checkEntities(ctx);
+  // Each part is independent: one malformed file must not hide the others.
+  const parts = [checkEntities, checkEntityReferences, checkManifest, checkStoryBible, checkSeriesPlan];
+  for (const part of parts) {
+    try {
+      part(ctx);
+    } catch (err) {
+      ctx.err('', 'INTERNAL_ERROR', `The cross-reference check ${part.name} stopped early: ${err.message}`);
+    }
+  }
   for (const issueId of ctx.issues) checkIssueReferences(ctx, issueId);
 }
 

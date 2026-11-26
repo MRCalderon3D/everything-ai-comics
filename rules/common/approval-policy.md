@@ -114,7 +114,8 @@ being conditioned on the newer image.
 - `scripts/validate-workspace.js` enforces the verdict rules above, rejects a
   blocking finding marked `accepted`, and requires a page with
   `status: reviewed` or `approved` to have a review of its `current_render`
-  with verdict `pass` or `fixed`.
+  with verdict `pass` or `fixed`. It fails a registry asset whose ID carries
+  `_MASTER` while its status is neither `approved` nor `superseded`.
 - `scripts/build-edition.js` refuses renders without a `pass` or `fixed`
   review unless it is run with `--draft`.
 - `hooks/protect-approved-assets.js` enforces immutability of approved

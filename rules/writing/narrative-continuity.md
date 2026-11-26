@@ -92,8 +92,11 @@ issue and scene summaries, beats, and the panel script in every `page.yaml`.
   timeline entry requires `order` and `event`.
 - `scripts/validate-workspace.js` schema-checks the bible, the series plan,
   and the issue and scene files. It checks that issue, scene, and page files
-  list each other consistently and that a scene's location and cast exist.
-  IDs cited inside the bible and the series plan are not resolved.
+  list each other consistently, that a scene's location and cast exist, and
+  that the pages a beat lists belong to the issue. Inside the bible it
+  resolves `affects` and `replaces`, and warns about a listed character
+  that has no character file yet. An issue directory missing from the series
+  plan is a warning.
 - `scripts/check-continuity.js` verifies that each issue's pages form one
   unbroken `enters_from` / `exits_to` chain (`PAGE_CHAIN`) and that state
   tags carry from one appearance to the next (`STATE_DROPPED`).

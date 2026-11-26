@@ -31,6 +31,7 @@ const PLACEHOLDERS = [
   'characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V01.png',
   'characters/CHAR_OSKAR/refs/CHAR_OSKAR_TURN_MASTER_V01.png',
   'locations/LOC_FERRY_DECK/refs/LOC_FERRY_DECK_PLATE_MASTER_V01.png',
+  'props/PROP_FLARE_GUN/refs/PROP_FLARE_GUN_DETAIL_V01.png',
 ];
 
 const PAGE_1 = 'issues/ISS_001/pages/PG_001_001/page.yaml';

@@ -210,6 +210,139 @@ t.test('b. a current_render with no file on disk is MISSING_RENDER', () => {
   hasError(run((w) => w.remove('issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V01.png')), 'MISSING_RENDER', PAGE_1);
 });
 
+// --- b. bibles, registry, series plan ------------------------------------------
+
+const MARA = 'characters/CHAR_MARA/character.yaml';
+const MARA_WARDROBE = 'characters/CHAR_MARA/wardrobe.yaml';
+const LOCATION = 'locations/LOC_FERRY_DECK/location.yaml';
+const PROP = 'props/PROP_FLARE_GUN/prop.yaml';
+const MANIFEST = 'references/manifest.yaml';
+const BIBLE = 'story/story-bible.yaml';
+const SERIES_PLAN = 'story/series-plan.yaml';
+
+t.test('b. a bible reference that is not registered is UNKNOWN_ASSET', () => {
+  hasError(run((w) => w.edit(MARA, (c) => { c.references.push('CHAR_MARA_EXPR_V01'); })), 'UNKNOWN_ASSET', MARA);
+  hasError(run((w) => w.edit(LOCATION, (l) => { l.references = ['LOC_FERRY_DECK_NIGHT_V03']; })), 'UNKNOWN_ASSET', LOCATION);
+  hasError(run((w) => w.edit(PROP, (p) => { p.references = ['PROP_FLARE_GUN_TURN_V01']; })), 'UNKNOWN_ASSET', PROP);
+  hasError(run((w) => w.edit(MARA_WARDROBE, (wd) => { wd.outfits[0].references = ['CHAR_MARA_COAT_V01']; })),
+    'UNKNOWN_ASSET', MARA_WARDROBE);
+});
+
+t.test('b. a bible reference registered for another entity is ASSET_ENTITY_MISMATCH', () => {
+  const e = hasError(run((w) => w.edit(MARA, (c) => { c.references = ['CHAR_OSKAR_TURN_MASTER_V01']; })),
+    'ASSET_ENTITY_MISMATCH', MARA);
+  assert.ok(e.message.includes('CHAR_OSKAR') && e.message.includes('CHAR_MARA'), e.message);
+  hasError(run((w) => w.edit(LOCATION, (l) => { l.references = ['CHAR_MARA_TURN_MASTER_V01']; })), 'ASSET_ENTITY_MISMATCH', LOCATION);
+  hasError(run((w) => w.edit(PROP, (p) => { p.references = ['LOC_FERRY_DECK_PLATE_MASTER_V01']; })), 'ASSET_ENTITY_MISMATCH', PROP);
+  hasError(run((w) => w.edit(MARA_WARDROBE, (wd) => { wd.outfits[1].references = ['CHAR_OSKAR_TURN_MASTER_V01']; })),
+    'ASSET_ENTITY_MISMATCH', MARA_WARDROBE);
+});
+
+t.test('b. a default_wardrobe the character does not own is UNKNOWN_WARDROBE', () => {
+  hasError(run((w) => w.edit(MARA, (c) => { c.default_wardrobe = 'WARD_MARA_RAINCOAT'; })), 'UNKNOWN_WARDROBE', MARA);
+  hasError(run((w) => w.edit(MARA, (c) => { c.default_wardrobe = 'WARD_OSKAR_HOODED'; })), 'UNKNOWN_WARDROBE', MARA);
+  hasError(run((w) => w.remove(MARA_WARDROBE)), 'UNKNOWN_WARDROBE', MARA);
+});
+
+t.test('b. visually_adjacent_to: a missing character is ADJACENT_CHARACTER_UNKNOWN, the character itself is ADJACENT_CHARACTER_SELF', () => {
+  hasError(run((w) => w.edit(MARA, (c) => { c.visually_adjacent_to = ['CHAR_GHOST']; })), 'ADJACENT_CHARACTER_UNKNOWN', MARA);
+  hasError(run((w) => w.edit(MARA, (c) => { c.visually_adjacent_to = ['CHAR_OSKAR', 'CHAR_MARA']; })), 'ADJACENT_CHARACTER_SELF', MARA);
+});
+
+t.test('b. a first_appearance page the issue does not have is FIRST_APPEARANCE_UNKNOWN', () => {
+  assert.deepStrictEqual(run((w) => w.edit(MARA, (c) => { c.first_appearance = 'PG_001_001'; })).errors, []);
+  hasError(run((w) => w.edit(MARA, (c) => { c.first_appearance = 'PG_001_009'; })), 'FIRST_APPEARANCE_UNKNOWN', MARA);
+  // An issue that has no directory yet cannot be checked.
+  noError(run((w) => w.edit(MARA, (c) => { c.first_appearance = 'PG_002_001'; })), 'FIRST_APPEARANCE_UNKNOWN');
+});
+
+t.test('b. story bible: affects must exist (FACT_AFFECTS_UNKNOWN)', () => {
+  hasError(run((w) => w.edit(BIBLE, (b) => { b.facts[0].affects = ['CHAR_MARA', 'CHAR_GHOST']; })), 'FACT_AFFECTS_UNKNOWN', BIBLE);
+  hasError(run((w) => w.edit(BIBLE, (b) => { b.facts[0].affects = ['WARD_MARA_RAINCOAT']; })), 'FACT_AFFECTS_UNKNOWN', BIBLE);
+  hasError(run((w) => w.edit(BIBLE, (b) => { b.facts[0].affects = ['ISS_007']; })), 'FACT_AFFECTS_UNKNOWN', BIBLE);
+  hasError(run((w) => w.edit(BIBLE, (b) => { b.facts[0].affects = ['LOOK_SEPIA']; })), 'FACT_AFFECTS_UNKNOWN', BIBLE);
+  // Wardrobe and issue IDs that exist are accepted, as are looks with a registered asset.
+  assert.deepStrictEqual(run((w) => w.edit(BIBLE, (b) => {
+    b.facts[0].affects = ['WARD_MARA_OILSKIN', 'ISS_001', 'LOOK_NOIR_INK', 'PROP_FLARE_GUN', 'LOC_FERRY_DECK'];
+  })).errors, []);
+});
+
+t.test('b. story bible: replaces must name another fact (FACT_REPLACES_UNKNOWN, FACT_REPLACES_SELF)', () => {
+  const e = hasError(run((w) => w.edit(BIBLE, (b) => { b.facts[2].replaces = 'FACT_099'; })), 'FACT_REPLACES_UNKNOWN', BIBLE);
+  assert.ok(e.message.includes('FACT_003') && e.message.includes('FACT_099') && e.message.includes('user_change'), e.message);
+  hasError(run((w) => w.edit(BIBLE, (b) => { b.facts[2].replaces = 'FACT_003'; })), 'FACT_REPLACES_SELF', BIBLE);
+});
+
+t.test('b. story bible: a listed character with no character file is a BIBLE_CHARACTER_MISSING warning', () => {
+  const result = run((w) => w.edit(BIBLE, (b) => { b.characters.push({ id: 'CHAR_PATROL_OFFICER', role: 'antagonist' }); }));
+  assert.deepStrictEqual(result.errors, []);
+  hasWarning(result, 'BIBLE_CHARACTER_MISSING');
+});
+
+t.test('b. story bible: an open blocking question is a warning before any render and an error after', () => {
+  const reopen = (w) => w.edit(BIBLE, (b) => { b.open_questions[1].resolution = null; });
+  const after = run(reopen);
+  const e = hasError(after, 'BLOCKING_QUESTION_OPEN', BIBLE);
+  assert.ok(e.message.includes('PG_001_001'), e.message);
+
+  const before = run((w) => {
+    reopen(w);
+    for (const rel of [PAGE_1, PAGE_2]) {
+      w.edit(rel, (p) => {
+        p.current_render = null;
+        p.status = 'scripted';
+      });
+    }
+  });
+  noError(before, 'BLOCKING_QUESTION_OPEN');
+  hasWarning(before, 'BLOCKING_QUESTION_OPEN');
+  // A non-blocking question may stay open.
+  noError(run(), 'BLOCKING_QUESTION_OPEN');
+});
+
+t.test('b. registry: a missing file is ASSET_FILE_MISSING (error when approved, warning otherwise)', () => {
+  hasError(run((w) => w.remove('characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V01.png')), 'ASSET_FILE_MISSING', MANIFEST);
+  const draft = run((w) => w.remove('props/PROP_FLARE_GUN/refs/PROP_FLARE_GUN_DETAIL_V01.png'));
+  assert.deepStrictEqual(draft.errors, []);
+  hasWarning(draft, 'ASSET_FILE_MISSING');
+});
+
+t.test('b. registry: duplicate IDs, wrong entity prefix, and unapproved masters', () => {
+  hasError(run((w) => w.edit(MANIFEST, (m) => { m.assets.push({ ...m.assets[0] }); })), 'ASSET_DUPLICATE_ID', MANIFEST);
+  hasError(run((w) => w.edit(MANIFEST, (m) => { m.assets[1].entity = 'CHAR_OSKAR'; })), 'ASSET_ENTITY_ID_MISMATCH', MANIFEST);
+  hasError(run((w) => w.edit(MANIFEST, (m) => { m.assets[1].status = 'review'; })), 'MASTER_NOT_APPROVED', MANIFEST);
+  noError(run((w) => w.edit(MANIFEST, (m) => { m.assets[1].status = 'superseded'; })), 'MASTER_NOT_APPROVED');
+});
+
+t.test('b. series plan: an unplanned issue and a page budget that differs are warnings', () => {
+  const unplanned = run((w) => w.edit(SERIES_PLAN, (p) => { p.issues[0].id = 'ISS_002'; }));
+  assert.deepStrictEqual(unplanned.errors, []);
+  hasWarning(unplanned, 'ISSUE_NOT_IN_SERIES_PLAN');
+  const budget = run((w) => w.edit(SERIES_PLAN, (p) => { p.issues[0].page_budget = 8; }));
+  assert.deepStrictEqual(budget.errors, []);
+  hasWarning(budget, 'PAGE_BUDGET_MISMATCH');
+  // No series plan, nothing to compare.
+  assert.deepStrictEqual(run((w) => w.remove(SERIES_PLAN)).errors, []);
+});
+
+t.test('b. scene: unknown location or cast is UNKNOWN_ENTITY; a beat page outside the issue is BEAT_PAGES_UNKNOWN', () => {
+  hasError(run((w) => w.edit(SCENE, (s) => { s.location = 'LOC_EAST_DOCK'; })), 'UNKNOWN_ENTITY', SCENE);
+  hasError(run((w) => w.edit(SCENE, (s) => { s.cast.push('CHAR_GHOST'); })), 'UNKNOWN_ENTITY', SCENE);
+  hasError(run((w) => w.edit(SCENE, (s) => { s.beats[1].pages = ['PG_001_007']; })), 'BEAT_PAGES_UNKNOWN', SCENE);
+  hasError(run((w) => w.edit(PAGE_2, (p) => { p.scene = 'SC_001_02'; })), 'SCENE_PAGES_MISMATCH', SCENE);
+});
+
+t.test('an empty project from create-project.js trips none of the gates', () => {
+  const script = path.join(REPO_ROOT, 'scripts', 'create-project.js');
+  if (!fs.existsSync(script)) return; // tooling core not written yet
+  const target = tempDir('comics-new-project-');
+  const res = spawnSync(process.execPath, [script, '--title', 'Gate Check', '--target', target], { encoding: 'utf8' });
+  assert.strictEqual(res.status, 0, res.stdout + res.stderr);
+  const result = validateWorkspace(path.join(target, 'production'), { schemasDir: NO_SCHEMAS });
+  assert.deepStrictEqual(result.errors, []);
+  assert.deepStrictEqual(result.warnings.filter((w) => w.code !== 'SCHEMA_MISSING'), []);
+});
+
 // --- c. review rules -----------------------------------------------------------
 
 t.test('c. verdict pass with a finding or a failed check is REVIEW_PASS_NOT_CLEAN', () => {

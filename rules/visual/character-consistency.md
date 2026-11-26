@@ -99,10 +99,15 @@ prompt compilation, and every render that depicts a `CHAR_*` entity.
 - `character.schema.json` requires `description.summary`, at least one entry
   in `distinguishing_features`, and the `references` list.
 - `scripts/validate-workspace.js` schema-checks every character and wardrobe
-  file and checks that its ID matches its directory. An asset ID is resolved
-  against the registry where a page, a reference plan, or a page prompt
-  package cites it. `scripts/check-continuity.js` reports a ledger row that
-  names a character or wardrobe state the workspace does not define.
+  file and checks that its ID matches its directory. It resolves every entry
+  of `references`, in the character file and in each wardrobe outfit, against
+  the registry, and fails one that is registered for another entity
+  (`ASSET_ENTITY_MISMATCH`). It also fails a `default_wardrobe` that the
+  character's `wardrobe.yaml` does not define, a `visually_adjacent_to` entry
+  that names a missing character or the character itself, and a
+  `first_appearance` page that its issue does not have.
+  `scripts/check-continuity.js` reports a ledger row that names a character
+  or wardrobe state the workspace does not define.
 - `hooks/protect-approved-assets.js` blocks writes to approved masters.
 - No script can judge whether two designs are far enough apart, or whether a
   character who recurs has a reference that is good enough. The

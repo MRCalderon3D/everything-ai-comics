@@ -107,14 +107,16 @@ boundary between two pages does in each format is covered by
   its four values. `schemas/series-plan.schema.json` requires an integer
   `page_budget` of at least 1 for every issue.
 - `scripts/validate-workspace.js` resolves the page IDs that scene files
-  list, and fails an issue whose `page_count` differs from the number of
-  page directories on disk.
+  and their beats list, and fails an issue whose `page_count` differs from
+  the number of page directories on disk. It warns when `page_budget` in the
+  series plan differs from `page_count` in the issue file
+  (`PAGE_BUDGET_MISMATCH`).
 - `scripts/check-continuity.js` checks that `continuity.enters_from` and
   `exits_to` form one unbroken chain through the issue, which catches a page
   inserted without replanning its neighbors.
-- Agreement between `page_budget` in the series plan and `page_count` in
-  the issue file has no script. Production-qa compares them at issue review,
-  and `scripts/build-board.js` shows the pages of an issue side by side for
+- Whether a budget that no longer matches means changing the plan or
+  cutting pages is decided by production-qa at issue review.
+  `scripts/build-board.js` shows the pages of an issue side by side for
   that review.
 - Rhythm, density, and whether a page ends well are human review on the
   thumbnails and again on the rendered pages.
