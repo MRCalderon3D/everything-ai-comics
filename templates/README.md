@@ -46,14 +46,16 @@ and `generate-assets.js` write them.
 
 ## Tokens
 
-`create-project.js` replaces three tokens in the files it copies. They appear
-in `project/project.yaml` and in the `title` of the two story templates.
+`create-project.js` replaces four tokens in the files it copies. The first
+three appear in `project/project.yaml` and in the `title` of the two story
+templates.
 
 | Token | Replaced with |
 |---|---|
 | `{{TITLE}}` | The `--title` value. |
 | `{{PROJECT_ID}}` | The title in upper case with underscores. It appears in a comment only. |
 | `{{DATE}}` | The creation date, `YYYY-MM-DD`. |
+| `{{COMIC_FORMAT}}` | The `--format` value, or `paged`. No shipped template uses it. |
 
 The files parse and validate before and after substitution. Keep each token
 inside double quotes if you move it. `--format` rewrites the `comic_format`

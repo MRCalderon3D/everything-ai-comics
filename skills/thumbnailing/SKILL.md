@@ -51,9 +51,10 @@ cycle.
 5. Choose the medium. A text thumbnail (a grid in Markdown with one line per
    panel describing the masses and the balloon positions) is enough for a
    regular grid. Draw or generate a rough image when the layout is irregular
-   or the staging is complex. A generated rough goes through the normal
-   pipeline: dry-run by default, a generation record, and cost confirmation
-   for a batch.
+   or the staging is complex. A generated rough is made with the harness's
+   image tool or by a person, outside `generate-assets.js`, which handles
+   finished pages and reference sheets only. Confirm the cost first when
+   the tool charges, and note the tool in the round's file.
 6. Run the reading-order test. Have a reader who has not seen `page.yaml`
    number the panels and the balloons in the order they would read them, or
    do it yourself from the image alone before looking at the plan. Compare
@@ -83,8 +84,8 @@ cycle.
 
 - Files in `production/issues/<ISS_ID>/pages/<PG_ID>/thumbnails/`: text or
   image thumbnails, numbered, never overwritten.
-- A generation record under `production/generations/` for any generated
-  rough.
+- For a generated rough, a note of the tool and its cost in the round's
+  text file.
 - Changes to `page.yaml` for every problem the thumbnail exposed.
 - A short readability note per page: which tests ran and what changed.
 

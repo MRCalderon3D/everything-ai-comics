@@ -74,7 +74,8 @@ Every entry of a reference plan carries one `role`:
 - The frozen style block accompanies the image in the prompt text. Both are
   required. Neither replaces the other.
 - The only request without a look master is the one that creates the look
-  master. Its plan says so in `notes`.
+  master. `compile-prompts.js --asset <LOOK_ID> --sheet look` compiles that
+  first look page with no image and says so.
 
 ## The previous page as a reference
 
@@ -132,8 +133,11 @@ Every entry of a reference plan carries one `role`:
 - `schemas/reference-plan.schema.json` restricts `role` to the seven values
   and `priority` to its four, and requires a `reason` on every entry.
 - `scripts/build-reference-plan.js` writes the plan with the provider's
-  limit as `budget`, and each provider's `compile()` rejects a package with
-  more references than the provider accepts.
+  limit as `budget`. It stops when the look master or the identity master
+  of a drawn character is missing or unapproved, or when the required
+  entries exceed the budget, and it leaves out a previous render that has
+  no passing review. Each provider's `compile()` rejects a package with
+  more images than the provider accepts.
 - `scripts/validate-workspace.js` resolves every `asset_id` against
   `references/manifest.yaml` and the renders on disk.
 - `hooks/protect-approved-assets.js` blocks writes over approved reference

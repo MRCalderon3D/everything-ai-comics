@@ -23,9 +23,9 @@ visible and it has to be stated.
 - Author `character.yaml` per character: the `description` fields, at least one `distinguishing_features` entry, and a `prompt_summary` that carries those features in concrete visual words.
 - Compare each character with the rest of the cast and fill `visually_adjacent_to`. Give adjacent characters different face shapes, hair, facial hair, builds, and clothing silhouettes.
 - Author `wardrobe.yaml`: one `WARD_*` outfit per state with layers, accessories, and `hands` (bare, gloved, bandaged), so gloves cannot appear between panels.
-- Plan and curate reference sheets in the comic's drawing style: turnaround, expressions, wardrobe. Plain background, readable face, consistent scale, no scene lighting.
-- Design recurring secondary characters too. Anyone who must be recognized across panels gets at least a small identity strip.
-- Register sheets in `references/manifest.yaml` with `kind`, `default_role`, and `status`; supersede with a new `_V##` and never overwrite an approved master.
+- Plan and curate reference sheets in the comic's drawing style: turnaround, expressions, wardrobe. Each is compiled from the character files with `compile-prompts.js --asset <CHAR_ID> --sheet <kind>`, so the sheet is only as exact as the description. Plain background, readable face, consistent scale, no scene lighting.
+- Design recurring secondary characters too. Anyone who must be recognized across panels gets at least a turnaround.
+- Promote the chosen candidate (`<CHAR_ID>_<TAG>_V##`) to `<CHAR_ID>_<TAG>_MASTER_V##` and register it in `references/manifest.yaml` with `kind`, `default_role`, and `status`; supersede with a new `_V##` and never overwrite an approved master.
 - Apply a user change to identity in the bible entry, the wardrobe, and the sheets together, and report which rendered pages the change invalidates.
 - Answer identity findings from review by fixing the description or the reference first. Repairing with the same ambiguous description repeats the failure.
 

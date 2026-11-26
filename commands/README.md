@@ -102,8 +102,9 @@ each file looks like.
 
 The commands that can spend generation budget are `/visual-development`,
 `/generate-pages`, `/repair-page`, and `/thumbnails` with sketch
-rendering. All of them are dry-run by default and show a cost estimate
-before a live batch.
+rendering. The first three are dry-run by default and show a cost estimate
+before a live batch. A sketch thumbnail comes from the harness's image tool
+directly, after its estimate is shown.
 
 Two kinds of result are reported apart everywhere. Scripts validate files:
 schemas, cross-references, the ledger, the review and edition rules. A

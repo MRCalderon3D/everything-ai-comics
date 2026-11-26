@@ -62,10 +62,14 @@ positions against.
 6. Test the map against the event list from step 1. Each position an event
    needs has to resolve to a level, a side, and a landmark or `null`. Each
    change of level has a connection to travel by. Add what is missing.
-7. Plan the plates, named `LOC_<NAME>_PLATE_MASTER_V##`: one establishing
-   plate per time-of-day state, more where a level cannot be seen from the
-   first. List them in the file's `notes`; `references` stays empty until
-   `/visual-development` registers the assets.
+7. Plan the establishing plate. `/visual-development` compiles it from
+   `location.yaml` and `map.yaml` with `compile-prompts.js --asset <LOC_ID>
+   --sheet plate`, lit for the first entry of `time_of_day_states`, so put
+   the state the story uses most first. Where a level cannot be seen from
+   the plate, plan a `detail` study of it (`--sheet detail --subject
+   "<text>"`). List the planned sheets in the file's `notes`. The approved
+   plate is registered as `<LOC_ID>_PLATE_MASTER_V##`; `references` stays
+   empty until then.
 8. Set `status: review`, run `node scripts/validate-workspace.js --root
    production`, then the self-evaluation gates on both files. Report the
    levels, the side convention, and any event the map still cannot stage.

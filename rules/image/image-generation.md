@@ -33,9 +33,9 @@ the page-by-page procedure in `page-generation.md`.
   A page may override it in `generation.provider`. Both name an entry of
   `manifests/image-providers.json`.
 - `scripts/generate-assets.js` runs dry unless `--live` is passed. A dry run
-  writes the request spec and a pending generation record and calls no
-  network. A live batch also needs `--yes` after the cost estimate (see
-  `common/cost-control.md`).
+  writes the request spec (`GEN_*.request.json`) and a generation record
+  with `status: dry_run`, and calls no network. A live run also needs
+  `--yes` after the cost estimate (see `common/cost-control.md`).
 - A provider MUST refuse a live run when one of its required environment
   variables is missing (`FAL_KEY`, `REPLICATE_API_TOKEN`, `COMFYUI_HOST`,
   `GOOGLE_API_KEY`).
@@ -59,11 +59,37 @@ package against them.
 | `imageEditing` | Whether a request can carry an edit target | Required for `/repair-page` |
 | `textRendering` | `reliable`, `unreliable`, or `none` | Decides whether in-image lettering is sensible |
 
-- `compile()` MUST fail on an unsupported aspect ratio or on more references
-  than the limit. It never clamps, crops, or drops an input silently.
-- A repair request goes only to a provider with `imageEditing: true`. With
-  any other provider a repair is a full regeneration as a sibling version,
-  and the review treats it as a new page.
+The values declared in `manifests/image-providers.json`:
+
+| Provider | `referenceImages` | `imageEditing` | `textRendering` |
+|---|---|---|---|
+| fal | 4 | true | unreliable |
+| replicate | 1 | false | unreliable |
+| comfyui | 8 | false | none |
+| gemini | 3 | true | unreliable |
+| harness-native | 4 | true | unreliable |
+| manual | 4 | true | unreliable |
+
+All six produce `2:3`, `3:4`, `9:16`, `1:1`, `3:2`, `4:3`, and `16:9`.
+gemini, harness-native, and manual add `4:5`, and gemini also `5:4` and
+`21:9`.
+
+- `compile()` MUST fail on an unsupported aspect ratio, on more input images
+  than the limit (the edit target of a repair counts as one), on a repair
+  for a provider without `imageEditing`, and on in-image lettering for a
+  provider whose `textRendering` is `none`. It never clamps, crops, or drops
+  an input silently.
+- A repair request goes only to a provider with `imageEditing: true`.
+  replicate and comfyui have none, so `compile-prompts.js --repair` refuses
+  them. Compile the repair for a provider that can edit, or correct the
+  source and generate the page again as a sibling version, which the review
+  treats as a new page.
+- A declared capability describes the adapter, and the model can narrow it.
+  fal's default model is text-to-image: it ignores the attached images, with
+  a warning, and refuses a repair. Pin a multi-image fal model with
+  `compile-prompts.js --model` before page work. comfyui's default graph
+  wires no input images either; its limit of eight describes a workflow of
+  your own.
 - Capabilities in the manifest are a snapshot. When a provider changes,
   update the provider file and the manifest together and re-run
   `npm run validate`.
@@ -91,6 +117,10 @@ package against them.
 - `project.lettering.mode` is chosen with the provider's `textRendering` in
   view. `reliable`: `in_image` is allowed. `unreliable`: prefer `overlay`.
   `none`: `overlay` is REQUIRED, and prompts ask for art with no text.
+- No provider in the manifest declares `reliable`. Five are `unreliable`,
+  and the compiler warns on each `in_image` package that the review must
+  check every string. comfyui is `none`, and the compiler refuses an
+  `in_image` page with lettering for it.
 - Prefer `overlay` regardless of provider when the lettering language uses
   accents or a non-Latin script that the provider is known to break, or
   when the pages run close to the word budgets.
@@ -109,13 +139,19 @@ package against them.
   `prompts/<provider>.yaml` beside the page file. The package binds the
   prompt, the parameters, the references in attachment order, and
   `source_hashes` of the page file, the reference plan, and the style block.
+- The same script compiles reference art from the bibles:
+  `--asset <ENTITY_ID> --sheet <kind>` writes
+  `<entity dir>/refs/prompts/<provider>.<kind>.yaml`, and a look page goes to
+  `references/style/prompts/<provider>.<LOOK_ID>.yaml`. Per-panel packages
+  (`--panel <PN_ID>`) go to `prompts/<provider>.<PN_ID>.yaml`.
 - The frozen style block (`style/style-block.txt`) appears verbatim in every
   package, and the approved look master is attached as an image on every
   request.
 - Hand-editing a compiled package is forbidden. Change the page file, the
   reference plan, or the style block and recompile. A package whose hashes
   no longer match its sources is stale and MUST NOT be submitted.
-- Every request, dry or live, produces a generation record
+- Every request, dry or live, produces a generation record and a
+  `GEN_*.request.json` beside it, the request as sent
   (`common/asset-provenance.md`). Model, cost, and seed are copied from what
   the tool reports. What it does not report is recorded as unavailable (see
   `page-generation.md`).
@@ -125,16 +161,19 @@ package against them.
 - `schemas/prompt-package.schema.json` and
   `schemas/generation-record.schema.json` check packages and records, and
   `hooks/validate-after-write.js` re-checks them on write.
-- Each provider's `compile()` rejects a package whose aspect ratio or
-  reference count exceeds its capabilities, and `npm run validate` checks
-  the provider files against `manifests/image-providers.json`.
-- `scripts/generate-assets.js` runs dry by default and refuses a live run
-  with a missing environment variable.
+- Each provider's `compile()` rejects a package whose aspect ratio or image
+  count exceeds its capabilities, a repair it cannot edit, and in-image
+  lettering it cannot render at all. `npm run validate` checks the provider
+  files against `manifests/image-providers.json`.
+- `scripts/generate-assets.js` runs dry by default, refuses a live run with
+  a missing environment variable, and refuses a live run of a package whose
+  page file or style block changed after it was compiled. A dry run of a
+  stale package prints a warning.
 - `hooks/require-cost-confirmation.js` blocks `generate-assets --live`
   without `--yes`. `npm run doctor` reports which provider variables are
   set, without printing their values.
 - The choice of lettering mode against `textRendering` is a project decision
-  made by the art-director and the letterer at `/style-bible`. No script
-  enforces it.
+  made by the art-director and the letterer at `/style-bible`. The compiler
+  enforces only the `none` case; for `unreliable` it warns.
 - What the image looks like is never certified here. That is visual review
   (`common/visual-evidence.md`).

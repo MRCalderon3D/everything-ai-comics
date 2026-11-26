@@ -61,9 +61,11 @@ Further requirements:
 - The identity reference of every character being corrected is attached, with
   the difference from adjacent characters stated in words
   (`visual/character-consistency.md`).
-- A provider without the `imageEditing` capability cannot take an edit
-  target. The repair is then a full regeneration of the page from the
-  corrected plan, still saved as the next version.
+- A provider without the `imageEditing` capability (replicate, comfyui)
+  cannot take an edit target, and `compile-prompts.js --repair` refuses it.
+  The repair is then compiled for a provider that can edit, or it is a full
+  regeneration of the page from the corrected plan, still saved as the next
+  version.
 
 ## After the repair
 
@@ -89,7 +91,8 @@ Further requirements:
 - When the limit is reached and a blocking finding is still open, no further
   generation is requested for that page. The verdict is `flagged`. The agent
   records the upstream issue and the decision needed, and the work returns to
-  the page plan or to the references.
+  the page plan or to the references. `compile-prompts.js --repair` refuses
+  a review whose `repair_cycle` has reached the limit.
 - After the plan or the references have changed, the page starts again from a
   newly compiled prompt as a first render of the revised plan, with a new
   version number.

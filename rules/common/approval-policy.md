@@ -119,7 +119,10 @@ being conditioned on the newer image.
   review unless it is run with `--draft`.
 - `hooks/protect-approved-assets.js` enforces immutability of approved
   reference assets on write.
-- Whether a reference plan cites only approved, current masters is read from
-  `references/manifest.yaml` by `production-qa` at the generation gate.
+- `scripts/build-reference-plan.js` attaches only assets whose status is
+  `approved` in `references/manifest.yaml`, and `scripts/compile-prompts.js`
+  refuses a plan whose required asset has lost that status since. Whether an
+  approved master is still the current one is read by `production-qa` at the
+  generation gate.
 - The approval act itself is human review. The tooling verifies the
   bookkeeping around it.

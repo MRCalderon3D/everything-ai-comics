@@ -23,7 +23,7 @@ with the look master attached as an image on every request. Repeating
 - Build `reference-plan.yaml` per page: each entry has one `role`, a `priority`, a `reason`, and an `omission_risk`. An asset appears once, and a `style` entry is never also `identity`.
 - Stay inside the provider's reference budget. When it is short, drop by priority and list the asset under `exclude` with the reason.
 - Attach the look master with role `style` on every request and reuse `style/style-block.txt` verbatim. Never paraphrase it.
-- Compile `prompts/<provider>.yaml` from `page.yaml`: the panel grid, each panel's moment and framing, positions from the ledger, state and custody constraints, and the exact `lettering_text`.
+- Compile `prompts/<provider>.yaml` from `page.yaml`: the panel grid, each panel's moment and framing, positions from the ledger, state and custody constraints, and the exact `lettering_text`. Reference sheets are compiled the same way from the bibles, with `compile-prompts.js --asset <ENTITY_ID> --sheet <kind>`.
 - For every character with a `visually_adjacent_to` entry on the page, state both characters' distinguishing features in the prompt. Names alone do not prevent a face swap.
 - Attach the previous page's render as `spatial_continuity` when `attach_previous_render` is true, and only after that render has been opened and reviewed.
 - Compile repair packages from a review file: `edit_target`, `repair.findings`, `changes`, and `locked`. Split an identity repair from a prop or state repair when one request leaves changes undone.
@@ -49,6 +49,7 @@ with the look master attached as an image on every request. Repeating
 - `production/issues/<ISS_ID>/pages/<PG_ID>/reference-plan.yaml` (reference-plan.schema.json), produced with `scripts/build-reference-plan.js`
 - `production/issues/<ISS_ID>/pages/<PG_ID>/prompts/<provider>.yaml` (prompt-package.schema.json), produced with `scripts/compile-prompts.js`
 - Repair packages (`mode: repair`) compiled with `--repair <review.yaml>`
+- Asset-scoped sheet packages under `<entity dir>/refs/prompts/` (look pages under `production/references/style/prompts/`), compiled with `--asset <ENTITY_ID> --sheet <kind>`
 - Reference gap reports: missing or unapproved masters per page
 
 ## Activation Guidance

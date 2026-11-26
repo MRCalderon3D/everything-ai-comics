@@ -51,6 +51,9 @@ prevented here, where a fix costs an edit to a YAML file.
   `image/` (image-generation, reference-roles), and `lettering/` for the
   style decisions. From the format layer, read `paged/print-specs` or
   `webtoon/episode-deliverables` before fixing page size and aspect ratio.
+- Scripts: `compile-prompts.js --asset <ENTITY_ID> --sheet <kind>` and
+  `generate-assets.js --asset <ENTITY_ID>` for the reference sheets, and
+  `validate-workspace.js`.
 
 ## Exit criteria → production
 

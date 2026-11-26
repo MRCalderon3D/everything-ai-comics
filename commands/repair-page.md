@@ -64,22 +64,31 @@ references, where the cause usually is.
    who holds the object, a position with no landmark. Fix an upstream cause
    first, in the bible, the page file, or the reference plan. Sending the
    same ambiguous description again repeats the failure.
-4. State the repair in four parts: the edit target (the exact render), the
-   failing panels with their finding IDs, the exact changes, and the locked
-   elements. Write each change so its presence can be seen in the result
-   ("Give Oskar a round face and a hooded jacket in panel 3"). Lock
-   everything that was right: lettering, panel borders, the characters who
-   passed.
-5. Keep identity repairs apart from prop and state repairs when a combined
-   request has left some changes undone. Send the identity findings in one
-   request and the prop or state findings in another, each with the
-   reference sheet of what it corrects attached.
+4. State the repair in the review file, because the compiler builds the
+   request from it. The request has four parts: the edit target (the exact
+   render), the failing panels with their finding IDs, the exact changes,
+   and the locked elements. The changes come from each open finding's
+   `repair` and `expected` fields, so write each one so its presence can be
+   seen in the result ("Give Oskar a round face and a hooded jacket in
+   panel 3"). The compiler locks everything that was right: the panels no
+   finding names, the lettering, the panel borders, the drawing style.
+5. One request carries every open blocking finding of the review, or every
+   open finding when none is blocking. When a combined request leaves some
+   changes undone, the next cycle carries only the findings still open,
+   which keeps an identity repair apart from a prop or state repair. Each
+   request attaches the reference sheet of what it corrects.
 6. prompt-director compiles the request: `node scripts/compile-prompts.js
    --page <page.yaml> --provider <id> --repair <review.yaml>`. The package
    has `mode: repair`, `edit_target`, and a `repair` block with
-   `of_render`, `findings`, `changes`, and `locked`. A provider without
-   `imageEditing` cannot take an edit target; the repair is then a full
-   regeneration from the corrected plan, still saved as the next version.
+   `of_render`, `findings`, `changes`, and `locked`. It replaces the
+   generate package in `prompts/<provider>.yaml`; the request that produced
+   the flagged render stays in its `GEN_*.request.json`. The script refuses
+   when the review's `repair_cycle` has reached the limit, when no finding
+   is open, and when the reviewed render is not on disk. A provider without
+   `imageEditing` (replicate, comfyui) cannot take an edit target and the
+   script refuses it too: compile for a provider that can edit, or treat
+   the repair as a full regeneration from the corrected plan, still saved
+   as the next version.
 7. Cost gate: a repair run is its own batch. Show the estimate and wait
    for confirmation. Run `node scripts/generate-assets.js --page
    <page.yaml> --provider <id>` for the dry run and add `--live --yes`
@@ -118,7 +127,8 @@ references, where the cause usually is.
   repair package (`mode: repair`); validates against
   `schemas/prompt-package.schema.json`.
 - `production/generations/<PG_ID>/GEN_<PG_ID>_<attempt##>.yaml`, validates
-  against `schemas/generation-record.schema.json`.
+  against `schemas/generation-record.schema.json`, with its
+  `.request.json` beside it.
 - `production/issues/<ISS_ID>/pages/<PG_ID>/reviews/<RENDER_ID>.review.yaml`
   for the new render; validates against
   `schemas/visual-review.schema.json`.

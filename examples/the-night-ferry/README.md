@@ -35,8 +35,8 @@ the-night-ferry/
   issues/ISS_001/
     issue.yaml                      "Crossing", 2 pages, 8 panels
     scenes/SC_001_01.yaml           one scene on the ferry deck
-    pages/PG_001_001/               page.yaml, reference-plan.yaml, renders/, reviews/
-    pages/PG_001_002/               page.yaml, reference-plan.yaml, renders/, reviews/
+    pages/PG_001_001/               page.yaml, reference-plan.yaml, prompts/, renders/, reviews/
+    pages/PG_001_002/               page.yaml, reference-plan.yaml, prompts/, renders/, reviews/
   generations/                      one record per generation attempt
   continuity/ISS_001.final-state.yaml
   editions/ED_001_01/edition.yaml   draft edition, no exports yet
@@ -106,14 +106,17 @@ node scripts/build-edition.js --edition examples/the-night-ferry/editions/ED_001
 The same commands exist as npm scripts, for example
 `npm run validate:workspace -- --root examples/the-night-ferry`.
 
-Three scripts write into the workspace when you point them at it:
+Four scripts write into the workspace when you point them at it:
 
 - `build-reference-plan.js --page <page.yaml>` rewrites `reference-plan.yaml`
   next to the page.
+- `compile-prompts.js --page <page.yaml>` rewrites
+  `prompts/harness-native.yaml` next to the page.
 - `generate-assets.js --page <page.yaml>` is a dry run by default and adds a
-  generation record under `generations/`.
-- `build-edition.js` adds files under `editions/ED_001_01/exports/` and lists
-  them under `exports` in `edition.yaml`.
+  generation record and its `GEN_*.request.json` under `generations/`.
+- `build-edition.js` adds files under `editions/ED_001_01/exports/`
+  (`the-night-ferry-001-ed01.cbz`) and lists them under `exports` in
+  `edition.yaml`.
 
 `letter-pages.js` has nothing to do here. The project letters in the image
 (`lettering.mode: in_image`), so there is no `lettering.yaml`.

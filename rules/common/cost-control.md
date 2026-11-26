@@ -23,8 +23,10 @@ generation, and every agent that plans a batch of pages or reference art.
 
 ## Dry-run default
 
-- Every provider's `generate` MUST default to `dryRun: true`: it writes the
-  request spec and a pending generation record and makes no network call.
+- Every provider's `generate` MUST default to `dryRun: true`: it makes no
+  network call and returns a generation record with `status: dry_run`.
+  `scripts/generate-assets.js` writes that record and the request spec
+  (`GEN_*.request.json`) under `generations/`.
 - Live generation requires `--live` and `--yes` on
   `scripts/generate-assets.js`, plus the provider's required environment
   variables. A missing variable MUST abort the run. It never falls back to
@@ -41,7 +43,8 @@ generation, and every agent that plans a batch of pages or reference art.
 - Confirmation scales with cost. At zero external cost (`harness-native`,
   `manual`, a local `comfyui`) there is nothing to confirm: the agent states
   what it is about to generate and proceeds. Plan, provenance, and review are
-  unchanged.
+  unchanged. The handoff providers need neither `--live` nor `--yes`; a live
+  `comfyui` run still takes both flags.
 - A confirmation covers the batch that was estimated. New items mean a new
   estimate, including one extra page added to a confirmed run.
 - When pricing is unknown, the agent MUST say so and treat the item as

@@ -68,8 +68,9 @@ contradicting them.
 - The same holds for faces, hands, and held props the story tracks. Art
   that can lose a few millimetres (sky, floor, background) fills the space
   between the safe line and the bleed edge.
-- In `in_image` mode the prompt states the margin, and the review checks
-  the pixels. In `overlay` mode the `box` of every element in
+- In `in_image` mode the compiled prompt carries no margin figure. State
+  the margin once in the lettering line of the frozen style block, and the
+  review checks the pixels. In `overlay` mode the `box` of every element in
   `lettering.yaml` is placed inside the safe area, measured in pixels on
   the overlay's `canvas`.
 - Sound effects drawn as part of a bleed panel may run off the page when

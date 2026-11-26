@@ -60,10 +60,16 @@ without text and the lettering is set on top from `lettering.yaml`.
    tail starts and that it ends at the speaker's mouth; and that the first
    balloon to be read sits where the eye enters the panel for the
    project's reading direction. Sound effects sit beside their source.
-4. `in_image` mode. Use it only with a provider whose `textRendering`
-   capability is `reliable`. The placement goes into each panel's `notes`
-   so the prompt can state it, and the compiled package lists every string
-   under `lettering_text`. After generation, go to step 6 on the render.
+4. `in_image` mode. No provider declares `textRendering: reliable`. With an
+   `unreliable` provider the mode works only when every string is checked
+   in review and the user accepts repair cycles for text. With `none`
+   (comfyui) the compiler refuses the page. The placement goes into each
+   panel's `notes` for the reviewer. The compiled prompt lists each string
+   with its panel, type, and speaker in reading order and asks for balloons
+   clear of faces, hands, and the action; room a balloon needs is reserved
+   through the panel's `framing.composition`. The package lists every
+   string under `lettering_text`. After generation, go to step 6 on the
+   render.
 5. `overlay` mode. The art is generated with no text. Write
    `lettering.yaml` beside the page file: `page`, `render`, `canvas` (the
    page's `width_px` and `height_px`), `font`, and one entry in `elements`

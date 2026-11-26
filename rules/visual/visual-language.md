@@ -96,9 +96,11 @@ against a page.
   hash of the style block the package was compiled with, and lists the
   attached references with their roles.
 - `reference-plan.schema.json` restricts each entry to one role.
-- Whether every plan and package for an issue includes the current look
-  master in the `style` role is read from those files by the prompt-director
-  and by `production-qa` at the generation gate.
+- `scripts/build-reference-plan.js` puts the approved look master first in
+  every plan with role `style`, and stops when none is approved.
+  `scripts/compile-prompts.js` refuses a reference sheet for the same
+  reason. Whether the attached look master is still the current version is
+  read by the prompt-director and by `production-qa` at the generation gate.
 - Whether a page matches the look is visual review. The `style_fidelity`
   check and the `style_fidelity` gate of every review are filled in by
   comparing the render with the look master, and the art-director decides

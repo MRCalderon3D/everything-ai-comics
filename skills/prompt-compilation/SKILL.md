@@ -41,50 +41,70 @@ a prompt exists only in someone's head.
    it with `node scripts/build-reference-plan.js --page <page.yaml>`). No
    blocking open question touches the page's cast.
 2. Compile with the script:
-   `node scripts/compile-prompts.js --page <page.yaml> [--provider <id>]`.
+   `node scripts/compile-prompts.js --page <page.yaml> [--provider <id>] [--model <id>]`.
    It writes `prompts/<provider>.yaml` next to the page. Do not write a
-   page package by hand, and do not edit the `prompt` field afterwards.
-   When the text is wrong, the source is wrong.
-3. Read the compiled package and confirm it opens with the reference
-   legend: every attached image listed in attachment order with exactly one
-   role and what that role covers. "Image 1: drawing style only. Image 2:
-   Mara's face, hair, and build. Image 3: the previous page, for the deck's
-   layout only." A style image never doubles as a face.
-4. Confirm the style block follows, word for word as in
-   `style/style-block.txt`.
-5. Confirm the page structure: aspect ratio, number of panels, the grid
-   from `layout.tiers`, and the reading order.
-6. Confirm each panel carries its ledger: framing, the one `moment`, each
-   visible character with position (level, side, landmark), facing, action,
-   wardrobe, state tags, and held props, then the background. Characters
-   marked `off_panel` are named as absent from the drawing.
+   package by hand, and do not edit the `prompt` field afterwards. When the
+   text is wrong, the source is wrong.
+3. Read the compiled package and confirm it opens with the style block,
+   word for word as in `style/style-block.txt`.
+4. Confirm the page header that follows: aspect ratio, number of panels,
+   the grid from `layout.tiers`, the reading direction, and the color mode
+   with its spot colors.
+5. Confirm the reference legend: every attached image listed in attachment
+   order with exactly one role and what that role covers. "Image 1: drawing
+   style only. Image 2: identity of Mara. Image 3: the previous page, for
+   the setting and the staging only." A style image never doubles as a
+   face. In a repair the edit target is Image 1.
+6. Confirm each panel carries its ledger: framing, the one `moment`, the
+   setting and background, then each drawn character with position (level,
+   side, landmark), facing, action, acting, wardrobe, state tags, and held
+   props, and the props in view. Characters marked `off_panel` are named as
+   not drawn.
 7. Confirm the difference statements. For every pair on the page listed in
    `visually_adjacent_to`, the prompt states how they differ, using their
-   `distinguishing_features`: "Oskar: round face, hooded jacket, about
-   twelve. Mara: long face, broken nose, cropped grey hair, fifties." Names
-   alone do not stop one face being used for both.
+   `distinguishing_features`: "Mara is not Oskar. Mara: broken nose, grey
+   cropped hair. Oskar: round face, hooded jacket." Names alone do not stop
+   one face being used for both.
 8. Confirm the lettering. With `lettering.mode: in_image`, every string in
    `lettering_text` appears in the prompt exactly as in `page.yaml`, tied to
    its panel, type, and speaker. With `overlay`, the prompt asks for art
-   with no text. If the provider's `textRendering` is not `reliable`, say
-   so before generation; overlay lettering is the usual answer.
-9. Check the package against the provider: reference count within
-   `referenceImages`, aspect ratio in `aspectRatios`, and for a repair,
-   `imageEditing` available. The compiler pins `model` through the
-   provider's `compile()`.
+   with no text and `lettering_text` is empty. No provider in the roster
+   declares `textRendering: reliable`. For an `unreliable` provider the
+   compiler warns that the review must check every string. For `none`
+   (comfyui) it refuses an `in_image` page that has lettering; use overlay
+   lettering or another provider.
+9. Read the compiler's verdict on the provider. The provider's `compile()`
+   runs last and refuses a package with more images than `referenceImages`
+   (the edit target counts as one), an aspect ratio outside `aspectRatios`,
+   or a repair on a provider without `imageEditing` (replicate, comfyui).
+   It also pins `model`. fal's default model is text-to-image: it ignores
+   the attached images, with a warning, and cannot run a repair, so pin a
+   multi-image fal model with `--model`.
 10. For a repair, compile with `--repair <review.yaml>`. The package has
-    `mode: repair`, `edit_target` set to the flagged render, and a `repair`
-    block: `of_render`, the `findings` addressed, the exact `changes`, and
-    the `locked` elements that must come back unchanged.
-11. Confirm `source_hashes` for the page, the reference plan, and the style
+    `mode: repair`, `edit_target` set to the reviewed render, and a `repair`
+    block: `of_render`, the `findings` addressed (the open blocking ones,
+    or every open finding when none is blocking), the exact `changes`, and
+    the `locked` elements that must come back unchanged. The script refuses
+    when the review's `repair_cycle` has reached
+    `repair_policy.max_cycles`, when the review has no open finding, and
+    when the reviewed render is not on disk.
+11. For a page with `generation.mode: per_panel`, compile each panel with
+    `--panel <PN_ID>`. Each run writes `prompts/<provider>.<PN_ID>.yaml`
+    with the id `PP_<PAGE_ID>_<PROVIDER>-P##`, carrying only the references
+    that panel needs. `--panel` and `--repair` cannot be combined.
+12. Confirm `source_hashes` for the page, the reference plan, and the style
     block, and `status: compiled`. Set the page's `status` to `prompted`.
     A package whose hashes no longer match its sources is stale and is
-    recompiled before use.
+    recompiled before use: `generate-assets.js` compares the page and
+    style-block hashes, warns in a dry run, and refuses a live run.
 
 ## Outputs
 
 - `issues/<ISS_ID>/pages/<PG_ID>/prompts/<provider>.yaml` (`prompt-package`
   schema), in `generate` or `repair` mode.
+- In per-panel mode, `prompts/<provider>.<PN_ID>.yaml` for each panel.
+- For a reference sheet, `<entity dir>/refs/prompts/<provider>.<kind>.yaml`,
+  and for a look page `references/style/prompts/<provider>.<LOOK_ID>.yaml`.
 
 ## Quality Bar
 
@@ -134,18 +154,26 @@ a prompt exists only in someone's head.
 If a prompt keeps failing, the defect is upstream, in the bible, the plan,
 or the page, and that is where the edit goes.
 
-Reference sheets, plates, and look masters have no page to compile from, and
-the script takes pages only. Their asset-scoped packages (`page: null`,
-`asset: <entity ID>`) are assembled from the entity's fixed fields
-(`prompt_summary`, `distinguishing_features`, the outfit `description`) and
-the style block verbatim, under the same rules: no wording the bible lacks,
-one role per attached image.
+Reference sheets, plates, and look pages have no page to compile from. The
+same script compiles them from the entity's bible file:
+`node scripts/compile-prompts.js --asset <ENTITY_ID> --sheet <kind> [--root <workspace>] [--provider <id>] [--model <id>]`.
+The kinds are `turnaround`, `expressions`, and `wardrobe` for a character,
+`plate` for a location, `prop` for a prop, `look` for a look, and `detail`
+with `--subject "<text>"` for a close study of any entity. `--outfit
+<WARD_ID>` picks the wardrobe state and `--expressions a,b,c` the
+expression list. The package is asset-scoped (`page: null`,
+`asset: <ENTITY_ID>`, id `PP_<ENTITY_ID>_<PROVIDER>-<TAG>`) and hashes only
+the style block. Its rules are the same: no wording the bible lacks, one
+role per attached image. A sheet needs an approved look master; the first
+look page of a project is the one request compiled without an image.
 
 Providers read prompts differently. Gemini-class models respond to full
-sentences that describe the page and do poorly with keyword lists. Models
-without a negative-prompt input take prevention phrased positively ("each
-character appears once in each panel"). The provider's `compile()` applies
-these differences; the package's content stays the same.
+sentences that describe the page and do poorly with keyword lists, so the
+compiler writes sentences. Hard constraints are phrased positively ("each
+named character appears exactly once in every panel that lists them"), and
+the `negative_prompt` field holds the short exclusion list. The provider's
+`compile()` places that list where the provider takes it; the package's
+content stays the same.
 
 Prompt text is model-facing and exempt from `text-humanization`. It answers
 to this skill and to `rules/image/page-generation.md` and

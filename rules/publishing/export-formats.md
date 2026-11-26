@@ -39,7 +39,10 @@ Publishing layer. Applies to `deliverables` in `project.yaml`, to the
 | `print` | Press-ready files to a printer's specification | External prepress tool, from the edition's renders |
 
 - An edition's `exports` list records each file the build produced, with
-  its `format` (`pdf`, `cbz`, or `web`) and its `built_at` time.
+  its `format` (`pdf`, `cbz`, or `web`) and its `built_at` time. For the web
+  reader the recorded file is its `index.html`.
+- Without `--formats`, the build produces the `pdf`, `cbz`, and `web`
+  targets the project declares, and `pdf` and `cbz` when it declares none.
 - Deliverables are declared before pages are planned, because they set the
   page ratio, the lettering size, and the safe margins.
 - A target that the project does not declare is not built on speculation.
@@ -99,13 +102,20 @@ Publishing layer. Applies to `deliverables` in `project.yaml`, to the
 ## Exports never overwrite
 
 - `build-edition.js` skips an export file that already exists and says so.
-  File names carry the issue and the edition number
-  (`the-night-ferry-ed01.cbz`), so two editions never compete for a name.
+  File names are
+  `<title-slug>-<issue number>-ed<edition number>[-DRAFT].<ext>`
+  (`the-night-ferry-001-ed01.cbz` for `ED_001_01`), and the web reader is a
+  directory with the same base name and a `-web` suffix
+  (`the-night-ferry-001-ed01-web/`). The slug comes from the project title.
+  Two editions never compete for a name.
 - When pages change, create the next edition (`edition-assembly.md`) and
   build that. Do not rebuild an existing edition with different renders.
 - `--force` exists for rebuilding the exports of a `draft` edition after a
-  failed or interrupted build. It MUST NOT be used on an edition with status
-  `reviewed` or `published`.
+  failed or interrupted build, and for rebuilding `-DRAFT` files with
+  `--draft`. On an edition with status `reviewed` or `published` the script
+  refuses it with the error `force-not-draft` and writes nothing. That
+  edition is corrected with a new edition ID that sets `supersedes` and
+  `changes`.
 - Files that left the workspace (sent to a reader, uploaded, printed) are
   identified by edition ID in any later conversation about them.
 
@@ -144,17 +154,20 @@ settings in the edition's `notes`.
   `format` to `pdf`, `cbz`, or `web`.
 - `scripts/build-edition.js` builds only from an `edition.yaml`, applies the
   review gate of `edition-assembly.md`, and skips an existing export unless
-  `--force` is passed. In a paged project it compares the aspect ratio of
-  the listed pages and stops when they differ by more than 2%. In a webtoon
-  project it compares widths and warns. It rejects an SVG listed as
-  `lettered_file`.
+  `--force` is passed. It refuses `--force` on an edition whose status is
+  not `draft` (`force-not-draft`), unless the build is `--draft`. In a paged
+  project it compares the aspect ratio of the listed pages and stops when
+  they differ by more than 2%. In a webtoon project it compares widths and
+  warns. It rejects an SVG listed as `lettered_file`, and a WebP page when
+  `pdf` is among the formats.
 - `hooks/protect-approved-assets.js` blocks a direct write over an existing
   file under `editions/*/exports/`.
 - `scripts/validate-workspace.js` checks that every file an edition lists
   for its pages exists on disk.
-- Whether `--force` was used on a non-draft edition is not recorded by the
-  tooling. Production-qa compares `built_at` times with the edition's status
-  at release review.
+- A `--force` rebuild of a draft leaves no mark beyond a newer `built_at`
+  on the export. Production-qa reads the `built_at` times at release review
+  and confirms the exports were built after the last change to the page
+  list.
 - The order of pages in a reader app, the look of the web reader, and the
   state of anything made with an external tool are checked by opening the
   export. The prepress-specialist does this for every format before an

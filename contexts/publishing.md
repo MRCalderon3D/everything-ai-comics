@@ -8,8 +8,9 @@ issue, and an edition lists the exact render of every page and exports it.
 
 - Lettering finished in the project's mode. In `overlay` mode that means a
   `lettering.yaml` per page and a `renders/<RENDER_ID>.lettered.svg` from
-  `scripts/letter-pages.js`. In `in_image` mode it means every string on the
-  render checked against `page.yaml`.
+  `scripts/letter-pages.js`, exported to PNG or JPEG in a browser or a
+  vector tool so the edition can list it as `lettered_file`. In `in_image`
+  mode it means every string on the render checked against `page.yaml`.
 - `continuity/<ISS_ID>.final-state.yaml`: where every character and prop
   ends the issue, with open threads and open issues listed.
 - `editions/<ED_ID>/edition.yaml` and its exports under `exports/`: PDF, CBZ,

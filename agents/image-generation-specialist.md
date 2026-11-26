@@ -21,11 +21,11 @@ own output.
 
 ## Responsibilities
 
-- Run `scripts/generate-assets.js` with `--package`, `--page`, or `--issue`. Dry-run is the default; `--live --yes` comes only after a cost estimate has been confirmed.
-- Check each package against the provider's capabilities before spending: reference count, aspect ratio, `imageEditing` for repairs, `textRendering` for in-image lettering.
+- Run `scripts/generate-assets.js` with `--package`, `--page`, `--issue`, or `--asset`. Dry-run is the default; `--live --yes` comes only after a cost estimate has been confirmed.
+- Check each package against the provider's capabilities before spending: reference count, aspect ratio, `imageEditing` for repairs (replicate and comfyui have none), `textRendering` for in-image lettering (no provider is `reliable`, comfyui is `none`).
 - Generate pages one at a time in reading order. The previous page's render is attached to the next request only after it has been opened and reviewed.
-- Save every returned image as `renders/<PG_ID>_V##` with the next version number. Never overwrite or delete an earlier candidate.
-- Write a `GEN_*` record per attempt. When the tool reports no model, cost, or seed, record `model: unreported`, `cost.amount: null`, and list the gap in `metadata_unavailable`. Invent nothing.
+- File every returned image under the next version number: a page as `renders/<PG_ID>_V##`, a sheet as `<ENTITY_ID>_<TAG>_V##` in the entity's `refs/`, never under a `_MASTER` name. Never overwrite or delete an earlier candidate.
+- Keep a `GEN_*` record and its `GEN_*.request.json` per attempt. When the tool reports no model, cost, or seed, record `model: unreported`, `cost.amount: null`, and list the gap in `metadata_unavailable`. Invent nothing.
 - Open each returned file and confirm it is a readable image at the requested size. Report that as "an image exists" and hand it to review.
 - For a repair, submit the repair package against its `edit_target` and save the result as a sibling version.
 - Stop at the project's `repair_policy.max_cycles` and report upstream. Rerolling past the limit hides a plan or reference problem.
@@ -50,7 +50,7 @@ own output.
 
 - Versioned candidates under `production/issues/<ISS_ID>/pages/<PG_ID>/renders/`
 - Reference art candidates under each entity's `refs/`, for the designers to curate
-- `production/generations/<PG_ID or ASSET_ID>/GEN_*.yaml` (generation-record.schema.json)
+- `production/generations/<PG_ID or ENTITY_ID>/GEN_*.yaml` (generation-record.schema.json), each with its `GEN_*.request.json`
 - A cost estimate per batch, submitted before any live run
 
 ## Activation Guidance

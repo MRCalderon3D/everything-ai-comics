@@ -35,7 +35,7 @@ hook check each YAML file against its schema.
 | `page` | Layout, panel script, panel ledger, lettering text | `production/issues/<ISS_ID>/pages/<PG_ID>/page.yaml` |
 | `lettering` | Overlay geometry for balloons, captions, and sound effects | `production/issues/<ISS_ID>/pages/<PG_ID>/lettering.yaml` |
 | `reference-plan` | Reference images for one page, one role each, with priority and omission risk | `production/issues/<ISS_ID>/pages/<PG_ID>/reference-plan.yaml` |
-| `prompt-package` | Compiled prompt, parameters, references, repair block, source hashes | `production/issues/<ISS_ID>/pages/<PG_ID>/prompts/<provider>.yaml` |
+| `prompt-package` | Compiled prompt, parameters, references, repair block, source hashes | `production/issues/<ISS_ID>/pages/<PG_ID>/prompts/<provider>.yaml`, and any `prompts/*.yaml` beside reference art (`<entity dir>/refs/prompts/`, `references/style/prompts/`) |
 | `generation-record` | Provenance of one attempt: provider, model, output, cost, status | `production/generations/<scope>/GEN_*.yaml` |
 | `visual-review` | Fourteen checks with evidence, findings, two gates, verdict | `production/issues/<ISS_ID>/pages/<PG_ID>/reviews/<RENDER_ID>.review.yaml` |
 | `continuity-state` | Where every character and prop is at the end of an issue | `production/continuity/<ISS_ID>.final-state.yaml` |
@@ -63,7 +63,7 @@ the data model lists them.
 | Fact | `^FACT_\d{3}$` | `FACT_007` |
 | Provider | `^[a-z][a-z0-9-]*$` | `harness-native` |
 | State tag, level, landmark | `^[a-z][a-z0-9_]*$` | `cut_left_hand`, `deck`, `crates` |
-| Prompt package | `^PP_(PG_\d{3}_\d{3}\|<entity>)_[A-Z0-9][A-Z0-9_-]*$` | `PP_PG_001_001_HARNESS-NATIVE` |
+| Prompt package | `^PP_(PG_\d{3}_\d{3}\|<entity>)_[A-Z0-9][A-Z0-9_-]*$` | `PP_PG_001_001_HARNESS-NATIVE`, `PP_PG_001_002_FAL-P03`, `PP_CHAR_MARA_FAL-TURN` |
 | Generation record | `^GEN_(PG_\d{3}_\d{3}\|<entity>)_\d{2}$` | `GEN_PG_001_002_02` |
 
 ## Design decisions

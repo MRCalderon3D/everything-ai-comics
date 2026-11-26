@@ -73,11 +73,16 @@ line without lending anyone its characters.
    Costume reference: `wardrobe`. Style sample: `style`. Location photo:
    `spatial_continuity`. Prop photo: `prop_consistency`. One asset has one
    role.
-7. Decide how each asset will be used. An identity photograph normally
-   conditions sheet generation and is not attached to page requests, since
-   a photograph on a page request drags the rendering toward photography.
-   The stylized sheet made from it becomes the page-level identity
-   reference. A style sample conditions the look master in the same way.
+7. Decide how each asset will be used. An identity photograph is not
+   attached to page requests, since a photograph on a page request drags
+   the rendering toward photography. It reaches the page through the
+   written description: `compile-prompts.js --asset <CHAR_ID> --sheet
+   turnaround` builds the turnaround from `character.yaml` with the look
+   master attached, and the approved turnaround becomes the page-level
+   identity reference. List the sheet in `character.references` and leave
+   the photograph out, so reference plans pick the sheet. A style sample
+   reaches the look page the same way, through the style bible and the
+   style block.
 8. Report conflicts and do not merge them. A file that contradicts an
    approved fact or an approved sheet (a beard where the bible says
    clean-shaven) is a decision for the user: change the canon as a
@@ -88,7 +93,8 @@ line without lending anyone its characters.
    immediately.
 10. Hand off: list which assets can go straight to review as masters (a
     finished character drawing the user made is already in style) and which
-    should condition `/visual-development`.
+    should inform `/visual-development` through the descriptions written
+    in step 4.
 
 ## Outputs
 
@@ -96,7 +102,8 @@ line without lending anyone its characters.
 - Registry entries in `production/references/manifest.yaml` with class,
   role, origin, and license notes; files moved to their homes.
 - A conflict report where the material disagrees with existing canon.
-- A use plan: direct-to-review candidates and conditioning-only assets.
+- A use plan: direct-to-review candidates, and assets that only inform a
+  description.
 
 ## Quality Bar
 
@@ -141,7 +148,7 @@ line without lending anyone its characters.
 ## Notes
 
 Ingestion comes before `/visual-development`: analyze first, then generate
-masters conditioned on the user's material. Where the harness can open
+masters from the descriptions the analysis wrote into the bibles. Where the harness can open
 images directly, the analysis reads the files; where it cannot, the user
 pastes them into the conversation and the procedure is the same. Text
 documents are read and analyzed like images. The one-role policy is

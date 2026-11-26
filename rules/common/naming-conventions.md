@@ -40,16 +40,23 @@ every cross-reference inside structured files.
   style assets. The name part is uppercase letters, digits, and underscores,
   starting with a letter (`CHAR_MARA`, `LOC_FERRY_DECK`).
 - Assets: the entity ID, a short kind, and a version `_V##`
-  (`CHAR_MARA_TURN_V01`). Approved masters carry `_MASTER` before the
-  version: `CHAR_MARA_TURN_MASTER_V02`. The entity of an asset is its leading
-  entity ID, and `references/manifest.yaml` states it explicitly.
+  (`CHAR_MARA_TURN_V01`). The kind tags the scripts write are `TURN`,
+  `EXPR`, `WARD`, `PLATE`, `PROP`, and `DETAIL`; a look page has none
+  (`LOOK_NOIR_INK_V01`). Approved masters carry `_MASTER` before the
+  version: `CHAR_MARA_TURN_MASTER_V02`. A generated candidate never takes
+  the `_MASTER` name; it gets one when it is approved. The entity of an
+  asset is its leading entity ID, and `references/manifest.yaml` states it
+  explicitly.
 - Wardrobe states: `WARD_<CHARACTER>_<NAME>` (`WARD_MARA_OILSKIN`).
 - Canon facts: `FACT_###` (`FACT_001`), numbered in the story bible.
-- Prompt packages: `PP_<page-or-asset-id>_<PROVIDER>`, with the provider ID
-  in uppercase (`PP_PG_001_001_HARNESS-NATIVE`).
+- Prompt packages: `PP_<page-or-entity-id>_<PROVIDER>`, with the provider ID
+  in uppercase (`PP_PG_001_001_HARNESS-NATIVE`). A per-panel package adds
+  `-P##` (`PP_PG_001_002_FAL-P03`), and a reference-sheet package adds the
+  kind tag (`PP_CHAR_MARA_FAL-TURN`).
 - Generation records: `GEN_<page-id>_<attempt##>` for pages
-  (`GEN_PG_001_001_01`) or `GEN_<asset-id>_<attempt##>` for reference art.
-  Attempt numbers are two digits, sequential per page or asset, never reused.
+  (`GEN_PG_001_001_01`) or `GEN_<entity-id>_<attempt##>` for reference art
+  (`GEN_CHAR_MARA_01`). Attempt numbers are two digits, sequential per page
+  or entity, never reused.
 - Review findings: `F##` (`F01`), unique within a review file.
 - Editions: `ED_<issue>_##` (`ED_001_03`). A rebuilt edition gets the next
   number.
@@ -79,11 +86,16 @@ reference plays when it is attached to a request.
 - Issue and page directories are named by ID and hold `issue.yaml` and
   `page.yaml`. A scene file is its ID: `scenes/SC_001_01.yaml`.
 - Files named after an artifact use the ID verbatim: `PG_001_002_V02.png`,
-  `GEN_PG_001_002_02.yaml`, `CHAR_MARA_TURN_MASTER_V01.png`.
+  `GEN_PG_001_002_02.yaml`, `CHAR_MARA_TURN_MASTER_V01.png`. The request
+  file beside a generation record is `GEN_PG_001_002_02.request.json`.
 - A review is `<RENDER_ID>.review.yaml`. A lettered overlay is
   `<RENDER_ID>.lettered.svg`. An end-of-issue state is
   `<ISS_ID>.final-state.yaml`.
 - A prompt package file is named after its provider: `prompts/fal.yaml`.
+  A per-panel package adds the panel ID (`prompts/fal.PN_001_002_03.yaml`),
+  a sheet package the sheet kind (`refs/prompts/fal.turnaround.yaml`), and
+  a look package the look ID
+  (`references/style/prompts/fal.LOOK_NOIR_INK.yaml`).
 - Everything else is lowercase-kebab (`reference-plan.yaml`,
   `story-bible.yaml`, `series-plan.yaml`). NEVER use spaces, camelCase, or
   non-ASCII characters in a filename.
@@ -92,8 +104,10 @@ reference plays when it is attached to a request.
 
 - The schemas in `schemas/` regex-check every ID field against the patterns
   listed in `docs/data-model.md`.
-- `scripts/validate-workspace.js` runs those schemas and rejects dangling
-  cross-references.
+- `scripts/validate-workspace.js` runs those schemas, checks that the ID
+  inside a file matches its path, and rejects a page, reference plan, or
+  page prompt package that cites an unregistered asset or a render that is
+  not on disk.
 - `scripts/check-continuity.js` fails when a page names a character, prop,
   location, wardrobe state, level, or landmark that does not exist in the
   workspace (ledger rule 11).

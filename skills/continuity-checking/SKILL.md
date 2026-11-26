@@ -146,8 +146,9 @@ renders with eyes.
 ## Notes
 
 `scripts/check-continuity.js` automates the ledger rules listed in
-`docs/data-model.md`. It reads `page.yaml` files and nothing else, so its
-output describes the plan. The visual audit uses the method and the finding
+`docs/data-model.md`. It reads the page files, the bible entries they name,
+and the state file an issue opens from. It opens no image, so its output
+describes the plan. The visual audit uses the method and the finding
 format of `pixel-review`, applied across pages where that skill works one
 page at a time.
 

@@ -14,11 +14,11 @@ pages:                                 # reading order, once each, no gaps
   - page: PG_001_001
     render: PG_001_001_V01             # the exact render that ships
     file: issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V01.png   # relative to the workspace root
-    lettered_file: null                # overlay mode: the lettered output. Else null
+    lettered_file: null                # overlay mode: the lettered page as PNG or JPEG, named <RENDER_ID>.lettered.png. Else null
 
 exports: []                            # filled by build-edition.js
 #  - format: cbz                        # pdf | cbz | web
-#    file: editions/ED_001_01/exports/title-ed01.cbz
+#    file: editions/ED_001_01/exports/<title-slug>-001-ed01.cbz   # <title-slug>-<issue number>-ed<edition number>[-DRAFT].<ext>; web is <...>-web/index.html
 #    built_at: null
 
 created_at: "2026-01-01"
