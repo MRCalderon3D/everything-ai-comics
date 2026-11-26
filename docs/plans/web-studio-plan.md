@@ -116,6 +116,36 @@ asking the chat.
    installer, a check that the CLIs are present and logged in, clear messages
    when they are not.
 
+### Spike 1 result (2026-11-26): Codex draws headless
+
+Run with codex-cli 0.167.1, `codex exec --skip-git-repo-check --ephemeral -s
+workspace-write --json`, in an empty folder. Both images were opened and
+looked at.
+
+| Test | Result | Time |
+|---|---|---|
+| One ink panel from text, saved to a named file | 1672 x 941 PNG at the requested path | 103 s |
+| A three-panel portrait page with the first image attached as style reference (`-i`) and one caption | 1024 x 1536 PNG (2:3), three bordered panels, style carried over, caption text exact | 331 s |
+
+What the studio has to account for:
+
+- `-i` takes several files, so the prompt must come through stdin
+  (`codex exec ... -i ref.png - < prompt.txt`). Passed as an argument, the
+  prompt is read as another image path and the run exits at once.
+- Output is 1024 x 1536, below the 2000 x 3000 page size in the sample
+  project. Either the project page size follows the tool or pages are
+  upscaled later. Not solved here.
+- A page with one reference took five and a half minutes. A twelve-page
+  issue with reviews and repairs is an hour or more of queue.
+- The run printed errors about an MCP server configured on this machine that
+  was not running. They did not affect the result; the driver should not
+  treat stderr noise as failure.
+- Not tested yet: several references at once (style plus two character
+  sheets plus the previous page), editing an existing image for a repair,
+  and how often the lettering comes back wrong.
+
+Spikes 2 and 3 have not been run.
+
 Phase 0 decides whether phases 2 to 5 can rely on Codex for drawing. With no
 API in the first version there is no second illustrator, so if the spike
 fails the fallback is a handoff: the studio prepares the prompt and the
