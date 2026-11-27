@@ -205,7 +205,10 @@ const provider = {
   label: 'Codex CLI (codex exec with its image tool)',
   env: [],
   capabilities: {
-    referenceImages: 4,
+    // Measured 2026-11-27 (Codex CLI 0.167.1): pages drawn with a look master
+    // plus 4 and plus 5 turnaround sheets kept every identity distinct in a
+    // full-figure panel and a close-up panel. Six is the largest count tested.
+    referenceImages: 6,
     aspectRatios: ['2:3', '3:4', '9:16', '1:1', '4:5', '3:2', '4:3', '16:9'],
     imageEditing: true,
     textRendering: 'unreliable',
