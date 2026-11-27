@@ -163,14 +163,40 @@ async function main() {
     assert.strictEqual((await s.api('GET', `${P}/uploads`)).body.uploads.length, 0);
     assert.strictEqual(r.body.check.ok, true, JSON.stringify(r.body.check));
 
-    // A published edition stays; a draft goes.
+    // A published edition stays; a draft goes. A draft build first: the final
+    // build reuses its edition (same pages) and removes its -DRAFT files.
+    done(await s.runOp(id, 'publish.build', { formats: ['cbz'], mode: 'draft' }, 60000), 'draft publish');
+    const draftEd = ws.listEditions(root).pop();
+    const draftFiles = () => (ws.loadEdition(root, draftEd).exports || []).map((e) => String(e.file));
+    assert.ok(draftFiles().some((f) => /-DRAFT/.test(f)), draftFiles().join(' '));
     const pub = done(await s.runOp(id, 'publish.build', { formats: ['cbz'], mode: 'final' }, 60000), 'publish');
     const edition = ws.listEditions(root).pop();
+    assert.strictEqual(edition, draftEd, 'the final build reuses the draft edition');
+    assert.ok(draftFiles().length && draftFiles().every((f) => !/-DRAFT/.test(f)), draftFiles().join(' '));
+    assert.ok(!fs.readdirSync(path.join(root, 'editions', edition, 'exports')).some((f) => /-DRAFT/.test(f)));
     [plan] = await checkOf([{ id: edition }]);
     assert.ok(pub && plan.refused && ['edition_published'].includes(plan.refused.code), JSON.stringify(plan));
     const shipped = ws.loadEdition(root, edition).pages[0].render;
     [plan] = await checkOf([{ id: shipped }]);
     assert.deepStrictEqual([plan.refused.code], ['in_edition']);
+
+    // A draft that a later edition builds on can go: the later one builds on what came before it.
+    const base = ws.loadEdition(root, edition);
+    const writeEd = (eid, doc) => {
+      fs.mkdirSync(path.join(root, 'editions', eid), { recursive: true });
+      fs.writeFileSync(path.join(root, 'editions', eid, 'edition.yaml'),
+        require('../scripts/lib/yaml').stringify(Object.assign({}, base, { exports: [] }, doc)));
+    };
+    writeEd('ED_001_08', { id: 'ED_001_08', status: 'draft', supersedes: edition, changes: [] });
+    writeEd('ED_001_09', { id: 'ED_001_09', status: 'draft', supersedes: 'ED_001_08', changes: ['PG_001_001 added with V01'] });
+    [plan] = await checkOf([{ id: 'ED_001_08' }]);
+    assert.ok(plan.deletable && !plan.refused, JSON.stringify(plan));
+    r = await del([{ id: 'ED_001_08' }]);
+    assert.strictEqual(r.status, 200, JSON.stringify(r.body));
+    assert.ok(!fs.existsSync(path.join(root, 'editions', 'ED_001_08')));
+    assert.strictEqual(ws.loadEdition(root, 'ED_001_09').supersedes, edition);
+    r = await del([{ id: 'ED_001_09' }]);
+    assert.strictEqual(r.status, 200, JSON.stringify(r.body));
 
     // --- 6. clean up ------------------------------------------------------------------------------------
     const tryA = done(await s.runOp(id, 'character.sheet', { character: 'CHAR_MARA', sheet: 'turnaround' }), 'try').result.sheet.candidate_id;

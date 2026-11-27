@@ -386,10 +386,12 @@ function planEdition(project, id) {
     out.refused = refuse('edition_published', { status: doc.status });
     return out;
   }
+  // A draft is a trial: a later edition that builds on it now builds on the
+  // one before it (or on none), so the chain of editions stays whole.
   const later = attempt(() => S.ws.listEditions(root), []).filter((e) => e !== id && (attempt(() => S.ws.loadEdition(root, e), null) || {}).supersedes === id);
   if (later.length) {
-    out.refused = refuse('edition_superseded_by', { editions: later.join(', ') });
-    return out;
+    out.edits.push({ type: 'edition_supersedes', editions: later, to: (doc && doc.supersedes) || null });
+    out.notes.push(msg('delete.note.edition_relinked'));
   }
   out.remove.push(`editions/${id}`);
   return out;
@@ -550,6 +552,16 @@ function applyEdit(project, edit, touched) {
       mark('references/manifest.yaml', rewriteYaml(root, 'references/manifest.yaml', (doc) => {
         if (Array.isArray(doc.assets)) doc.assets = doc.assets.filter((a) => !a || !edit.ids.includes(a.id));
       }));
+      break;
+    case 'edition_supersedes':
+      for (const e of edit.editions) {
+        const rel = `editions/${e}/edition.yaml`;
+        mark(rel, rewriteYaml(root, rel, (doc) => {
+          doc.supersedes = edit.to;
+          // With nothing before it, there is nothing it changed from.
+          if (!edit.to) doc.changes = [];
+        }));
+      }
       break;
     case 'manifest_entity':
       mark('references/manifest.yaml', rewriteYaml(root, 'references/manifest.yaml', (doc) => {

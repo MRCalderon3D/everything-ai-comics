@@ -34,6 +34,32 @@ function blocker(page, render, code, detail) {
 }
 
 /**
+ * Remove the -DRAFT exports of an edition (files and list entries).
+ * Returns the workspace paths removed. Only paths inside the edition's own
+ * exports directory are touched.
+ */
+function dropDraftExports(root, editionFile) {
+  const doc = S.ws.loadYaml(editionFile) || {};
+  const list = Array.isArray(doc.exports) ? doc.exports : [];
+  const isDraft = (e) => e && /-DRAFT(\.|-|$)/.test(String(e.file || ''));
+  const drafts = list.filter(isDraft);
+  if (!drafts.length) return [];
+  const exportsDir = path.join(path.dirname(editionFile), 'exports');
+  const removed = [];
+  for (const e of drafts) {
+    const abs = S.ws.abs(root, String(e.file).replace(/\\/g, '/'));
+    const inside = path.relative(exportsDir, abs);
+    if (!inside || inside.startsWith('..') || path.isAbsolute(inside)) continue;
+    fs.rmSync(abs, { recursive: true, force: true });
+    // An images export also leaves its zip beside the folder.
+    if (e.format === 'images') fs.rmSync(`${abs.replace(/[\\/]+$/, '')}.zip`, { force: true });
+    removed.push(String(e.file));
+  }
+  pipeline.setTopLevel(editionFile, { exports: list.filter((e) => !isDraft(e)) });
+  return removed;
+}
+
+/**
  * What keeps the issue from a final edition right now:
  * [{ page, render, code, message }]. Used by the publish screen too.
  */
@@ -74,6 +100,7 @@ module.exports = {
   readiness,
   signature,
   blocker,
+  dropDraftExports,
   params: [
     { name: 'issue', type: 'string', required: false, description: 'Issue ID. Default ISS_001.' },
     { name: 'formats', type: 'string[]', required: false, description: 'Any of pdf, cbz, epub, web, images. Default ["pdf", "cbz"].' },
@@ -157,6 +184,17 @@ module.exports = {
           pipeline.setTopLevel(file, { status: 'reviewed' });
         } catch (err) {
           h.log(`could not mark the edition as reviewed: ${err.message}`);
+        }
+      }
+      // A final build into an edition built earlier as a draft (same pages,
+      // so the edition was reused) replaces its draft files: they would
+      // otherwise stay listed beside the final ones, stamped DRAFT.
+      if (!draft) {
+        try {
+          const dropped = dropDraftExports(root, file);
+          if (dropped.length) h.log(`removed ${dropped.length} draft export(s): ${dropped.join(', ')}`);
+        } catch (err) {
+          h.log(`could not remove the draft exports: ${err.message}`);
         }
       }
       h.note(result.skipped.length

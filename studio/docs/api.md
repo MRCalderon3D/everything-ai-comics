@@ -6499,7 +6499,7 @@ What can be deleted, and when it is refused:
 | `asset` | A sheet candidate or master, a look page, a reference photo filed for an entity (`CHAR_MARA_TURN_V02`, `LOOK_NOIR_INK_V03`, `CHAR_MARA_REF_V01`) | The image, its registry entry, its generation record and request, the references in the entity file, its outfits and `project.yaml`, its identity check. A master takes the try it was approved from. | Pages or a cover were drawn from it (`drawn_from`); a planned page lists it (`planned_reference`); it is the try a master was approved from (`promoted`). |
 | `render` | A page version (`PG_001_004_V02`) or a cover version (`CV_001_V01`) | The image, its lettered versions, its review, its generation record. A current version that goes sends the page back to the newest one left, or to not drawn. | An edition ships it (`in_edition`, `in_draft_edition`); it is the approved page or cover; another page uses it as its previous page (`render_reference`); the lettering is placed on it. |
 | `upload` | `up_...` | The file and its index entry. Uploads are outside the history: this cannot be undone. | A queued or running job reads it. |
-| `edition` | `ED_001_02` | The edition directory with its exports. | It is not a draft; a later edition builds on it. |
+| `edition` | `ED_001_02` | The edition directory with its exports. A later edition that builds on this draft then builds on the one before it (`supersedes`), and its `changes` empty when there is none. | It is not a draft. |
 | `entity` | `CHAR_MARA`, `LOC_DOCK`, `PROP_FLARE_GUN` | Its directory, registry entries and generation records; mentions in other characters' `visually_adjacent_to` and in maps' `leads_to`. The story bible is left to the person. | A page, scene or cover still names it (`entity_in_use`). |
 | `page` | The last page of an issue | Its directory and generation records; the page before it ends the chain, scenes and beats drop it, `page_count`, `panel_count` and the series plan follow. | It is not the last page, so numbers would have gaps (`page_not_last`); an edition ships it. |
 
@@ -8038,8 +8038,10 @@ gate), build-edition.
 Steps: `edition`, `gate`, `build`. When the issue ships exactly what its
 latest edition ships, that edition is reused and only the missing formats are
 built (`reused: true`); an existing export is never overwritten (`skipped`).
-A final build marks the edition `reviewed`. Publishing stays the person's
-decision.
+A final build marks the edition `reviewed` and removes the `-DRAFT` exports a
+draft build left in that same edition (files and `exports` entries), so only
+the final files are listed; build again any format that only had a draft.
+Publishing stays the person's decision.
 
 Result: `edition`, `reused`, `draft`, `formats`, `written[]` and `skipped[]`
 (`format`, `file`), `shipped[]` (`page`, `render`, `verdict`), `warnings`,

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Web studio, editions: a final build into an edition that was first built
+  as a draft (same pages, so the edition is reused) removes that edition's
+  `-DRAFT` files, which were listed beside the final ones. A draft edition
+  can be deleted even when a later edition builds on it; the later one then
+  builds on the edition before it.
 - Web studio, making an image outside the studio from the conversation: asking
   for "the prompt and the references" of a page, a cover or a sheet runs
   `page.manual`, and its result in the conversation shows the references
