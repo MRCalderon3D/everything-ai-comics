@@ -1,11 +1,11 @@
 TASK
-The page {{page}} has used its repair cycles, so it will not be edited again: it is drawn again from its plan. Change the plan so that the new drawing shows what the person asks for.
+The person chose to have page {{page}} drawn again from its plan rather than edit the image once more (each edit regenerates the whole image and degrades it a little). Change the plan so that the new drawing shows what the person asks for.
 
 COMMAND FILES TO FOLLOW
 - commands/page-plan.md (when the layout changes)
 - commands/panel-script.md (framing, action, acting, lettering text)
 - commands/panel-ledger.md (after any change to who is where or who holds what)
-- rules/common/repair-limits.md (why the fix goes into the plan at this point)
+- rules/common/repair-limits.md (why a redraw goes through the plan)
 
 WHAT THE PERSON ASKED FOR
 <<<

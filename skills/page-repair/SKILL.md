@@ -31,14 +31,17 @@ problem belongs to the plan or the references.
 - The flagged render and its prompt package.
 - `page.yaml`, the reference plan, and the bibles for the entities named in
   the findings.
-- `project.repair_policy.max_cycles` (default 2) and the review's
-  `repair_cycle`.
+- `project.repair_policy.max_cycles` (default 2), `touch_up_warning`
+  (default 2) and the review's `repair_cycle`.
 - The renders of the neighboring pages.
 
 ## Process
 
 1. Check the budget. If the flagged review's `repair_cycle` already equals
-   `max_cycles`, do not repair. Go to step 11.
+   `max_cycles`, do not repair on your own. Go to step 11. A change request
+   from the person is the exception: once `repair_cycle` reaches
+   `touch_up_warning`, tell them more edits may degrade the image and offer
+   a redraw from the plan instead. Repair only if they choose the touch-up.
 2. Mark the failed render as superseded and keep it. Its file, prompt
    package, and review stay on disk. Set its generation record to
    `status: rejected`. It will stop being the page's `current_render` when
@@ -115,7 +118,8 @@ problem belongs to the plan or the references.
   elements; none of the three is empty.
 - The new review covers the whole page and names the neighbors it was
   compared against in `compared_against.neighbors`.
-- `repair_cycle` never exceeds `project.repair_policy.max_cycles`.
+- `repair_cycle` never exceeds `project.repair_policy.max_cycles`, except
+  after a touch-up the person chose with the warning in front of them.
 - The verdict is `fixed` only if no blocking finding is `open`.
 
 ## Common Failure Modes
@@ -150,8 +154,11 @@ problem belongs to the plan or the references.
 
 The limit is `project.repair_policy.max_cycles`. Its default of 2 is where
 this skill's one-line description gets "two-cycle" from, and a project may
-change it. `validate-workspace.js` rejects a review whose `repair_cycle`
-exceeds it and a `fixed` finding without a recheck. The verification itself
+change it. It stops the repairs an agent starts. A person's touch-ups read
+`touch_up_warning` instead, which warns and lets them choose.
+`validate-workspace.js` rejects a review whose `repair_cycle` exceeds
+`max_cycles` without a change request behind it, and a `fixed` finding
+without a recheck. The verification itself
 follows `pixel-review`, and the reviewer who rechecks should not be the
 agent that generated the repair. The rules are `rules/common/repair-limits.md`
 and `rules/common/visual-evidence.md`.

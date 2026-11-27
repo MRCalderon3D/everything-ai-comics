@@ -39,6 +39,7 @@ const conversation = require('./conversation');
 const projectOptions = require('./project-options');
 const deletion = require('./deletion');
 const entityEdit = require('./entity-edit');
+const letteringPlan = require('./lettering-plan');
 const { msg } = require('./i18n');
 const { HttpError, errorText, newId, nowIso } = require('./util');
 
@@ -50,6 +51,12 @@ const MAX_CARDS = 6;
  * the merged entity.
  */
 const ALWAYS_CONFIRM = ['delete', 'entity.merge'];
+/**
+ * Corrections that may need the person's choice: once an image has reached
+ * the touch-up warning of the project, the card offers "touch up anyway" and
+ * "redraw with the change" instead of Run (ops/correction.js).
+ */
+const CHOICE_ACTIONS = ['page.correct', 'cover.correct'];
 
 // --- the operations, as actions -------------------------------------------------
 
@@ -309,7 +316,7 @@ const DIRECT = {
 
   'options.update': {
     params: [
-      { name: 'options', type: 'object', required: true, description: `The options to change: any of title, logline, genre, language, comic_format, publication, reading_direction, color_mode, lettering_mode, rating, page_size. Choices: ${Object.entries(projectOptions.CHOICES).map(([k, v]) => `${k} ${(Array.isArray(v) ? v : Object.keys(v)).join('|')}`).join('; ')}.` },
+      { name: 'options', type: 'object', required: true, description: `The options to change: any of title, logline, genre, language, comic_format, publication, reading_direction, color_mode, lettering_mode, rating, page_size, touch_up_warning (0 to 10: edits of one image before a correction warns and offers a redraw). Choices: ${Object.entries(projectOptions.CHOICES).map(([k, v]) => `${k} ${(Array.isArray(v) ? v : Object.keys(v)).join('|')}`).join('; ')}.` },
     ],
     validate(p) {
       if (!p.options || typeof p.options !== 'object' || Array.isArray(p.options)) throw new HttpError(400, 'bad_params', '"options" must be an object.');
@@ -449,6 +456,27 @@ const DIRECT = {
         return outcome;
       });
       return Object.assign({}, outcome, { commit: saved.commit });
+    },
+  },
+
+  'page.lettering': {
+    params: [
+      { name: 'page', type: 'string', required: true, description: 'Page ID (PG_001_003).' },
+      { name: 'panels', type: 'object[]', required: true, description: `The panels whose lettering changes, each with its whole new list in reading order: [{ "panel": "PN_001_003_02", "lettering": [{ "id": "L03", "type": "balloon", "speaker": "CHAR_MARA", "text": "..." }, { "type": "thought", "speaker": "CHAR_MARA", "text": "..." }] }]. Keep the "id" of an element that stays; a new one has none; leave an element out to remove it; [] empties the panel. Kinds: ${letteringPlan.KINDS.join(', ')}. ${letteringPlan.SPOKEN.join(', ')} need "speaker" (a character of the page; one who is not in that panel becomes a voice from off panel); the others have none. Panels not listed stay as they are.` },
+    ],
+    validate(p, { project }) {
+      const pageId = text(p, 'page', { required: true, max: 40 });
+      if (!S.ws.ID.page.test(pageId)) throw new HttpError(400, 'bad_params', '"page" must be a page ID.');
+      const page = S.ws.loadPage(project.root, pageId);
+      if (!page) throw new HttpError(404, 'page_not_found', `${pageId} does not exist in this project.`);
+      return { page: pageId, panels: letteringPlan.checkPanels(p.panels, page) };
+    },
+    async run(services, project, params) {
+      const page = S.ws.loadPage(project.root, params.page);
+      if (!page) throw new HttpError(404, 'page_not_found', `${params.page} does not exist in this project.`);
+      const res = await letteringPlan.savePlan(services, project, params.page, letteringPlan.applyPanels(page, params.panels), { by: 'chat' });
+      // The card keeps what happened, not the whole file.
+      return Object.assign({}, res, { file: { path: res.file.path, etag: res.file.etag } });
     },
   },
 
@@ -613,7 +641,18 @@ function makeCard(project, services, item, { conversation: convId, message, job,
   if (!found) throw new HttpError(400, 'unknown_action', `"${String(item.action).slice(0, 60)}" is not an action of the studio.`);
   const params = item.params && typeof item.params === 'object' && !Array.isArray(item.params) ? JSON.parse(JSON.stringify(item.params)) : {};
   // A card that waits for an earlier one is checked again when it is about to run.
-  const clean = deferred ? params : (found.def.validate ? found.def.validate(params, { project, services }) : params);
+  let clean = params;
+  let choice = null;
+  if (!deferred && found.def.validate) {
+    try {
+      clean = found.def.validate(params, { project, services });
+    } catch (err) {
+      // An image at the touch-up warning: the person chooses on the card, the model does not.
+      if (err.code !== 'touch_up_choice' || !CHOICE_ACTIONS.includes(found.name)) throw err;
+      clean = found.def.validate(Object.assign({}, params, { mode: 'touch_up' }), { project, services });
+      choice = choiceOf(err.details || {});
+    }
+  }
   const traits = found.kind === 'op' ? OP_TRAITS[found.name] : null;
   const settings = project.settings();
   const tools = (traits ? traits.verbs(clean) : []).map((verb) => {
@@ -629,7 +668,8 @@ function makeCard(project, services, item, { conversation: convId, message, job,
     why: typeof item.why === 'string' ? item.why.replace(/\s+/g, ' ').trim().slice(0, 400) : '',
     title: found.kind === 'op' ? msg(`op.${found.name}.title`) : msg(`action.${found.name}.title`),
     summary: found.kind === 'op' ? msg(`op.${found.name}.summary`) : msg(`action.${found.name}.summary`),
-    details: Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
+    // A lettering card shows its change as a preview, not as the raw list of panels.
+    details: Object.entries(params).filter(([name, v]) => v !== undefined && v !== null && v !== '' && !(found.name === 'page.lettering' && name === 'panels'))
       .map(([name, value]) => ({ name, value: plainValue(project, name, value) })),
     draws: traits ? !!traits.draws(clean) : false,
     auto: traits ? !!traits.text(clean) && !traits.draws(clean) : false,
@@ -637,9 +677,13 @@ function makeCard(project, services, item, { conversation: convId, message, job,
     tools,
     typical: typical(project, services, found.name, clean),
     uploads,
+    preview: previewOf(project, found.name, clean),
     photo_rights: ['character.create', 'character.update'].includes(found.name) && uploads.some((u) => u.kind === 'image'),
     // The person's message asked for exactly this, now: the card starts in the same turn (see runRequested).
-    requested: item.run === true && !ALWAYS_CONFIRM.includes(found.name),
+    // A card that still needs the person's choice never starts by itself.
+    requested: item.run === true && !ALWAYS_CONFIRM.includes(found.name) && !choice,
+    choice,
+    chosen: null,
     always_confirm: ALWAYS_CONFIRM.includes(found.name),
     status: 'pending',
     // Proposed together with an earlier card that makes it possible ("approve the plan and draw it"):
@@ -657,6 +701,43 @@ function makeCard(project, services, item, { conversation: convId, message, job,
     updated_at: nowIso(),
   };
   return card;
+}
+
+/**
+ * What a card will change, shown before it runs. For page.lettering: one
+ * line per balloon added, removed, changed or moved, against the plan as it
+ * is now.
+ */
+function previewOf(project, name, params) {
+  if (name !== 'page.lettering' || !params || !Array.isArray(params.panels)) return null;
+  return attempt(() => {
+    const page = S.ws.loadPage(project.root, params.page);
+    if (!page) return null;
+    const after = letteringPlan.applyPanels(page, params.panels);
+    letteringPlan.normalize(after);
+    const changes = letteringPlan.changesOf(page, after);
+    const limits = letteringPlan.limitsOf(S.ws.loadProject(project.root) || {});
+    return {
+      page: page.number || null,
+      changes: letteringPlan.changeLines(changes, letteringPlan.namesOf(project.root, after)),
+      warnings: letteringPlan.warnings(after, limits),
+      drawn: !!page.current_render,
+    };
+  }, null);
+}
+
+/** What a correction card at the touch-up warning offers. */
+function choiceOf(details) {
+  const kind = details.kind === 'cover' ? 'cover' : 'page';
+  return {
+    touch_ups: Number.isInteger(details.touch_ups) ? details.touch_ups : null,
+    warning: Number.isInteger(details.warning) ? details.warning : null,
+    text: msg(`card.choice.warning.${kind}`, { n: details.touch_ups, warning: details.warning }),
+    options: [
+      { mode: 'touch_up', label: msg('card.choice.touch_up') },
+      { mode: 'redraw', label: msg(`card.choice.redraw.${kind}`) },
+    ],
+  };
 }
 
 /**
@@ -746,10 +827,28 @@ function compact(result) {
  * @param {{by: 'click'|'text'|'auto'}} how
  * @returns {Promise<{card: object, job: object|null}>}
  */
-async function runCard(services, project, convId, cardId, { by = 'click', chained = false } = {}) {
+async function runCard(services, project, convId, cardId, { by = 'click', chained = false, choice = undefined } = {}) {
   const card = conversation.getCard(project, convId, cardId);
   if (card.status !== 'pending' && !(chained && card.status === 'waiting')) {
     throw new HttpError(409, 'card_not_pending', `This card was already ${card.status}.`, undefined, { status: card.status });
+  }
+  // A correction at the touch-up warning runs only with the person's choice.
+  if (card.choice && !card.chosen) {
+    const modes = card.choice.options.map((o) => o.mode);
+    if (!modes.includes(choice)) {
+      if (chained) {
+        // Its turn came, but it waits for the person's click on one of the choices.
+        card.status = 'pending';
+        card.updated_at = nowIso();
+        conversation.saveCard(project, convId, card);
+        emitCard(services, project, card);
+        return { card, job: null };
+      }
+      throw new HttpError(409, 'choice_needed', `This card needs the person's choice: ${modes.join(' or ')}.`, { modes });
+    }
+    card.chosen = choice;
+    card.params = Object.assign({}, card.params, { mode: choice });
+    card.details = (card.details || []).filter((d) => d.name !== 'mode').concat([{ name: 'mode', value: choice }]);
   }
   const found = find(card.action);
   if (!chained) card.run_by = by;
@@ -1027,6 +1126,14 @@ function stateBlock(project, services, convId) {
   }
 
   const provider = attempt(() => pipeline.compileProvider(project, services.drivers), 'manual');
+  const warning = projectOptions.touchUpWarning(attempt(() => S.ws.loadProject(root), {}) || {});
+  const edits = (render) => attempt(() => {
+    const review = S.ws.loadReview(root, render);
+    return review && Number.isInteger(review.repair_cycle) ? review.repair_cycle : 0;
+  }, 0);
+  const atWarning = (render) => (render && edits(render) >= warning
+    ? `, edited ${edits(render)} time(s): at the touch-up warning of ${warning}, a correction needs the person's choice`
+    : '');
   for (const issue of attempt(() => aggregates.issues(project).issues, []) || []) {
     const pages = attempt(() => S.ws.listPages(root, issue.id), []) || [];
     const words = pages.slice(0, 30).map((entry) => {
@@ -1035,14 +1142,14 @@ function stateBlock(project, services, convId) {
       // Once a page is drawn its plan approval no longer matters.
       const bits = p.current_render ? [] : [p.plan_approved ? 'plan approved' : 'plan not approved'];
       if (p.current_render) {
-        bits.push(`${p.current_render} ${p.passes ? (p.outcome === 'notes' ? 'passes with notes' : 'passes') : 'flagged'}`);
+        bits.push(`${p.current_render} ${p.passes ? (p.outcome === 'notes' ? 'passes with notes' : 'passes') : 'flagged'}${atWarning(p.current_render)}`);
         if (p.status === 'approved' || p.human_approval === 'approved') bits.push('approved');
       } else bits.push('not drawn');
       return `${entry.id} (${bits.join(', ')})`;
     });
     const cover = issue.cover || {};
     const coverText = !cover.exists ? 'no cover' : cover.status === 'approved' ? `cover approved (${cover.approved_render})`
-      : cover.current_render ? `cover ${cover.current_render} ${cover.passes ? 'passes' : 'flagged'}, not approved` : 'cover written, not drawn';
+      : cover.current_render ? `cover ${cover.current_render} ${cover.passes ? 'passes' : 'flagged'}${atWarning(cover.current_render)}, not approved` : 'cover written, not drawn';
     const editions = attempt(() => S.ws.listEditions(root).filter((e) => e.startsWith(`ED_${issue.id.slice(4)}_`)), []) || [];
     const editionText = editions.length ? `editions ${editions.map((e) => {
       const doc = attempt(() => S.ws.loadEdition(root, e), {}) || {};
@@ -1082,6 +1189,6 @@ function stateBlock(project, services, convId) {
 }
 
 module.exports = {
-  OP_TRAITS, DIRECT, REFERENCE_MS, MAX_CARDS, ALWAYS_CONFIRM,
+  OP_TRAITS, DIRECT, REFERENCE_MS, MAX_CARDS, ALWAYS_CONFIRM, CHOICE_ACTIONS,
   catalog, find, promptText, makeCard, propose, runCard, dismissCard, jobSettled, stateBlock, typical, resultScreens, withAttachments,
 };

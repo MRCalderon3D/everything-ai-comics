@@ -43,7 +43,7 @@ async function main() {
     'style.define', 'style.look', 'approve.asset', 'options.update', // Style and options
     'character.create', 'character.update', 'character.sheet', // Characters
     'entities.derive', // Places
-    'pages.plan', 'approve.plan', 'pages.generate', 'issue.create', // Pages
+    'pages.plan', 'approve.plan', 'page.lettering', 'pages.generate', 'issue.create', // Pages
     'page.review', 'approve.page', 'page.correct', 'page.manual', // Check and corrections
     'cover.create', 'cover.correct', 'approve.cover', // Cover
     'lettering.apply', 'publish.build', // Publish

@@ -28,7 +28,7 @@ own output.
 - Keep a `GEN_*` record and its `GEN_*.request.json` per attempt. When the tool reports no model, cost, or seed, record `model: unreported`, `cost.amount: null`, and list the gap in `metadata_unavailable`. Invent nothing.
 - Open each returned file and confirm it is a readable image at the requested size. Report that as "an image exists" and hand it to review.
 - For a repair, submit the repair package against its `edit_target` and save the result as a sibling version.
-- Stop at the project's `repair_policy.max_cycles` and report upstream. Rerolling past the limit hides a plan or reference problem.
+- Stop at the project's `repair_policy.max_cycles` and report upstream. Rerolling past the limit hides a plan or reference problem. Go past it only for a touch-up the user chose after the `repair_policy.touch_up_warning` warning.
 
 ## Uses These Skills
 

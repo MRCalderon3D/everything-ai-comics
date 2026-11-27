@@ -87,6 +87,7 @@ export const api = {
   settings: (id) => request('GET', `${project(id)}/settings`),
   saveSettings: (id, body) => request('PUT', `${project(id)}/settings`, { body }),
   options: (id) => request('GET', `${project(id)}/options`),
+  savePlan: (id, page, body) => request('PUT', `${project(id)}/pages/${enc(page)}/plan`, { body }),
   saveOptions: (id, body) => request('PUT', `${project(id)}/options`, { body }),
 
   story: (id) => request('GET', `${project(id)}/story`),
@@ -121,7 +122,7 @@ export const api = {
   conversation: (id) => request('GET', `${project(id)}/conversation`),
   sendMessage: (id, text, screen, attachments) => request('POST', `${project(id)}/conversation`, { body: { text, screen, attachments: attachments && attachments.length ? attachments : undefined } }),
   /** An action card of a reply: run it, or dismiss it. */
-  runAction: (id, conv, card) => request('POST', `${project(id)}/conversation/${enc(conv)}/actions/${enc(card)}/run`, { body: {} }),
+  runAction: (id, conv, card, choice) => request('POST', `${project(id)}/conversation/${enc(conv)}/actions/${enc(card)}/run`, { body: choice ? { choice } : {} }),
   dismissAction: (id, conv, card) => request('POST', `${project(id)}/conversation/${enc(conv)}/actions/${enc(card)}/dismiss`, { body: {} }),
   newConversation: (id) => request('POST', `${project(id)}/conversation/new`, { body: {} }),
   conversations: (id) => request('GET', `${project(id)}/conversations`),

@@ -10,6 +10,7 @@ const S = require('./scaffold');
 const git = require('./git');
 const { msg } = require('./i18n');
 const files = require('./files');
+const letteringPlan = require('./lettering-plan');
 const chats = require('./chats');
 const conversation = require('./conversation');
 const screens = require('./screens');
@@ -373,6 +374,14 @@ function createApi(services) {
     };
   }, { bodyLimit: FILE_SAVE_LIMIT });
 
+  // The plan of a page saved from its plan review: the lettering is made consistent and checked
+  // (lettering-plan.js), the same path as the chat's page.lettering card.
+  put(`${P}/pages/:page/plan`, async (req, res, ctx) => {
+    const proj = project(ctx);
+    const body = await readJsonBody(req, FILE_SAVE_LIMIT);
+    return letteringPlan.savePlan(services, proj, ctx.params.page, body.data, { base_etag: body.base_etag });
+  }, { bodyLimit: FILE_SAVE_LIMIT });
+
   // --- raw files -----------------------------------------------------------------------
 
   router.add('GET', `${P}/raw/*path`, (req, res, ctx) => {
@@ -674,9 +683,11 @@ function createApi(services) {
   // An action card of a reply: run it (queue its job, or make its decision now), or dismiss it.
   post(`${P}/conversation/:conversation/actions/:card/run`, async (req, res, ctx) => {
     const proj = project(ctx);
-    await readJsonBody(req, JSON_LIMIT);
+    const body = await readJsonBody(req, JSON_LIMIT);
     const entry = conversation.get(proj, ctx.params.conversation);
-    return actions.runCard(services, proj, entry.id, ctx.params.card, { by: 'click' });
+    // A correction card at the touch-up warning carries the person's choice: { "choice": "touch_up" | "redraw" }.
+    const choice = body && typeof body.choice === 'string' ? body.choice : undefined;
+    return actions.runCard(services, proj, entry.id, ctx.params.card, { by: 'click', choice });
   });
 
   post(`${P}/conversation/:conversation/actions/:card/dismiss`, async (req, res, ctx) => {

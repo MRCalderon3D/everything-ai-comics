@@ -23,8 +23,9 @@ a finding.
   a second time is a reroll, and rerolls do not address causes.
 - A repair is finished when the new file has been opened and each requested
   change has been seen in it.
-- Repairs are counted. When the count reaches the project's limit, generation
-  stops.
+- Repairs are counted. When the count reaches the project's limit, automatic
+  repairs stop. A touch-up the person asks for past the warning is their
+  choice, made with the warning in front of them.
 
 ## Before the request
 
@@ -86,23 +87,38 @@ Further requirements:
 
 ## Cycle limit
 
-- `repair_cycle` is 0 for a first render and rises by one with each repair.
-- The limit is `project.repair_policy.max_cycles`, 2 by default.
-- When the limit is reached and a blocking finding is still open, no further
-  generation is requested for that page. The verdict is `flagged`. The agent
-  records the upstream issue and the decision needed, and the work returns to
-  the page plan or to the references. `compile-prompts.js --repair` refuses
-  a review whose `repair_cycle` has reached the limit.
+- `repair_cycle` is 0 for a first render and rises by one with each edit of
+  the image, whoever asked for it.
+- Two limits read that count, one for each kind of edit.
+- Automatic repairs, the ones an agent or the studio starts after a blocking
+  review, stop at `project.repair_policy.max_cycles` (2 by default). When the
+  limit is reached and a blocking finding is still open, no further
+  generation is requested for that page on anyone's own initiative. The
+  verdict is `flagged`. The agent records the upstream issue and the decision
+  needed, and the work returns to the page plan or to the references.
+  `compile-prompts.js --repair` refuses a review whose `repair_cycle` has
+  reached the limit. No loop runs past it by itself.
+- Touch-ups the person asks for (a finding with `source: user_request`) read
+  `project.repair_policy.touch_up_warning` (2 by default). It is a warning,
+  not a stop. Every edit regenerates the whole image, so colours shift, line
+  softens, faces drift and lettering degrades a little more each round. A
+  redraw from the plan starts clean from the approved sheets, and it can
+  lose a composition or a gesture the person liked. Once the count reaches
+  the warning, say so in those terms and offer both: touch up anyway, or
+  redraw the whole page with the change written into the plan. The person
+  chooses for each request. A touch-up they choose may go past `max_cycles`.
 - After the plan or the references have changed, the page starts again from a
   newly compiled prompt as a first render of the revised plan, with a new
   version number.
-- Declaring success at the limit, or raising the limit to keep rerolling, is
-  NEVER acceptable. Changing `max_cycles` is a project decision for the user.
+- Declaring success at the limit, or raising `max_cycles` to keep rerolling,
+  is NEVER acceptable. Both numbers are project decisions for the user. An
+  agent never picks "touch up anyway" for the person.
 
 ## Validation
 
 - `scripts/validate-workspace.js` rejects a review whose `repair_cycle`
-  exceeds `project.repair_policy.max_cycles`, a `fixed` finding without a
+  exceeds `project.repair_policy.max_cycles` unless the review of the render
+  it edited holds a change request from the person, a `fixed` finding without a
   `recheck` and its evidence, a `fixed` verdict with an open blocking
   finding, and a blocking finding marked `accepted`.
 - `prompt-package.schema.json` defines the `repair` block and `edit_target`

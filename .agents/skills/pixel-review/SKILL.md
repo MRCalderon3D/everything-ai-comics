@@ -113,10 +113,10 @@ that differs, two gates, and a verdict.
 12. After a repair, check the whole page and its neighbors again for
     collateral changes to text, identities, anatomy, clothing, and
     geography. Local edits move things nobody asked them to move.
-13. Stop at the limit. `repair_cycle` never exceeds
+13. Stop at the limit. Automatic repairs never take `repair_cycle` past
     `repair_policy.max_cycles`. A page still flagged at the limit goes back
     to its plan or its references, with the upstream cause written into the
-    review's `notes`.
+    review's `notes`. Only a touch-up the person chooses goes further.
 14. Save the review, leave `human_approval.status` as `pending`, and set the
     page's `status` to `reviewed` only when the verdict is `pass` or
     `fixed`. Then run

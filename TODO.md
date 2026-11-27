@@ -422,6 +422,60 @@ liked. The person should choose.
   own.
 - The chat offers the same choice when a correction hits the limit.
 
+### 17. The chat can guide the whole comic
+
+Item 8 lets the chat do anything the screens do, when asked. The person
+also wants the opposite: someone who does not know the steps, or does not
+want to use the screens, can let the chat lead from an empty project to a
+published comic, the way a person who knows the craft would.
+
+- A "Guide me" mode, offered on a new project and available any time from
+  the chat. In it, the chat knows where the project is (the same step
+  state the side navigation uses) and always ends its reply with the next
+  step: what it is, why it comes now, and what the person has to decide.
+- One decision at a time, in plain words, with choices where they help
+  (pick a style from the gallery with images, how many pages, which
+  characters need a sheet). It explains a term the first time it uses it
+  (look page, sheet, plan, touch-up), briefly.
+- The story stays the person's (item 5): the guide asks them to tell the
+  story, asks about what is missing, and offers to propose text only as a
+  proposal they accept.
+- Every action still goes through cards: explicit requests run at once,
+  drawing says how long it takes. While a job runs, the guide says what is
+  happening and what comes after, and picks up when the result arrives
+  (item 8 results), showing the image and asking for approval or changes.
+- Approvals are the person's: the guide shows the sheet, the plan or the
+  page and asks "approve it, or what should change?".
+- It handles detours: the person can ask anything or jump to a screen, and
+  the guide resumes from the current state, not from a script.
+- The person can leave guide mode at any point and keep going on the
+  screens; the state is the same.
+- Test it end to end in fake mode (a whole comic driven only by answering
+  the guide), and once with the real CLIs.
+
+### 18. When the drawing tool runs out of quota
+
+Found in a real run: Codex's image tool hit its usage limit in the middle
+of a 12-page `pages.generate`. Codex said so plainly ("Image generation
+failed because the usage limit was reached"), but the job went on to the
+next page, and the next, each failing the same way a minute later, with a
+correction queued behind them that would fail too.
+
+- Recognise a quota or rate-limit answer from either tool (Codex and
+  Claude Code both say so in their output) as its own error kind, separate
+  from a failed drawing.
+- On it, stop the job's remaining pages at once, pause the queued jobs that
+  need the same tool, and tell the person in plain words: which tool ran
+  out, that nothing is wrong with the pages, and when it may come back if
+  the tool says.
+- Keep what was not drawn ready to resume with one button ("draw the
+  remaining pages"), and do not count the failed attempts against the
+  touch-up or repair limits.
+- The chat and the guide (item 17) say the same and offer to resume later.
+- Before batch work that draws many images (all pages of an issue, all
+  missing sheets), say how many images it will draw, so the person can
+  weigh it against their plan.
+
 ## Scaffold
 
 ### 6. More comic styles

@@ -75,7 +75,8 @@ content:
   rating: mature                       # all-ages | teen | mature
   violence_treatment: Implied, never anatomical.
 repair_policy:
-  max_cycles: 2                        # integer >= 0, default 2
+  max_cycles: 2                        # integer >= 0, default 2. automatic repairs per page
+  touch_up_warning: 2                  # integer >= 0, default 2. edits of one image before a person's touch-up comes with a warning
 created_at: "2026-11-26"
 version: "0.1.0"
 ```
@@ -461,6 +462,18 @@ Ledger rules (`check-continuity.js` enforces them mechanically):
 11. Every `character`, `prop`, `location`, wardrobe, level, and landmark
     referenced exists in the workspace.
 
+`check-continuity.js` also counts, at plan time, the reference images each
+page and panel will need: the look master, one identity master per character
+drawn (off-panel rows do not count), the approved wardrobe sheet of an outfit
+that is not the default, and `references.required`. A panel whose count is
+over the image provider's `referenceImages` is a `REFERENCE_BUDGET` warning
+naming the panel and its cast; a `full_page` page over the budget is one more
+warning that gives the count of every panel and says whether drawing it panel
+by panel would fit. The provider is the page's `generation.provider`, else
+the project's `default_providers.image`, or `--provider`. These are
+warnings: the plan is valid, and the person decides between drawing panel by
+panel, a provider that takes more images, or changing the staging.
+
 ## issues/<ISS_ID>/pages/<PG_ID>/lettering.yaml (`lettering`)
 
 Only in `overlay` lettering mode. Geometry for `letter-pages.js`; the text
@@ -491,6 +504,7 @@ elements:                              # required
 page: PG_001_001                       # required
 provider: harness-native               # required
 budget: 4                              # the provider's reference image limit at planning time
+mode: full_page                        # full_page | per_panel: the page's generation.mode at planning time
 required:                              # required
   - asset_id: LOOK_NOIR_INK_MASTER_V01 # required. asset ID, or a render ID for a previous page
     entity: LOOK_NOIR_INK              # entity ID; null for a render
@@ -505,6 +519,17 @@ created_at: "2026-11-26"
 
 One role per entry, and an asset appears once. A `style` entry is never also
 `identity`.
+
+A plan fits one generation mode, one provider and one budget. When the page's
+`generation.mode` changes (`full_page` to `per_panel` or back), or the page
+is compiled for another provider or one whose budget changed,
+`compile-prompts.js` rebuilds the plan and writes it over the old one before
+compiling, and says so in a warning. When the rebuilt plan does not fit (a
+page that needs 6 images, set back to `full_page` for a provider that takes
+5), the compile fails with the reason the old plan was out of date, followed
+by the build error and its ways out; the old plan stays on disk.
+`build-reference-plan.js --if-stale` does the same check from the command
+line. A plan written before plans recorded `mode` counts as `full_page`.
 
 ## issues/<ISS_ID>/pages/<PG_ID>/prompts/<provider>.yaml (`prompt-package`)
 
@@ -682,7 +707,10 @@ Review rules (`validate-workspace.js` enforces them mechanically):
   any check or gate is `not_performed`.
 - A `blocking` finding cannot be `accepted`.
 - A `region` stays inside the page: `x + w` and `y + h` are at most 1.
-- `repair_cycle` never exceeds `project.repair_policy.max_cycles`.
+- `repair_cycle` never exceeds `project.repair_policy.max_cycles`, with one
+  exception: a touch-up the person asked for. A review past the limit is
+  valid when the review of the render it edited (`supersedes`) holds a
+  change request (`source: user_request`).
 - `page.yaml` with `status: reviewed` or `approved` has a review file for its
   `current_render` whose verdict is `pass` or `fixed`.
 
@@ -730,6 +758,11 @@ render's review, and the repair pipeline treats it like any other finding.
 - `compile-prompts.js --repair` selects the open blocking findings, or every
   open finding when none is blocking, and adds every open change request.
   In the prompt a request with no check reads `Failed check: user request`.
+- Every edit of an image counts toward `repair_cycle`, whoever asked for it.
+  Once the count reaches `project.repair_policy.touch_up_warning`, a person's
+  touch-up comes with a warning that more edits may degrade the image and
+  the offer of a redraw from the plan. The person chooses. A touch-up they
+  choose may go past `max_cycles`, which only stops the automatic repairs.
 - The call takes a cover render (`CV_001_V01`) the same way. The review file
   is the one beside the cover's renders, its `page` is the cover ID, and an
   approved cover whose approved render is flagged returns to `draft`.

@@ -81,7 +81,9 @@ pick up again on another day without redoing or skipping work.
 9. Hold the repair limit. When a review's `repair_cycle` reaches
    `repair_policy.max_cycles` and the page is still flagged, stop
    generating. The next work is on the plan or the references, and the user
-   hears what decision is needed.
+   hears what decision is needed. A touch-up the user asks for past
+   `repair_policy.touch_up_warning` waits for their choice between touching
+   up anyway and a redraw from the plan.
 10. Run approvals. Bibles and reference assets move `draft`, `review`,
     `approved`, and only an explicit sign-off from the user or the
     editor-in-chief sets `approved`. Approved assets are immutable: a change

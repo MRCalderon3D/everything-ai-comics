@@ -250,7 +250,12 @@ the raw names stay under "Details". An
 operation goes through the normal queue, with its progress shown live on the
 card; a decision runs through the same code as the screen's button. Work
 that only writes text may start at once if the person turns that on in
-Settings. Drawing, approving and answering always wait for them. When a job
+Settings. Drawing, approving and answering always wait for them. A change to
+the lettering of a page (`page.lettering`) shows on its card as the
+balloons it adds, removes, changes or moves, before anything is saved. A
+correction of an image at the touch-up warning shows the warning and two
+buttons, touch up anyway and redraw with the change, in place of Run; it
+never starts by itself, even when the message asked for it. When a job
 started from a card ends or stops to ask, its result comes back into the
 conversation: the outcome, the images it drew, links to the screens where
 they are approved, and the questions, which can be answered right there. A
@@ -416,13 +421,22 @@ What each screen asks of the person:
   missing.
 - Pages: the plan of each page, what the planner filled in that the text did
   not say (each item can be changed through the conversation), the drawing,
+  the lettering of each panel (add, remove and reorder balloons, captions and
+  sound effects, pick the kind with its plain name and icon, pick who says it
+  from the panel's cast or as a voice from off panel, see where the tail
+  points, and count words and balloons against the lettering rules while
+  typing, with a warning before saving when a panel goes over). Saving runs
+  the page's checks again; on a page already drawn it says the change needs
+  the page drawn again, or lettered again in overlay mode, and offers that,
   and while a page is drawn, a waiting state that says what is happening and
   how long a page usually takes in this comic.
 - Settings: per kind of work (planning, checking, drawing) the tool, then a
   model from the list the installed tool reports, the default marked, a name
   typed by hand when needed, and the time measured with each model. Without
   Codex, drawing says the pages are uploaded by hand. A switch lets the
-  conversation start text-only work without a click.
+  conversation start text-only work without a click. "Touch-ups before a
+  warning" (0 to 10, default 2) is written to `project.yaml`
+  (`repair_policy.touch_up_warning`), so the scaffold reads the same number.
 
 Both languages (English and Spanish) have the same keys in
 `web/js/i18n/en.js` and `es.js`; the text the server writes arrives in the
@@ -466,10 +480,15 @@ changes, and no transition runs.
    again, up to the project's repair limit. A page that still fails is left
    flagged with its evidence.
 5. Corrections: a change the person asks for is recorded as a finding on the
-   review and counts toward the same limit. Below the limit the existing
-   image is edited. At the limit the change goes into the page plan and the
-   page is drawn again, as the scaffold's repair-limits rule asks. The job
-   says which of the two happened.
+   review, and the existing image is touched up into a new version. Every
+   edit regenerates the whole image, so colours, line and faces wear a
+   little each round. Once an image has had as many edits as the project's
+   touch-up warning (2 unless Settings say otherwise), the correction form
+   says so and offers both paths: touch up anyway, or redraw the whole page
+   with the change written into its plan. The person chooses; the studio
+   never picks for them. A touch-up they choose may go past the repair
+   limit, which only stops the automatic repairs, and the automatic repairs
+   after it still keep that limit. The job says which path it took.
 
 The automatic check is an AI reading an image. It catches a lot and it is not
 a guarantee, so the interface shows the evidence with every verdict, and the

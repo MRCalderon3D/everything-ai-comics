@@ -30,7 +30,8 @@ does not exist yet.
   recorded separately.
 - Repair as a sibling version, followed by a recheck of the whole page and
   its neighbors. After `repair_policy.max_cycles` failed cycles (two by
-  default), stop and fix the plan or the references.
+  default), stop and fix the plan or the references. A person's touch-ups
+  warn at `repair_policy.touch_up_warning` and go on only if they choose.
 
 ## Defer
 

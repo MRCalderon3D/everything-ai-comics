@@ -383,6 +383,15 @@ a.msg-from:hover { background: var(--accent-wash); color: var(--accent); }
 .card-status[data-status="done"] { background: var(--ok-wash); color: var(--ink); }
 .card-status[data-status="failed"] { background: var(--bad-wash); color: var(--ink); }
 .action-why { color: var(--ink); }
+.action-preview { display: flex; flex-direction: column; gap: 4px; }
+.letter-changes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.letter-change { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.letter-change .letter-glyph { width: 1.5rem; height: 1.5rem; border-width: 1px; }
+.letter-change .letter-glyph .icon { width: 14px; height: 14px; }
+.letter-change-kind { font-weight: 600; }
+.letter-change.removed q { text-decoration: line-through; color: var(--ink-3); }
+.letter-change del { color: var(--ink-3); }
+.action-choice .row { flex-wrap: wrap; }
 .action-details { display: grid; grid-template-columns: max-content 1fr; gap: 2px 8px; margin: 0; }
 .action-details dt { color: var(--ink-3); font-family: var(--font-file); font-size: 0.75rem; }
 .action-details dd { margin: 0; overflow-wrap: anywhere; }

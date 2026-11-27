@@ -1,7 +1,8 @@
 'use strict';
 /**
  * build-reference-plan.js: roles, order, the provider budget, the approval
- * rule, and the previous-render rule. Runs on a throwaway copy of the
+ * rule, the previous-render rule, rebuilding a plan that no longer fits the
+ * page's generation mode or provider, and the plan-time reference count. Runs on a throwaway copy of the
  * fixture workspace in tests/fixtures/prompt-pipeline/.
  */
 
@@ -13,7 +14,11 @@ const fx = require('./fixtures/prompt-pipeline/setup');
 const ws = require('../scripts/lib/workspace');
 const yaml = require('../scripts/lib/yaml');
 const { validateDoc } = require('../scripts/lib/page-pipeline');
-const { buildReferencePlan, roleOfAsset } = require('../scripts/build-reference-plan');
+const {
+  buildReferencePlan, roleOfAsset, ensureReferencePlan, planStaleness, referenceDemand,
+} = require('../scripts/build-reference-plan');
+const { compilePage } = require('../scripts/compile-prompts');
+const { loadImageProvider } = require('../scripts/lib/providers');
 
 const SCRIPT = path.join(__dirname, '..', 'scripts', 'build-reference-plan.js');
 const NOW = new Date('2026-11-26T09:00:00Z');
@@ -310,6 +315,108 @@ function testCli() {
   });
 }
 
+/**
+ * A plan built for another generation.mode, provider, or budget is never
+ * compiled as it is: compile-prompts.js rebuilds it first, or refuses with
+ * the reason when the rebuilt plan cannot fit.
+ */
+function testStalePlan() {
+  return fx.withWorkspace((root) => {
+    const PLAN = path.join(fx.pageDir(root, fx.PAGE_2), 'reference-plan.yaml');
+    const PAGE_REL = `issues/ISS_001/pages/${fx.PAGE_2}/page.yaml`;
+    const readPlan = () => yaml.parse(fs.readFileSync(PLAN, 'utf8'));
+    const setMode = (mode) => fx.editYaml(root, PAGE_REL, (p) => { p.generation.mode = mode; });
+    const two = { referenceImages: 2, aspectRatios: ['2:3', '3:4', '1:1', '4:3', '3:2', '16:9', '9:16', '4:5'], imageEditing: true, textRendering: 'unreliable' };
+    const manual = loadImageProvider('manual');
+    const tight = { id: 'manual', kind: 'image', capabilities: two, compile: (pkg, o) => manual.compile(pkg, o) };
+
+    // Mara and Oskar never share a panel: panel by panel, two images fit.
+    fx.editYaml(root, PAGE_REL, (p) => {
+      p.panels[1].cast = p.panels[1].cast.filter((r) => r.character === 'CHAR_MARA');
+      p.panels[3].cast = p.panels[3].cast.filter((r) => r.character === 'CHAR_OSKAR');
+      p.generation.mode = 'per_panel';
+    });
+    const built = ensureReferencePlan(root, ws.loadPage(root, fx.PAGE_2), {
+      providerId: 'manual', capabilities: two, now: NOW, buildMissing: true,
+    });
+    assert.strictEqual(built.rebuilt, true);
+    assert.deepStrictEqual(built.reasons, ['there is no reference plan']);
+    assert.deepStrictEqual([readPlan().mode, readPlan().budget, readPlan().provider], ['per_panel', 2, 'manual']);
+
+    // Same mode, provider and budget: the plan is current and kept.
+    const page = () => ws.loadPage(root, fx.PAGE_2);
+    assert.deepStrictEqual(planStaleness(readPlan(), page(), 'manual', 2), []);
+    const panel = compilePage(root, page(), { providerId: 'manual', provider: tight, panel: 'PN_001_002_02' });
+    assert.deepStrictEqual(panel.pkg.references.map((r) => r.asset_id), [LOOK, MARA]);
+    assert.ok(!panel.warnings.some((w) => /rebuilt/.test(w)), panel.warnings.join(' | '));
+
+    // Switched to full_page: the per_panel plan is out of date, and the
+    // rebuilt one cannot fit two images, so the compile refuses and says why.
+    setMode('full_page');
+    assert.deepStrictEqual(planStaleness(readPlan(), page(), 'manual', 2), [
+      'it was built for drawing panel by panel and the page is now set to the whole page at once (generation.mode full_page)',
+    ]);
+    const before = fs.readFileSync(PLAN, 'utf8');
+    expectError(() => compilePage(root, page(), { providerId: 'manual', provider: tight }), 'budget_exceeded',
+      /^PG_001_002: the reference plan is out of date \(it was built for drawing panel by panel .*\) and could not be rebuilt: the page needs 3 required reference images .* set generation\.mode to per_panel/);
+    assert.strictEqual(fs.readFileSync(PLAN, 'utf8'), before, 'a refused rebuild leaves the old plan in place');
+
+    // With a provider that takes the whole cast, the plan is rebuilt for full_page and written back.
+    const whole = compilePage(root, page(), { providerId: 'harness-native', now: NOW });
+    assert.ok(whole.warnings.some((w) => w.startsWith('the reference plan was rebuilt: it was built for drawing panel by panel')),
+      whole.warnings.join(' | '));
+    assert.deepStrictEqual([readPlan().mode, readPlan().budget, readPlan().provider], ['full_page', 4, 'harness-native']);
+    assert.deepStrictEqual(whole.pkg.references.slice(0, 3).map((r) => r.asset_id), [LOOK, MARA, OSKAR]);
+    assert.ok(validateDoc('reference-plan', readPlan()).valid);
+
+    // And back to per_panel: rebuilt again, for the mode alone.
+    setMode('per_panel');
+    const back = compilePage(root, page(), { providerId: 'harness-native', panel: 'PN_001_002_04', now: NOW });
+    assert.ok(back.warnings.includes('the reference plan was rebuilt: it was built for drawing the whole page at once and the page is now set to panel by panel (generation.mode per_panel)'),
+      back.warnings.join(' | '));
+    assert.strictEqual(readPlan().mode, 'per_panel');
+
+    // A plan written before plans recorded their mode counts as full_page.
+    const old = readPlan();
+    delete old.mode;
+    assert.strictEqual(planStaleness(old, page(), 'harness-native', 4).length, 1);
+    setMode('full_page');
+    assert.deepStrictEqual(planStaleness(old, page(), 'harness-native', 4), []);
+
+    // The CLI: --if-stale keeps a current plan and rebuilds a stale one.
+    fs.writeFileSync(PLAN, yaml.stringify(Object.assign(old, { mode: 'full_page' })));
+    const pageFile = fx.pageFile(root, fx.PAGE_2);
+    const kept = spawnSync(process.execPath, [SCRIPT, '--page', pageFile, '--if-stale'], { encoding: 'utf8' });
+    assert.strictEqual(kept.status, 0, kept.stderr);
+    assert.ok(/is current \(harness-native, budget 4, full_page\): kept/.test(kept.stdout), kept.stdout);
+    const redone = spawnSync(process.execPath, [SCRIPT, '--page', pageFile, '--provider', 'gemini', '--if-stale'], { encoding: 'utf8' });
+    assert.strictEqual(redone.status, 0, redone.stderr);
+    assert.ok(/rebuilt: it was built for harness-native and the page is now drawn with gemini; it was budgeted for 4 images and gemini takes 3/.test(redone.stdout),
+      redone.stdout);
+    assert.deepStrictEqual([readPlan().provider, readPlan().budget], ['gemini', 3]);
+  });
+}
+
+/** What a planned page needs, counted from its cast before any sheet is drawn. */
+function testReferenceDemand() {
+  return fx.withWorkspace((root) => {
+    const demand = referenceDemand(root, ws.loadPage(root, fx.PAGE_2));
+    assert.deepStrictEqual(demand.page, { count: 3, items: ['look master', 'CHAR_MARA', 'CHAR_OSKAR'] });
+    const panel2 = demand.panels.find((p) => p.id === 'PN_001_002_02');
+    assert.deepStrictEqual(panel2, { id: 'PN_001_002_02', count: 3, items: ['look master', 'CHAR_MARA', 'CHAR_OSKAR'] });
+    assert.strictEqual(demand.panels.length, ws.loadPage(root, fx.PAGE_2).panels.length);
+
+    // Page 1: Oskar is only off panel, so he does not count.
+    assert.deepStrictEqual(referenceDemand(root, ws.loadPage(root, fx.PAGE_1)).page.items, ['look master', 'CHAR_MARA']);
+
+    // A character with no sheet at all still counts: the plan will need one.
+    fx.editYaml(root, 'references/manifest.yaml', (doc) => {
+      doc.assets = doc.assets.filter((a) => a.entity !== 'CHAR_OSKAR');
+    });
+    assert.strictEqual(referenceDemand(root, ws.loadPage(root, fx.PAGE_2)).page.count, 3);
+  });
+}
+
 async function main() {
   assert.strictEqual(roleOfAsset({ id: 'X', kind: 'plate', default_role: 'composition' }), 'composition');
   assert.strictEqual(roleOfAsset({ id: 'X', kind: 'expressions' }), 'identity');
@@ -320,6 +427,8 @@ async function main() {
   await testApprovalRule();
   await testPreviousRenderRule();
   await testCli();
+  await testStalePlan();
+  await testReferenceDemand();
   console.log('reference-plan: OK');
 }
 

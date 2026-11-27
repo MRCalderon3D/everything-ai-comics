@@ -799,11 +799,29 @@ function checkReviewDoc(ctx, rel, doc, pageId, fileRender, maxCycles) {
         `Finding ${f.id || '?'} is blocking and accepted; expected open or fixed, because a blocking finding cannot be accepted.`);
     }
   }
-  if (typeof doc.repair_cycle === 'number' && doc.repair_cycle > maxCycles) {
+  if (typeof doc.repair_cycle === 'number' && doc.repair_cycle > maxCycles && !personTouchUp(ctx, doc)) {
     ctx.err(rel, 'REVIEW_REPAIR_LIMIT',
-      `repair_cycle is ${doc.repair_cycle}; expected at most ${maxCycles} (project.repair_policy.max_cycles). ` +
+      `repair_cycle is ${doc.repair_cycle}; expected at most ${maxCycles} (project.repair_policy.max_cycles), ` +
+      'unless the edit was a touch-up the person asked for (a change request on the review of the render it edited). ' +
       'Fix the plan or the references before generating again.');
   }
+}
+
+/**
+ * Was the edit that produced this render a touch-up the person asked for?
+ * max_cycles stops the automatic repairs; a person may choose to touch an
+ * image up past it (rules/common/repair-limits.md). The sign is a change
+ * request (source: user_request) on the review of the render it edited.
+ */
+function personTouchUp(ctx, doc) {
+  if (!hasText(doc.supersedes) || !(ws.ID.render.test(doc.supersedes) || ws.ID.coverRender.test(doc.supersedes))) return false;
+  let previous = null;
+  try {
+    previous = ctx.review(doc.supersedes);
+  } catch (err) {
+    previous = null;
+  }
+  return !!previous && arr(previous.findings).some((f) => isObj(f) && f.source === 'user_request');
 }
 
 function checkReviews(ctx) {

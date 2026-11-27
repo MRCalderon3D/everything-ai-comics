@@ -64,8 +64,11 @@ generation, and every agent that plans a batch of pages or reference art.
 
 ## Repair budgets
 
-- Each render gets at most `project.repair_policy.max_cycles` repair cycles
-  (default 2). The limit and what follows it are in `repair-limits.md`.
+- Each render gets at most `project.repair_policy.max_cycles` automatic
+  repair cycles (default 2). Touch-ups the person asks for warn at
+  `project.repair_policy.touch_up_warning` (default 2) and go on only when
+  the person chooses. Both limits and what follows them are in
+  `repair-limits.md`.
 - Repeated failure is a planning defect. Change the plan or the references
   before spending again on the same inputs.
 - Regenerating a page whose render is already approved always needs human
@@ -80,7 +83,8 @@ generation, and every agent that plans a batch of pages or reference art.
 - Each generation record carries a `cost` block with `estimated` and
   `reported` flags, so spend can be totalled from `generations/`.
 - `scripts/validate-workspace.js` rejects a review whose `repair_cycle`
-  exceeds `project.repair_policy.max_cycles`.
+  exceeds `project.repair_policy.max_cycles`, except after a touch-up the
+  person asked for.
 - Whether a batch was generated one page at a time with a review in between
   shows in the order of generation records and review dates. A person reads
   that, along with the spend report, at each phase gate.

@@ -84,7 +84,10 @@ which is how a style sample ends up donating its face to a character.
     the reason in `notes`. If the required entries alone exceed the budget,
     stop. Choose a provider with a higher limit, generate per panel
     (`generation.mode: per_panel`), or split the page, and bring the choice
-    to the user.
+    to the user. Moving a character off panel to save an image changes the
+    staging: propose it with the reason, never make it silently.
+    `check-continuity.js` already warns about this at plan time
+    (`REFERENCE_BUDGET`), per page and per panel.
 12. Exclude anything that contradicts the page: an outfit from another
     scene, a plate of the location at another time of day, a superseded
     sheet.
@@ -93,7 +96,10 @@ which is how a style sample ends up donating its face to a character.
     `--provider <id>` to plan for a provider other than the default. Read
     the file it writes against steps 3 to 12. When the selection is wrong,
     correct the inputs and run it again. Sharpen `reason` and
-    `omission_risk` by hand last.
+    `omission_risk` by hand last. The plan records the `generation.mode`,
+    provider and budget it was built for; `compile-prompts.js` rebuilds it
+    when one of them changes, which replaces hand edits, so put lasting
+    choices in `references.required` and `references.optional` instead.
 
 ## Outputs
 
@@ -105,6 +111,7 @@ story:
 page: PG_001_002
 provider: harness-native
 budget: 4
+mode: full_page
 required:
   - asset_id: LOOK_NOIR_INK_MASTER_V01
     entity: LOOK_NOIR_INK

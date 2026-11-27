@@ -250,6 +250,27 @@ function blockerOf(code, detail, pageId) {
   };
 }
 
+/**
+ * The project as compile-prompts.js should read it for a repair. A touch-up
+ * the person chose (options.touchUp, with an open change request on the
+ * review) is theirs to make past repair_policy.max_cycles, which stops only
+ * the automatic repairs (rules/common/repair-limits.md). For that one
+ * compile the limit is read as covering this edit; project.yaml is not
+ * changed, and the automatic repairs that follow read the real limit.
+ * Every other compile reads project.yaml as it is.
+ */
+function projectForRepair(root, review, options) {
+  if (!options.touchUp || !review) return undefined;
+  const asked = (Array.isArray(review.findings) ? review.findings : [])
+    .some((f) => f && f.status === 'open' && f.source === 'user_request');
+  if (!asked) return undefined;
+  const doc = S.ws.loadProject(root) || {};
+  const max = doc.repair_policy && Number.isInteger(doc.repair_policy.max_cycles) ? doc.repair_policy.max_cycles : 2;
+  const cycle = Number.isInteger(review.repair_cycle) ? review.repair_cycle : 0;
+  if (cycle < max) return undefined;
+  return Object.assign({}, doc, { repair_policy: Object.assign({}, doc.repair_policy, { max_cycles: cycle + 1 }) });
+}
+
 /** Compile and write the prompt package of a page (a repair when repairReview is given). */
 function compilePage(root, pageId, provider, options = {}) {
   const page = S.ws.loadPage(root, pageId);
@@ -260,6 +281,7 @@ function compilePage(root, pageId, provider, options = {}) {
       providerId: provider,
       model: options.model || undefined,
       repairReview: options.repairReview || undefined,
+      project: projectForRepair(root, options.repairReview, options),
     });
     S.pipeline.assertValid('prompt-package', result.pkg, `prompt package ${result.pkg.id}`);
   } catch (err) {
@@ -292,6 +314,7 @@ function compileCover(root, issueId, provider, options = {}) {
   try {
     result = S.compileCover({
       root, issue: issueId, provider, model: options.model || undefined, repair: options.repair || undefined, write: true,
+      project: projectForRepair(root, options.repair && typeof options.repair === 'object' ? options.repair : null, options),
     });
   } catch (err) {
     throw new OpError(err.code || 'compile_failed', pipelineMessage(err));

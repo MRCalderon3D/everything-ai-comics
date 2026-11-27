@@ -464,7 +464,7 @@ setting is not in the list.
         "note_code": "model.source.fake",
         "note_params": {}
       },
-      "models_detected_at": "2026-11-27T01:23:13Z"
+      "models_detected_at": "2026-11-27T02:24:44Z"
     },
     "codex": {
       "installed": true,
@@ -491,7 +491,7 @@ setting is not in the list.
         "note_code": "model.source.fake",
         "note_params": {}
       },
-      "models_detected_at": "2026-11-27T01:23:13Z"
+      "models_detected_at": "2026-11-27T02:24:44Z"
     }
   },
   "draw": { "available": true, "provider": "codex-cli", "manual": true },
@@ -547,7 +547,7 @@ it starts no session.
         "note_code": "model.source.fake",
         "note_params": {}
       },
-      "models_detected_at": "2026-11-27T01:23:13Z"
+      "models_detected_at": "2026-11-27T02:24:44Z"
     },
     "codex": {
       "installed": true,
@@ -583,7 +583,7 @@ it starts no session.
         "note_code": "model.source.fake",
         "note_params": {}
       },
-      "models_detected_at": "2026-11-27T01:23:13Z"
+      "models_detected_at": "2026-11-27T02:24:44Z"
     }
   }
 }
@@ -874,7 +874,7 @@ job is queued or running.
       "comic_format": "paged",
       "language": "en",
       "created_at": "2026-11-27",
-      "updated_at": "2026-11-27T01:23:13.534Z",
+      "updated_at": "2026-11-27T02:24:44.691Z",
       "image": null,
       "counts": { "pages": 0, "rendered": 0, "passed": 0 },
       "busy": false
@@ -942,7 +942,7 @@ and `written`, the workspace paths of the story files.
     "comic_format": "paged",
     "language": "en",
     "created_at": "2026-11-27",
-    "updated_at": "2026-11-27T01:23:13.534Z",
+    "updated_at": "2026-11-27T02:24:44.691Z",
     "image": null,
     "counts": { "pages": 0, "rendered": 0, "passed": 0 },
     "busy": false
@@ -972,6 +972,7 @@ The project home: per-screen status, the next thing to do, what blocks it.
 | `issues` | The issues, as in `GET .../issues`. `first_issue` is the id to open by default. |
 | `look` | `{ id, approved }`. |
 | `repair_limit` | Repair cycles the studio spends on its own before it leaves a page flagged. |
+| `touch_up_warning` | Edits of one image after which a correction asks the person to choose between touching up anyway and a redraw (`repair_policy.touch_up_warning`, default 2). |
 | `history.git` | `true` when earlier states can be restored. |
 | `active_jobs` | Jobs that are queued, running, or waiting for an answer. |
 
@@ -986,14 +987,14 @@ The project home: per-screen status, the next thing to do, what blocks it.
     "comic_format": "paged",
     "language": "en",
     "created_at": "2026-11-27",
-    "updated_at": "2026-11-27T01:23:48.904Z",
+    "updated_at": "2026-11-27T02:25:18.785Z",
     "image": {
       "path": "issues/ISS_001/cover/renders/CV_001_V03.png",
-      "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/cover/renders/CV_001_V03.png?v=6tsmwyashcq",
+      "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/cover/renders/CV_001_V03.png?v=6tsmwyczkp3",
       "width": 600,
       "height": 900,
       "bytes": 8848,
-      "mtime": "2026-11-27T01:23:39.866Z"
+      "mtime": "2026-11-27T02:25:10.023Z"
     },
     "counts": { "pages": 3, "rendered": 3, "passed": 3 },
     "busy": false,
@@ -1092,11 +1093,11 @@ The project home: per-screen status, the next thing to do, what blocks it.
         "current_render": "CV_001_V03",
         "image": {
           "path": "issues/ISS_001/cover/renders/CV_001_V03.png",
-          "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/cover/renders/CV_001_V03.png?v=6tsmwyashcq",
+          "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/cover/renders/CV_001_V03.png?v=6tsmwyczkp3",
           "width": 600,
           "height": 900,
           "bytes": 8848,
-          "mtime": "2026-11-27T01:23:39.866Z"
+          "mtime": "2026-11-27T02:25:10.023Z"
         },
         "verdict": "fixed",
         "outcome": "pass",
@@ -1114,6 +1115,7 @@ The project home: per-screen status, the next thing to do, what blocks it.
   "first_issue": "ISS_001",
   "look": { "id": "LOOK_NOIR_INK", "approved": true },
   "repair_limit": 1,
+  "touch_up_warning": 2,
   "history": { "git": true },
   "active_jobs": []
 }
@@ -1130,7 +1132,7 @@ erased. While a job is queued or running the answer is 409 `project_busy`;
 ```json
 {
   "deleted": "overlay-letters",
-  "trash": ".trash/overlay-letters-20261127012401",
+  "trash": ".trash/overlay-letters-20261127022530",
   "note": "The project was moved to the trash folder of the studio home. Nothing was erased.",
   "note_code": "note.trashed",
   "note_params": {}
@@ -1184,12 +1186,12 @@ After a few pages were drawn:
       "job": "look",
       "runs": 5,
       "failed": 0,
-      "average_ms": 10,
-      "per_page_ms": 10,
-      "last_at": "2026-11-27T01:23:28Z",
+      "average_ms": 13,
+      "per_page_ms": 15,
+      "last_at": "2026-11-27T02:24:59Z",
       "kinds": {
-        "sheet.check": { "runs": 1, "average_ms": 10, "per_page_ms": null },
-        "review": { "runs": 4, "average_ms": 10, "per_page_ms": 10 }
+        "sheet.check": { "runs": 1, "average_ms": 4, "per_page_ms": null },
+        "review": { "runs": 4, "average_ms": 15, "per_page_ms": 15 }
       }
     },
     {
@@ -1198,16 +1200,16 @@ After a few pages were drawn:
       "job": "plan",
       "runs": 9,
       "failed": 0,
-      "average_ms": 13,
+      "average_ms": 17,
       "per_page_ms": 7,
-      "last_at": "2026-11-27T01:23:23Z",
+      "last_at": "2026-11-27T02:24:54Z",
       "kinds": {
-        "story.propose": { "runs": 3, "average_ms": 6, "per_page_ms": null },
-        "style.define": { "runs": 1, "average_ms": 14, "per_page_ms": null },
-        "character.write": { "runs": 2, "average_ms": 21, "per_page_ms": null },
-        "pages.breakdown": { "runs": 1, "average_ms": 12, "per_page_ms": 4 },
-        "pages.plan": { "runs": 1, "average_ms": 28, "per_page_ms": 9 },
-        "entities.derive": { "runs": 1, "average_ms": 5, "per_page_ms": null }
+        "story.propose": { "runs": 3, "average_ms": 12, "per_page_ms": null },
+        "style.define": { "runs": 1, "average_ms": 18, "per_page_ms": null },
+        "character.write": { "runs": 2, "average_ms": 16, "per_page_ms": null },
+        "pages.breakdown": { "runs": 1, "average_ms": 22, "per_page_ms": 7 },
+        "pages.plan": { "runs": 1, "average_ms": 22, "per_page_ms": 7 },
+        "entities.derive": { "runs": 1, "average_ms": 18, "per_page_ms": null }
       }
     },
     {
@@ -1216,12 +1218,12 @@ After a few pages were drawn:
       "job": "draw",
       "runs": 7,
       "failed": 0,
-      "average_ms": 123,
-      "per_page_ms": 126,
-      "last_at": "2026-11-27T01:23:28Z",
+      "average_ms": 117,
+      "per_page_ms": 117,
+      "last_at": "2026-11-27T02:24:58Z",
       "kinds": {
-        "sheet": { "runs": 3, "average_ms": 119, "per_page_ms": null },
-        "page": { "runs": 4, "average_ms": 126, "per_page_ms": 126 }
+        "sheet": { "runs": 3, "average_ms": 117, "per_page_ms": null },
+        "page": { "runs": 4, "average_ms": 117, "per_page_ms": 117 }
       }
     }
   ]
@@ -1300,7 +1302,7 @@ After a few pages were drawn:
         "note_code": "model.source.fake",
         "note_params": {}
       },
-      "models_detected_at": "2026-11-27T01:23:13Z"
+      "models_detected_at": "2026-11-27T02:24:44Z"
     },
     "codex": {
       "installed": true,
@@ -1336,7 +1338,7 @@ After a few pages were drawn:
         "note_code": "model.source.fake",
         "note_params": {}
       },
-      "models_detected_at": "2026-11-27T01:23:13Z"
+      "models_detected_at": "2026-11-27T02:24:44Z"
     }
   },
   "model_status": {
@@ -1350,10 +1352,10 @@ After a few pages were drawn:
       "job": "plan",
       "runs": 3,
       "failed": 0,
-      "average_ms": 6,
+      "average_ms": 12,
       "per_page_ms": null,
-      "last_at": "2026-11-27T01:23:14Z",
-      "kinds": { "story.propose": { "runs": 3, "average_ms": 6, "per_page_ms": null } }
+      "last_at": "2026-11-27T02:24:45Z",
+      "kinds": { "story.propose": { "runs": 3, "average_ms": 12, "per_page_ms": null } }
     }
   ],
   "choices": { "plan": ["claude", "codex"], "look": ["claude", "codex"], "draw": ["codex", "manual"] },
@@ -1434,6 +1436,7 @@ The general options of the project as a flat form, the choices for each, and
     "lettering_mode": "in_image",
     "rating": "teen",
     "repair_limit": 1,
+    "touch_up_warning": 2,
     "page": { "aspect_ratio": "2:3", "width_px": 2000, "height_px": 3000 },
     "page_size": "comic-2-3",
     "image_provider": "codex-cli"
@@ -1487,8 +1490,8 @@ The general options of the project as a flat form, the choices for each, and
     "text": "# production/project.yaml: workspace configuration\n# Schema: schemas/project.schema.json\n# Project: THE_NIGHT_FERRY\n# Ev…",
     "parse_error": null,
     "findings": [],
-    "etag": "aa5-1a21a997437",
-    "mtime": "2026-11-27T01:23:14.103Z",
+    "etag": "b39-1a21ad1c6cc",
+    "mtime": "2026-11-27T02:24:45.260Z",
     "url": "/api/projects/the-night-ferry/raw/project.yaml"
   }
 }
@@ -1511,7 +1514,8 @@ after the change.
 | `color_mode` | `monochrome`, `limited`, `full_color`. |
 | `lettering_mode` | `in_image` or `overlay`. |
 | `rating` | `all-ages`, `teen`, `mature`. |
-| `repair_limit` | 0 to 10. Writes `repair_policy.max_cycles`, the scaffold's own limit. |
+| `repair_limit` | 0 to 10. Writes `repair_policy.max_cycles`, the scaffold's limit on automatic repairs. |
+| `touch_up_warning` | 0 to 10. Writes `repair_policy.touch_up_warning`: how many edits an image takes before a correction warns that more may degrade it and offers a redraw. The person then chooses (`mode` of `page.correct`). The Settings screen shows it with one line on the trade-off. |
 | `page_size` | One of the ids in `choices.page_size`. |
 | `page` | `{ aspect_ratio, width_px, height_px }` for a size that is not in the list. |
 
@@ -1530,12 +1534,13 @@ after the change.
     "lettering_mode": "in_image",
     "rating": "teen",
     "repair_limit": 1,
+    "touch_up_warning": 2,
     "page": { "aspect_ratio": "2:3", "width_px": 2000, "height_px": 3000 },
     "page_size": "comic-2-3",
     "image_provider": "codex-cli"
   },
   "findings": [],
-  "commit": "bfa5518019ed574a02639b38772c0c2af7fcb186"
+  "commit": "fa010783c19fa85e2cf5fe6921202b4d9d0a4a27"
 }
 ```
 <!-- /example:options-put -->
@@ -1595,8 +1600,8 @@ A new project, before anything else:
     },
     "parse_error": null,
     "findings": [],
-    "etag": "17e-1a21a997124",
-    "mtime": "2026-11-27T01:23:13.316Z",
+    "etag": "17e-1a21ad1c3bd",
+    "mtime": "2026-11-27T02:24:44.477Z",
     "url": "/api/projects/the-night-ferry/raw/story/story-bible.yaml"
   },
   "series_plan": {
@@ -1608,8 +1613,8 @@ A new project, before anything else:
     "data": { "title": "The Night Ferry", "issues": ["{…}"] },
     "parse_error": null,
     "findings": [],
-    "etag": "178-1a21a997126",
-    "mtime": "2026-11-27T01:23:13.318Z",
+    "etag": "178-1a21ad1c3bd",
+    "mtime": "2026-11-27T02:24:44.477Z",
     "url": "/api/projects/the-night-ferry/raw/story/series-plan.yaml"
   },
   "sources": [
@@ -1617,7 +1622,7 @@ A new project, before anything else:
       "name": "description.md",
       "path": "story/source/description.md",
       "bytes": 115,
-      "mtime": "2026-11-27T01:23:13.316Z",
+      "mtime": "2026-11-27T02:24:44.475Z",
       "url": "/api/projects/the-night-ferry/raw/story/source/description.md"
     }
   ],
@@ -1662,8 +1667,8 @@ After a draft was decided on:
     },
     "parse_error": null,
     "findings": [],
-    "etag": "3d0-1a21a997248",
-    "mtime": "2026-11-27T01:23:13.608Z",
+    "etag": "3d0-1a21ad1c4da",
+    "mtime": "2026-11-27T02:24:44.762Z",
     "url": "/api/projects/the-night-ferry/raw/story/story-bible.yaml"
   },
   "series_plan": {
@@ -1675,8 +1680,8 @@ After a draft was decided on:
     "data": { "title": "The Night Ferry", "issues": ["{…}"] },
     "parse_error": null,
     "findings": [],
-    "etag": "178-1a21a997126",
-    "mtime": "2026-11-27T01:23:13.318Z",
+    "etag": "178-1a21ad1c3bd",
+    "mtime": "2026-11-27T02:24:44.477Z",
     "url": "/api/projects/the-night-ferry/raw/story/series-plan.yaml"
   },
   "sources": [
@@ -1684,7 +1689,7 @@ After a draft was decided on:
       "name": "description.md",
       "path": "story/source/description.md",
       "bytes": 115,
-      "mtime": "2026-11-27T01:23:13.316Z",
+      "mtime": "2026-11-27T02:24:44.475Z",
       "url": "/api/projects/the-night-ferry/raw/story/source/description.md"
     }
   ],
@@ -1693,7 +1698,7 @@ After a draft was decided on:
   "chat_key": "story",
   "proposals": [
     {
-      "id": "prop_2026112701231406408_fee4",
+      "id": "prop_2026112702244522808_d41f",
       "kind": "suggest",
       "status": "open",
       "title": "Suggestion",
@@ -1701,9 +1706,9 @@ After a draft was decided on:
       "title_params": {},
       "instruction": "Suggest an ending.",
       "summary": "This is the fake assistant. It proposes 3 kind(s) of story text for you to accept or reject.",
-      "created_at": "2026-11-27T01:23:14Z",
-      "updated_at": "2026-11-27T01:23:14Z",
-      "job": "job_2026112701231404207_e4bc",
+      "created_at": "2026-11-27T02:24:45Z",
+      "updated_at": "2026-11-27T02:24:45Z",
+      "job": "job_2026112702244519907_2931",
       "tool": "claude",
       "counts": { "parts": 3, "pending": 3, "accepted": 0, "edited": 0, "rejected": 0 }
     },
@@ -1763,11 +1768,11 @@ Asset fields, used for looks, characters, locations and props:
       "path": "references/style/LOOK_NOIR_INK_MASTER_V01.png",
       "image": {
         "path": "references/style/LOOK_NOIR_INK_MASTER_V01.png",
-        "url": "/api/projects/the-night-ferry/raw/references/style/LOOK_NOIR_INK_MASTER_V01.png?v=665mwyas01z",
+        "url": "/api/projects/the-night-ferry/raw/references/style/LOOK_NOIR_INK_MASTER_V01.png?v=665mwycz44v",
         "width": 600,
         "height": 900,
         "bytes": 7997,
-        "mtime": "2026-11-27T01:23:17.447Z"
+        "mtime": "2026-11-27T02:24:48.559Z"
       },
       "status": "approved",
       "role": "style",
@@ -1787,11 +1792,11 @@ Asset fields, used for looks, characters, locations and props:
         "path": "references/style/LOOK_NOIR_INK_V01.png",
         "image": {
           "path": "references/style/LOOK_NOIR_INK_V01.png",
-          "url": "/api/projects/the-night-ferry/raw/references/style/LOOK_NOIR_INK_V01.png?v=665mwyas01z",
+          "url": "/api/projects/the-night-ferry/raw/references/style/LOOK_NOIR_INK_V01.png?v=665mwycz44v",
           "width": 600,
           "height": 900,
           "bytes": 7997,
-          "mtime": "2026-11-27T01:23:17.447Z"
+          "mtime": "2026-11-27T02:24:48.559Z"
         },
         "status": "candidate",
         "role": null,
@@ -1805,11 +1810,11 @@ Asset fields, used for looks, characters, locations and props:
           "provider": "codex-cli",
           "model": "unreported",
           "status": "succeeded",
-          "created_at": "2026-11-27T01:23:17.341Z",
+          "created_at": "2026-11-27T02:24:48.450Z",
           "prompt_package": "PP_LOOK_NOIR_INK_CODEX-CLI-LOOK",
           "supplied_by_person": false,
-          "summary": "Codex saved one 600x900 PNG in 1 s; 1 reference image(s) passed to the image tool, as Codex reports.",
-          "notes": "Codex notes: Placeholder from the fake drawing tool. Not art."
+          "summary": "Codex saved one 600x900 PNG in 1 s; 1 reference image(s) sent, how many reached the image tool not r…",
+          "notes": "Codex did not report how many reference images reached its image tool: check every identity against …"
         }
       }
     ],
@@ -1822,11 +1827,11 @@ Asset fields, used for looks, characters, locations and props:
         "path": "references/style/LOOK_NOIR_INK_REF_V01.png",
         "image": {
           "path": "references/style/LOOK_NOIR_INK_REF_V01.png",
-          "url": "/api/projects/the-night-ferry/raw/references/style/LOOK_NOIR_INK_REF_V01.png?v=11dmwyaryz7",
+          "url": "/api/projects/the-night-ferry/raw/references/style/LOOK_NOIR_INK_REF_V01.png?v=11dmwycz320",
           "width": 200,
           "height": 300,
           "bytes": 1345,
-          "mtime": "2026-11-27T01:23:16.051Z"
+          "mtime": "2026-11-27T02:24:47.160Z"
         },
         "status": "approved",
         "role": "style",
@@ -1862,8 +1867,8 @@ Asset fields, used for looks, characters, locations and props:
     "data": null,
     "parse_error": null,
     "findings": [],
-    "etag": "384-1a21a997d7e",
-    "mtime": "2026-11-27T01:23:16.478Z",
+    "etag": "384-1a21ad1cfea",
+    "mtime": "2026-11-27T02:24:47.594Z",
     "url": "/api/projects/the-night-ferry/raw/style/style-bible.md"
   },
   "style_block": {
@@ -1875,8 +1880,8 @@ Asset fields, used for looks, characters, locations and props:
     "data": null,
     "parse_error": null,
     "findings": [],
-    "etag": "2dd-1a21a997d7e",
-    "mtime": "2026-11-27T01:23:16.478Z",
+    "etag": "2dd-1a21ad1cfe9",
+    "mtime": "2026-11-27T02:24:47.593Z",
     "url": "/api/projects/the-night-ferry/raw/style/style-block.txt",
     "template": false,
     "frozen": true
@@ -1890,8 +1895,8 @@ Asset fields, used for looks, characters, locations and props:
     "data": null,
     "parse_error": null,
     "findings": [],
-    "etag": "47-1a21a997d7e",
-    "mtime": "2026-11-27T01:23:16.478Z",
+    "etag": "47-1a21ad1cfea",
+    "mtime": "2026-11-27T02:24:47.594Z",
     "url": "/api/projects/the-night-ferry/raw/style/color-script.md"
   },
   "options": "{…}",
@@ -1934,11 +1939,11 @@ sheets waiting for a decision.
       "file": "characters/CHAR_MARA/character.yaml",
       "image": {
         "path": "characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V01.png",
-        "url": "/api/projects/the-night-ferry/raw/characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V01.png?v=8bpmwyas1s8",
+        "url": "/api/projects/the-night-ferry/raw/characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V01.png?v=8bpmwycz5w5",
         "width": 900,
         "height": 900,
         "bytes": 10789,
-        "mtime": "2026-11-27T01:23:19.688Z"
+        "mtime": "2026-11-27T02:24:50.837Z"
       },
       "has_master": true,
       "has_identity": true,
@@ -1995,11 +2000,11 @@ the identity check it had (`verdict`, `master`, `findings`, `redrawn`).
   "file": "characters/CHAR_MARA/character.yaml",
   "image": {
     "path": "characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V01.png",
-    "url": "/api/projects/the-night-ferry/raw/characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V01.png?v=8bpmwyas…",
+    "url": "/api/projects/the-night-ferry/raw/characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V01.png?v=8bpmwycz…",
     "width": 900,
     "height": 900,
     "bytes": 10789,
-    "mtime": "2026-11-27T01:23:19.688Z"
+    "mtime": "2026-11-27T02:24:50.837Z"
   },
   "has_master": true,
   "has_identity": true,
@@ -2036,8 +2041,8 @@ the identity check it had (`verdict`, `master`, `findings`, `redrawn`).
     },
     "parse_error": null,
     "findings": [],
-    "etag": "219-1a21a998d9a",
-    "mtime": "2026-11-27T01:23:20.602Z",
+    "etag": "219-1a21ad1dffe",
+    "mtime": "2026-11-27T02:24:51.710Z",
     "url": "/api/projects/the-night-ferry/raw/characters/CHAR_MARA/character.yaml"
   },
   "wardrobe": {
@@ -2049,8 +2054,8 @@ the identity check it had (`verdict`, `master`, `findings`, `redrawn`).
     "data": { "character": "CHAR_MARA", "outfits": ["{…}"] },
     "parse_error": null,
     "findings": [],
-    "etag": "149-1a21a998665",
-    "mtime": "2026-11-27T01:23:18.757Z",
+    "etag": "149-1a21ad1d8e1",
+    "mtime": "2026-11-27T02:24:49.889Z",
     "url": "/api/projects/the-night-ferry/raw/characters/CHAR_MARA/wardrobe.yaml"
   },
   "assets": {
@@ -2226,8 +2231,8 @@ One location: the summary plus `location` and `map` (text documents),
     },
     "parse_error": null,
     "findings": [],
-    "etag": "1db-1a21a99937b",
-    "mtime": "2026-11-27T01:23:22.107Z",
+    "etag": "1db-1a21ad1e5bc",
+    "mtime": "2026-11-27T02:24:53.180Z",
     "url": "/api/projects/the-night-ferry/raw/locations/LOC_MAIN_ROOM/location.yaml"
   },
   "map": {
@@ -2246,8 +2251,8 @@ One location: the summary plus `location` and `map` (text documents),
     },
     "parse_error": null,
     "findings": [],
-    "etag": "230-1a21a99937b",
-    "mtime": "2026-11-27T01:23:22.107Z",
+    "etag": "230-1a21ad1e5bc",
+    "mtime": "2026-11-27T02:24:53.180Z",
     "url": "/api/projects/the-night-ferry/raw/locations/LOC_MAIN_ROOM/map.yaml"
   },
   "screen": {
@@ -2397,8 +2402,8 @@ Page summary fields:
     },
     "parse_error": null,
     "findings": [],
-    "etag": "d1-1a21a999548",
-    "mtime": "2026-11-27T01:23:22.568Z",
+    "etag": "d1-1a21ad1e78f",
+    "mtime": "2026-11-27T02:24:53.647Z",
     "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/issue.yaml"
   },
   "planned": { "id": "ISS_001", "number": 1, "title": "Crossing", "page_budget": 3, "status": "planning" },
@@ -2425,11 +2430,11 @@ Page summary fields:
       "renders": 1,
       "image": {
         "path": "issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V01.png",
-        "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V01.png?v=73tmwyas4yx",
+        "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V01.png?v=73tmwycz8yj",
         "width": 600,
         "height": 900,
         "bytes": 9209,
-        "mtime": "2026-11-27T01:23:23.817Z"
+        "mtime": "2026-11-27T02:24:54.811Z"
       },
       "verdict": "pass",
       "outcome": "pass",
@@ -2468,11 +2473,11 @@ Page summary fields:
   },
   "planning": null,
   "added": {
-    "job": "job_202611270123220840x_1e21",
-    "ended_at": "2026-11-27T01:23:23Z",
+    "job": "job_202611270224531460x_63ae",
+    "ended_at": "2026-11-27T02:24:54Z",
     "entities": [
       {
-        "job": "job_202611270123220840x_1e21",
+        "job": "job_202611270224531460x_63ae",
         "id": "LOC_MAIN_ROOM",
         "kind": "location",
         "name": "Main room",
@@ -2522,14 +2527,15 @@ Everything about one page.
 | Field | Meaning |
 |---|---|
 | `page` | `page.yaml` as a text document: layout, panel script, ledger, lettering text. |
-| `plan` | The short readable plan: `purpose`, `grid`, `tiers`, `panels[]` (`id`, `number`, `slot`, `size`, `shot`, `moment`, `location`, `cast[]` with `character`, `name`, `off_panel`, `action`, `where`, `holding`, `state`, and `lettering[]` with `id`, `type`, `speaker`, `speaker_name`, `text`) and `text`, the same as plain lines under a heading in the language of the request. |
+| `plan` | The short readable plan: `purpose`, `grid`, `tiers`, `panels[]` (`id`, `number`, `slot`, `size`, `shot`, `moment`, `location`, `cast[]` with `character`, `name`, `off_panel`, `action`, `where`, `side` (the side of the location the character stands on, which a tail from off panel runs to), `holding`, `state`, and `lettering[]` with `id`, `type`, `speaker`, `speaker_name`, `text`) and `text`, the same as plain lines under a heading in the language of the request. |
 | `plan.panels[].slot` | Where the panel sits, as the plan says it: `{ tier, tiers, slot, of, placement }`. `tier` of `tiers` counts rows from the top, `slot` of `of` counts panels in the row in reading order, and `placement` is the scaffold's word for it (`full width`, `left`, `center`, `right`). `null` when `layout.tiers` is missing or does not add up to the panels of the page. There is no rectangle: see below. |
 | `plan_approval` | `{ approved, at, stale }`. `stale` is `true` when the plan changed after it was approved. |
 | `renders` | Every version, oldest first (fields below). |
 | `prompts` | The compiled prompt packages of the page: `path`, `id`, `provider`, `model`, `mode` (`generate` or `repair`), `prompt`, `negative_prompt`, `parameters`, `references[]` (`asset_id`, `role`, `path`, `image`), `edit_target`, `repair` (`of_render`, `findings`, `changes`, `locked`), `lettering_text`, and `stale` (reasons the package no longer matches its sources). |
 | `reference_plan` | `reference-plan.yaml` as a text document plus `entries[]`: each planned reference with `asset_id`, `entity`, `role`, `priority`, `reason`, `omission_risk`, `required` and its `image`. |
 | `findings` | Mechanical findings for this page: `continuity`, `validation` (`errors`, `warnings`), `schema`, and `blockers`. |
-| `lettering` | `mode` (`in_image` or `overlay`), `geometry` (`lettering.yaml` as a text document) and `needs_placement`. |
+| `lettering` | `mode` (`in_image` or `overlay`), `geometry` (`lettering.yaml` as a text document), `needs_placement`, and for the plan editor `limits` (`words_per_balloon` and `words_per_panel` from `project.lettering`, else 25 and 50; `per_panel`, the rule's ceiling of 4 balloons and captions), `kinds` (the lettering types in the order the editor offers them) and `spoken` (the kinds that have a speaker). |
+| `repair_limit`, `touch_up_warning` | The automatic repair limit, and the edits of one image after which a correction needs the person's choice. |
 | `draw` | `{ available, tool, reason }`. |
 | `neighbors` | `{ previous, next }` page IDs. |
 | `assumptions` | What the planner filled in that the person's text did not say, so the page could be drawn: `[{ panel, text, job, at }]`. `panel` is a panel id or `null` for the whole page; `text` is in the interface language. Show them to the person: each one can be changed in the plan (the page file, a chat message, or a correction). Planning the page again replaces the list. Empty for a page planned before this existed. |
@@ -2585,8 +2591,8 @@ Render fields:
     },
     "parse_error": null,
     "findings": [],
-    "etag": "ea7-1a21a99a69c",
-    "mtime": "2026-11-27T01:23:27.004Z",
+    "etag": "ea7-1a21ad1f760",
+    "mtime": "2026-11-27T02:24:57.696Z",
     "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_002/page.yaml"
   },
   "plan": {
@@ -2609,6 +2615,7 @@ Render fields:
             "off_panel": false,
             "action": "Stands and looks across the room.",
             "where": "ground, door",
+            "side": "left",
             "holding": [],
             "state": []
           }
@@ -2633,7 +2640,7 @@ Render fields:
       "body": "1. The place where this happens: FLAG She hears the crates shift and goes down to the deck. (Mara)\n   [caption…"
     }
   },
-  "plan_approval": { "approved": true, "at": "2026-11-27T01:23:23Z", "stale": false },
+  "plan_approval": { "approved": true, "at": "2026-11-27T02:24:54Z", "stale": false },
   "renders": [
     {
       "id": "PG_001_002_V01",
@@ -2641,11 +2648,11 @@ Render fields:
       "current": false,
       "image": {
         "path": "issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V01.png",
-        "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V01.png?v=74gmwyas65h",
+        "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V01.png?v=74gmwycza2j",
         "width": 600,
         "height": 900,
         "bytes": 9232,
-        "mtime": "2026-11-27T01:23:25.349Z"
+        "mtime": "2026-11-27T02:24:56.251Z"
       },
       "lettered": null,
       "overlay": null,
@@ -2705,11 +2712,11 @@ Render fields:
         "provider": "codex-cli",
         "model": "unreported",
         "status": "rejected",
-        "created_at": "2026-11-27T01:23:25.237Z",
+        "created_at": "2026-11-27T02:24:56.134Z",
         "prompt_package": "PP_PG_001_002_CODEX-CLI",
         "supplied_by_person": false,
-        "summary": "Codex saved one 600x900 PNG in 1 s; 3 reference image(s) passed to the image tool, as Codex reports.",
-        "notes": "Codex notes: Placeholder from the fake drawing tool. Not art. Replaced by PG_001_002_V02 after review."
+        "summary": "Codex saved one 600x900 PNG in 1 s; 3 reference image(s) sent, how many reached the image tool not reported.",
+        "notes": "Codex did not report how many reference images reached its image tool: check every identity against its sheet.…"
       }
     },
     {
@@ -2718,11 +2725,11 @@ Render fields:
       "current": true,
       "image": {
         "path": "issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V02.png",
-        "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V02.png?v=6wjmwyas70u",
+        "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V02.png?v=6wjmwyczatn",
         "width": 600,
         "height": 900,
         "bytes": 8947,
-        "mtime": "2026-11-27T01:23:26.478Z"
+        "mtime": "2026-11-27T02:24:57.227Z"
       },
       "lettered": null,
       "overlay": null,
@@ -2786,11 +2793,11 @@ Render fields:
         "provider": "codex-cli",
         "model": "unreported",
         "status": "succeeded",
-        "created_at": "2026-11-27T01:23:26.350Z",
+        "created_at": "2026-11-27T02:24:57.128Z",
         "prompt_package": "PP_PG_001_002_CODEX-CLI",
         "supplied_by_person": false,
-        "summary": "Codex saved one 600x900 PNG in 1 s; 4 reference image(s) passed to the image tool, as Codex reports.",
-        "notes": "Codex notes: Placeholder from the fake drawing tool. Not art."
+        "summary": "Codex saved one 600x900 PNG in 1 s; 4 reference image(s) sent, how many reached the image tool not reported.",
+        "notes": "Codex did not report how many reference images reached its image tool: check every identity against its sheet.…"
       }
     }
   ],
@@ -2816,11 +2823,12 @@ Render fields:
     "exists": true,
     "kind": "yaml",
     "schema": "reference-plan",
-    "text": "page: PG_001_002\nprovider: codex-cli\nbudget: 5\nrequired:\n  - asset_id: LOOK_NOIR_INK_MASTER_V01\n    entity: LO…",
+    "text": "page: PG_001_002\nprovider: codex-cli\nbudget: 5\nmode: full_page\nrequired:\n  - asset_id: LOOK_NOIR_INK_MASTER_V0…",
     "data": {
       "page": "PG_001_002",
       "provider": "codex-cli",
       "budget": 5,
+      "mode": "full_page",
       "required": ["{…}", "... 1 more"],
       "optional": ["{…}"],
       "exclude": [],
@@ -2828,8 +2836,8 @@ Render fields:
     },
     "parse_error": null,
     "findings": [],
-    "etag": "353-1a21a999dca",
-    "mtime": "2026-11-27T01:23:24.746Z",
+    "etag": "363-1a21ad1ef9f",
+    "mtime": "2026-11-27T02:24:55.711Z",
     "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_002/reference-plan.yaml",
     "entries": [
       {
@@ -2842,11 +2850,11 @@ Render fields:
         "required": true,
         "image": {
           "path": "references/style/LOOK_NOIR_INK_MASTER_V01.png",
-          "url": "/api/projects/the-night-ferry/raw/references/style/LOOK_NOIR_INK_MASTER_V01.png?v=665mwyas01z",
+          "url": "/api/projects/the-night-ferry/raw/references/style/LOOK_NOIR_INK_MASTER_V01.png?v=665mwycz44v",
           "width": 600,
           "height": 900,
           "bytes": 7997,
-          "mtime": "2026-11-27T01:23:17.447Z"
+          "mtime": "2026-11-27T02:24:48.559Z"
         }
       },
       "... 2 more"
@@ -2878,17 +2886,21 @@ Render fields:
       "mtime": null,
       "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_002/lettering.yaml"
     },
-    "needs_placement": false
+    "needs_placement": false,
+    "limits": { "words_per_balloon": 25, "words_per_panel": 50, "per_panel": 4 },
+    "kinds": ["balloon", "... 8 more"],
+    "spoken": ["balloon", "... 4 more"]
   },
   "draw": { "available": true, "tool": "codex", "reason": null },
   "repair_limit": 1,
+  "touch_up_warning": 2,
   "neighbors": { "previous": "PG_001_001", "next": "PG_001_003" },
   "assumptions": [
     {
       "panel": "PN_001_002_01",
       "text": "Placeholder: the figures stand left and right of the room and hold nothing, because the text does not say.",
-      "job": "job_202611270123220840x_1e21",
-      "at": "2026-11-27T01:23:22Z"
+      "job": "job_202611270224531460x_63ae",
+      "at": "2026-11-27T02:24:53Z"
     }
   ],
   "chat_key": "page:PG_001_002",
@@ -2925,11 +2937,11 @@ the current render are at the top level, as in a page summary: `verdict`,
       "current": false,
       "image": {
         "path": "issues/ISS_001/cover/renders/CV_001_V01.png",
-        "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/cover/renders/CV_001_V01.png?v=6dwmwyaseoh",
+        "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/cover/renders/CV_001_V01.png?v=6dwmwyczi6u",
         "width": 600,
         "height": 900,
         "bytes": 8276,
-        "mtime": "2026-11-27T01:23:36.401Z"
+        "mtime": "2026-11-27T02:25:06.774Z"
       },
       "lettered": null,
       "overlay": null,
@@ -2975,11 +2987,11 @@ the current render are at the top level, as in a page summary: `verdict`,
         "provider": "codex-cli",
         "model": "unreported",
         "status": "succeeded",
-        "created_at": "2026-11-27T01:23:36.300Z",
+        "created_at": "2026-11-27T02:25:06.677Z",
         "prompt_package": "PP_CV_001_CODEX-CLI",
         "supplied_by_person": false,
-        "summary": "Codex saved one 600x900 PNG in 1 s; 2 reference image(s) passed to the image tool, as Codex reports.",
-        "notes": "Codex notes: Placeholder from the fake drawing tool. Not art."
+        "summary": "Codex saved one 600x900 PNG in 1 s; 2 reference image(s) sent, how many reached the image tool not r…",
+        "notes": "Codex did not report how many reference images reached its image tool: check every identity against …"
       }
     },
     "... 2 more"
@@ -2987,11 +2999,11 @@ the current render are at the top level, as in a page summary: `verdict`,
   "current_render": "CV_001_V03",
   "image": {
     "path": "issues/ISS_001/cover/renders/CV_001_V03.png",
-    "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/cover/renders/CV_001_V03.png?v=6tsmwyashcq",
+    "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/cover/renders/CV_001_V03.png?v=6tsmwyczkp3",
     "width": 600,
     "height": 900,
     "bytes": 8848,
-    "mtime": "2026-11-27T01:23:39.866Z"
+    "mtime": "2026-11-27T02:25:10.023Z"
   },
   "verdict": "fixed",
   "outcome": "pass",
@@ -3024,8 +3036,8 @@ the current render are at the top level, as in a page summary: `verdict`,
     },
     "parse_error": null,
     "findings": [],
-    "etag": "260-1a21a99dc74",
-    "mtime": "2026-11-27T01:23:40.788Z",
+    "etag": "260-1a21ad22b48",
+    "mtime": "2026-11-27T02:25:10.984Z",
     "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/cover/cover.yaml"
   },
   "render_count": 3,
@@ -3086,11 +3098,11 @@ the current render are at the top level, as in a page summary: `verdict`,
         "lettered_file": null,
         "image": {
           "path": "issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V02.png",
-          "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V02.png?v=6vqmwyasaak",
+          "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V02.png?v=6vqmwycze8e",
           "width": 600,
           "height": 900,
           "bytes": 8918,
-          "mtime": "2026-11-27T01:23:30.716Z"
+          "mtime": "2026-11-27T02:25:01.646Z"
         }
       },
       {
@@ -3100,11 +3112,11 @@ the current render are at the top level, as in a page summary: `verdict`,
         "lettered_file": null,
         "image": {
           "path": "issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V03.png",
-          "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V03.png?v=7kwmwyascbf",
+          "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V03.png?v=7kwmwyczfzk",
           "width": 600,
           "height": 900,
           "bytes": 9824,
-          "mtime": "2026-11-27T01:23:33.339Z"
+          "mtime": "2026-11-27T02:25:03.920Z"
         }
       },
       "... 1 more"
@@ -3115,11 +3127,11 @@ the current render are at the top level, as in a page summary: `verdict`,
       "lettered_file": null,
       "image": {
         "path": "issues/ISS_001/cover/renders/CV_001_V03.png",
-        "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/cover/renders/CV_001_V03.png?v=6tsmwyashcq",
+        "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/cover/renders/CV_001_V03.png?v=6tsmwyczkp3",
         "width": 600,
         "height": 900,
         "bytes": 8848,
-        "mtime": "2026-11-27T01:23:39.866Z"
+        "mtime": "2026-11-27T02:25:10.023Z"
       }
     },
     "supersedes": "ED_001_01",
@@ -3143,7 +3155,7 @@ the current render are at the top level, as in a page summary: `verdict`,
         {
           "format": "pdf",
           "file": "editions/ED_001_01/exports/the-night-ferry-001-ed01.pdf",
-          "built_at": "2026-11-27T01:23:41Z",
+          "built_at": "2026-11-27T02:25:11Z",
           "exists": true,
           "bytes": 24459,
           "draft": false,
@@ -3154,7 +3166,7 @@ the current render are at the top level, as in a page summary: `verdict`,
         {
           "format": "cbz",
           "file": "editions/ED_001_01/exports/the-night-ferry-001-ed01.cbz",
-          "built_at": "2026-11-27T01:23:41Z",
+          "built_at": "2026-11-27T02:25:11Z",
           "exists": true,
           "bytes": 37725,
           "draft": false,
@@ -3165,7 +3177,7 @@ the current render are at the top level, as in a page summary: `verdict`,
         {
           "format": "web",
           "file": "editions/ED_001_01/exports/the-night-ferry-001-ed01-web/index.html",
-          "built_at": "2026-11-27T01:23:41Z",
+          "built_at": "2026-11-27T02:25:11Z",
           "exists": true,
           "bytes": 4254,
           "draft": false,
@@ -3209,8 +3221,8 @@ can be read this way; anything else is 415 `not_text`.
     "data": { "title": "The Night Ferry", "issues": ["{…}"] },
     "parse_error": null,
     "findings": [],
-    "etag": "178-1a21a997126",
-    "mtime": "2026-11-27T01:23:13.318Z",
+    "etag": "178-1a21ad1c3bd",
+    "mtime": "2026-11-27T02:24:44.477Z",
     "url": "/api/projects/the-night-ferry/raw/story/series-plan.yaml"
   }
 }
@@ -3252,13 +3264,13 @@ Answer:
     "data": { "title": "Crossing", "issues": ["{…}"] },
     "parse_error": null,
     "findings": [],
-    "etag": "171-1a21a9975dd",
-    "mtime": "2026-11-27T01:23:14.525Z",
+    "etag": "171-1a21ad1c862",
+    "mtime": "2026-11-27T02:24:45.666Z",
     "url": "/api/projects/the-night-ferry/raw/story/series-plan.yaml"
   },
   "findings": [],
   "continuity": [],
-  "commit": "8023e368fd3fffc14995650f85361771966de447",
+  "commit": "61179aa1504f673a8f19a70e6de360372beece0c",
   "created": false
 }
 ```
@@ -3293,6 +3305,101 @@ Findings returned for a file that parses and breaks its schema:
 Other refusals: 409 `style_frozen` for `style/style-block.txt` once a look
 master is approved; 400 `bad_path` for renders, exports, generation records
 and hidden files, which the pipeline writes itself.
+
+### `PUT /api/projects/:id/pages/:page/plan`
+
+Saves the plan of a page from its plan review, including its lettering.
+Body: `{ data, base_etag? }`, where `data` is the whole `page.yaml` as an
+object (as `GET .../pages/:page` sends it in `page.data`, with the edits).
+The chat's `page.lettering` action saves through the same code.
+
+Before writing, the lettering is made consistent with
+`rules/lettering/`:
+
+- an element keeps its `id`; a new one (no id, or a duplicate) gets the next
+  free `L01`..`L99`;
+- `order` is renumbered as the reading order of the page: panel by panel,
+  and in each panel in the order of the list;
+- `caption`, `narration`, `sign` and `sfx` lose their `speaker`; a spoken
+  element (`balloon`, `thought`, `whisper`, `shout`, `radio`) needs one, and
+  a speaker with no row in that panel's cast gets an off-panel row copied
+  from their nearest row on the page (`lettering.added_cast` lists them).
+
+422 `lettering_invalid` when an element cannot be right: a kind that does
+not exist, an empty text, a spoken element without a speaker, a speaker who
+is in no panel of the page. `details.problems` lists each one. 409
+`file_changed` when `base_etag` is stale. The word budgets and the ceiling of
+balloons per panel are not refusals: they come back as warnings, and the
+screen shows them before saving.
+
+The answer:
+
+| Field | Meaning |
+|---|---|
+| `saved`, `file`, `commit` | As for `PUT .../file`. The save is one step of the history. |
+| `findings` | Schema findings of `page.yaml` after the save. |
+| `continuity` | The continuity check of the issue, kept to this page. |
+| `lettering.warnings` | `[{ panel, number, code, element, words, count, limit }]` with `code` `balloon_words`, `panel_words` or `panel_count`. A sound effect counts toward the words of its panel, and not as a balloon. |
+| `lettering.changes` | Element by element: `{ change, id, panel, number, type, speaker, text, order, before? }` with `change` `added`, `removed`, `changed` or `moved`. |
+| `lettering.added_cast` | `[{ panel, character }]`: voices from off panel that got a ledger row. |
+| `lettering.limits` | The budgets used. |
+| `redraw` | `null`, or `{ render, mode }` when the lettering changed on a page that is already drawn: `mode` is `draw` (in-image lettering: the page has to be drawn again, `pages.generate`) or `reletter` (overlay: `lettering.apply`). The plan editor offers that action. |
+
+The tail is not stored. The rule derives it from the speaker (at the mouth,
+or to the panel edge on the speaker's side when they are off panel); the
+plan editor says it in words.
+
+<!-- example:page-plan-put -->
+```json
+{
+  "saved": true,
+  "file": {
+    "path": "issues/ISS_001/pages/PG_001_001/page.yaml",
+    "exists": true,
+    "kind": "yaml",
+    "schema": "page",
+    "text": "# Schema: schemas/page.schema.json\n\nid: PG_001_001\nissue: ISS_001\nnumber: 1\nscene: SC_001_01\npurpose: Mara cro…",
+    "data": {
+      "id": "PG_001_001",
+      "issue": "ISS_001",
+      "number": 1,
+      "scene": "SC_001_01",
+      "purpose": "Mara crosses the river alone at night.",
+      "page_turn": "none",
+      "layout": { "grid": "two tiers, 1 / 2", "tiers": "[2 items]", "reading_order": "[3 items]", "notes": "" },
+      "panels": ["{…}", "{…}", "... 1 more"],
+      "...": "7 more"
+    },
+    "parse_error": null,
+    "findings": [],
+    "etag": "ed1-1a21ad20027",
+    "mtime": "2026-11-27T02:24:59.943Z",
+    "url": "/api/projects/the-night-ferry/raw/issues/ISS_001/pages/PG_001_001/page.yaml"
+  },
+  "findings": [],
+  "continuity": [],
+  "lettering": {
+    "warnings": [],
+    "changes": [
+      {
+        "change": "added",
+        "id": "L03",
+        "panel": "PN_001_001_01",
+        "number": 1,
+        "type": "caption",
+        "speaker": null,
+        "text": "Later that night.",
+        "order": 2
+      }
+    ],
+    "added_cast": [],
+    "limits": { "words_per_balloon": 25, "words_per_panel": 50, "per_panel": 4 }
+  },
+  "redraw": { "render": "PG_001_001_V01", "mode": "draw" },
+  "commit": "74ff0466dc2c4ac51482073be7216842adaecd15"
+}
+```
+<!-- /example:page-plan-put -->
 
 ## Raw files
 
@@ -3345,14 +3452,14 @@ await fetch(`/api/projects/${id}/uploads?name=${encodeURIComponent(file.name)}`,
 ```json
 {
   "upload": {
-    "id": "up_202611270123145100a_4808",
+    "id": "up_202611270224456550a_aec9",
     "name": "style-reference.png",
     "kind": "image",
     "bytes": 1345,
     "width": 200,
     "height": 300,
-    "at": "2026-11-27T01:23:14Z",
-    "url": "/api/projects/the-night-ferry/uploads/up_202611270123145100a_4808"
+    "at": "2026-11-27T02:24:45Z",
+    "url": "/api/projects/the-night-ferry/uploads/up_202611270224456550a_aec9"
   }
 }
 ```
@@ -3367,14 +3474,14 @@ The staged uploads, newest first.
 {
   "uploads": [
     {
-      "id": "up_202611270123145100a_4808",
+      "id": "up_202611270224456550a_aec9",
       "name": "style-reference.png",
       "kind": "image",
       "bytes": 1345,
       "width": 200,
       "height": 300,
-      "at": "2026-11-27T01:23:14Z",
-      "url": "/api/projects/the-night-ferry/uploads/up_202611270123145100a_4808"
+      "at": "2026-11-27T02:24:45Z",
+      "url": "/api/projects/the-night-ferry/uploads/up_202611270224456550a_aec9"
     }
   ]
 }
@@ -3408,7 +3515,7 @@ Chat messages do not go through this route (see [Conversation](#conversation)).
 ```json
 {
   "job": {
-    "id": "job_202611270123169070h_d08c",
+    "id": "job_202611270224480290h_a8d8",
     "project": "the-night-ferry",
     "op": "style.look",
     "title": "Draw a look page",
@@ -3416,7 +3523,7 @@ Chat messages do not go through this route (see [Conversation](#conversation)).
     "title_params": {},
     "params": {},
     "status": "queued",
-    "created_at": "2026-11-27T01:23:16Z",
+    "created_at": "2026-11-27T02:24:48Z",
     "started_at": null,
     "ended_at": null,
     "current_step": null,
@@ -3517,7 +3624,7 @@ are not approved:
 ```json
 {
   "job": {
-    "id": "job_2026112701232321312_2c9e",
+    "id": "job_2026112702245425812_3dca",
     "project": "the-night-ferry",
     "op": "pages.generate",
     "title": "Draw pages",
@@ -3525,9 +3632,9 @@ are not approved:
     "title_params": {},
     "params": { "pages": ["PG_001_001", "... 2 more"], "approve_plans": false, "regenerate": false },
     "status": "done",
-    "created_at": "2026-11-27T01:23:23Z",
-    "started_at": "2026-11-27T01:23:23Z",
-    "ended_at": "2026-11-27T01:23:29Z",
+    "created_at": "2026-11-27T02:24:54Z",
+    "started_at": "2026-11-27T02:24:54Z",
+    "ended_at": "2026-11-27T02:24:59Z",
     "current_step": null,
     "steps": [
       {
@@ -3536,10 +3643,10 @@ are not approved:
         "label_code": "step.page.prepare",
         "label_params": { "n": 1 },
         "status": "done",
-        "started_at": "2026-11-27T01:23:23Z",
-        "ended_at": "2026-11-27T01:23:23Z",
+        "started_at": "2026-11-27T02:24:54Z",
+        "ended_at": "2026-11-27T02:24:54Z",
         "tool": null,
-        "commit": "529433667a9ca99335f200da56653a81478c8d74",
+        "commit": "ca2d035607ecfbf0e413e8fb8593efd1088619ed",
         "files": 3,
         "note": "2 reference images",
         "note_code": "note.references",
@@ -3556,10 +3663,10 @@ are not approved:
         "label_code": "step.page.draw",
         "label_params": { "n": 1 },
         "status": "done",
-        "started_at": "2026-11-27T01:23:23Z",
-        "ended_at": "2026-11-27T01:23:24Z",
+        "started_at": "2026-11-27T02:24:54Z",
+        "ended_at": "2026-11-27T02:24:55Z",
         "tool": "codex",
-        "commit": "0f106f6c661dda9ae34ca8410dee42340fa8d5a8",
+        "commit": "f568775aea3da3da14a521b455ea05cea4f653b8",
         "files": 4,
         "note": "PG_001_001_V01",
         "changed": [
@@ -3575,10 +3682,10 @@ are not approved:
         "label_code": "step.page.review",
         "label_params": { "n": 1 },
         "status": "done",
-        "started_at": "2026-11-27T01:23:24Z",
-        "ended_at": "2026-11-27T01:23:24Z",
+        "started_at": "2026-11-27T02:24:55Z",
+        "ended_at": "2026-11-27T02:24:55Z",
         "tool": "claude",
-        "commit": "d44e4b2a11d68142d9e9e132a2af7adc19233763",
+        "commit": "148fc19f47b3e88cb6ab4117459bf1272a10e5d6",
         "files": 2,
         "note": null,
         "changed": [
@@ -3592,10 +3699,10 @@ are not approved:
         "label_code": "step.page.prepare",
         "label_params": { "n": 2 },
         "status": "done",
-        "started_at": "2026-11-27T01:23:24Z",
-        "ended_at": "2026-11-27T01:23:25Z",
+        "started_at": "2026-11-27T02:24:55Z",
+        "ended_at": "2026-11-27T02:24:56Z",
         "tool": null,
-        "commit": "02ed5356b93dbd37ea2d1f2fe5f5220fe95ba7cf",
+        "commit": "272f015958a7cbf0fea9cbee14e9618f9f62a771",
         "files": 3,
         "note": "3 reference images",
         "note_code": "note.references",
@@ -3635,10 +3742,10 @@ are not approved:
     "error": null,
     "tools": { "draw": "codex", "look": "claude" },
     "commits": [
-      "529433667a9ca99335f200da56653a81478c8d74",
-      "0f106f6c661dda9ae34ca8410dee42340fa8d5a8",
-      "d44e4b2a11d68142d9e9e132a2af7adc19233763",
-      "02ed5356b93dbd37ea2d1f2fe5f5220fe95ba7cf",
+      "ca2d035607ecfbf0e413e8fb8593efd1088619ed",
+      "f568775aea3da3da14a521b455ea05cea4f653b8",
+      "148fc19f47b3e88cb6ab4117459bf1272a10e5d6",
+      "272f015958a7cbf0fea9cbee14e9618f9f62a771",
       "... 7 more"
     ],
     "position": null,
@@ -3686,7 +3793,7 @@ queued, running and waiting jobs). `running` is the job that runs now, or
 {
   "jobs": [
     {
-      "id": "job_2026112701232321312_2c9e",
+      "id": "job_2026112702245425812_3dca",
       "project": "the-night-ferry",
       "op": "pages.generate",
       "title": "Draw pages",
@@ -3694,9 +3801,9 @@ queued, running and waiting jobs). `running` is the job that runs now, or
       "title_params": {},
       "params": { "pages": ["PG_001_001", "... 2 more"], "approve_plans": false, "regenerate": false },
       "status": "done",
-      "created_at": "2026-11-27T01:23:23Z",
-      "started_at": "2026-11-27T01:23:23Z",
-      "ended_at": "2026-11-27T01:23:29Z",
+      "created_at": "2026-11-27T02:24:54Z",
+      "started_at": "2026-11-27T02:24:54Z",
+      "ended_at": "2026-11-27T02:24:59Z",
       "current_step": null,
       "steps": [
         {
@@ -3705,10 +3812,10 @@ queued, running and waiting jobs). `running` is the job that runs now, or
           "label_code": "step.page.prepare",
           "label_params": { "n": 1 },
           "status": "done",
-          "started_at": "2026-11-27T01:23:23Z",
-          "ended_at": "2026-11-27T01:23:23Z",
+          "started_at": "2026-11-27T02:24:54Z",
+          "ended_at": "2026-11-27T02:24:54Z",
           "tool": null,
-          "commit": "529433667a9ca99335f200da56653a81478c8d74",
+          "commit": "ca2d035607ecfbf0e413e8fb8593efd1088619ed",
           "files": 3,
           "note": "2 reference images",
           "note_code": "note.references",
@@ -3743,7 +3850,7 @@ queued, running and waiting jobs). `running` is the job that runs now, or
       },
       "error": null,
       "tools": { "draw": "codex", "look": "claude" },
-      "commits": ["529433667a9ca99335f200da56653a81478c8d74", "... 10 more"],
+      "commits": ["ca2d035607ecfbf0e413e8fb8593efd1088619ed", "... 10 more"],
       "position": null,
       "cost_usd": null,
       "read_only": false,
@@ -3771,14 +3878,14 @@ last `n`. Live lines arrive as `log` events.
 <!-- example:job-log -->
 ```json
 {
-  "job": "job_2026112701232321312_2c9e",
+  "job": "job_2026112702245425812_3dca",
   "lines": [
-    "2026-11-27T01:23:28Z PG_001_003:review Page 3: check",
-    "2026-11-27T01:23:28Z PG_001_003:review Claude Code started (sonnet)",
-    "2026-11-27T01:23:28Z PG_001_003:review reading commands for review",
-    "2026-11-27T01:23:28Z PG_001_003:review Claude Code finished in 1 s: The image matches the plan.",
-    "2026-11-27T01:23:28Z PG_001_003:review review of PG_001_003_V01: fixed, 1 open finding(s), 0 blocking",
-    "2026-11-27T01:23:29Z - Draw pages finished"
+    "2026-11-27T02:24:59Z PG_001_003:review Page 3: check",
+    "2026-11-27T02:24:59Z PG_001_003:review Claude Code started (sonnet)",
+    "2026-11-27T02:24:59Z PG_001_003:review reading commands for review",
+    "2026-11-27T02:24:59Z PG_001_003:review Claude Code finished in 1 s: The image matches the plan.",
+    "2026-11-27T02:24:59Z PG_001_003:review review of PG_001_003_V01: fixed, 1 open finding(s), 0 blocking",
+    "2026-11-27T02:24:59Z - Draw pages finished"
   ]
 }
 ```
@@ -3795,7 +3902,7 @@ after; files written before the cancel stay and are committed. 409
 ```json
 {
   "job": {
-    "id": "job_202611270123353381u_4fbf",
+    "id": "job_202611270225057811v_dba7",
     "project": "the-night-ferry",
     "op": "story.update",
     "title": "Update the story",
@@ -3803,9 +3910,9 @@ after; files written before the cancel stay and are committed. 409
     "title_params": {},
     "params": { "instruction": "SLOW change that will be cancelled.", "source_upload": null },
     "status": "cancelled",
-    "created_at": "2026-11-27T01:23:35Z",
-    "started_at": "2026-11-27T01:23:35Z",
-    "ended_at": "2026-11-27T01:23:35Z",
+    "created_at": "2026-11-27T02:25:05Z",
+    "started_at": "2026-11-27T02:25:05Z",
+    "ended_at": "2026-11-27T02:25:05Z",
     "current_step": null,
     "steps": [
       {
@@ -3814,8 +3921,8 @@ after; files written before the cancel stay and are committed. 409
         "label_code": "step.story.update.update",
         "label_params": {},
         "status": "cancelled",
-        "started_at": "2026-11-27T01:23:35Z",
-        "ended_at": "2026-11-27T01:23:35Z",
+        "started_at": "2026-11-27T02:25:05Z",
+        "ended_at": "2026-11-27T02:25:05Z",
         "tool": "claude",
         "commit": null,
         "files": 0,
@@ -3868,7 +3975,7 @@ A job waiting for a decision:
 ```json
 {
   "job": {
-    "id": "job_202611270123347671s_9012",
+    "id": "job_202611270225052341t_363b",
     "project": "the-night-ferry",
     "op": "story.update",
     "title": "Update the story",
@@ -3876,8 +3983,8 @@ A job waiting for a decision:
     "title_params": {},
     "params": { "instruction": "DECIDE whether the patrol knows the boy by name.", "source_upload": null },
     "status": "needs_decision",
-    "created_at": "2026-11-27T01:23:34Z",
-    "started_at": "2026-11-27T01:23:34Z",
+    "created_at": "2026-11-27T02:25:05Z",
+    "started_at": "2026-11-27T02:25:05Z",
     "ended_at": null,
     "current_step": null,
     "steps": [
@@ -3887,8 +3994,8 @@ A job waiting for a decision:
         "label_code": "step.story.update.update",
         "label_params": {},
         "status": "waiting",
-        "started_at": "2026-11-27T01:23:34Z",
-        "ended_at": "2026-11-27T01:23:34Z",
+        "started_at": "2026-11-27T02:25:05Z",
+        "ended_at": "2026-11-27T02:25:05Z",
         "tool": "claude",
         "commit": null,
         "files": 0,
@@ -3939,7 +4046,7 @@ The answer to `POST .../answer`:
 ```json
 {
   "job": {
-    "id": "job_202611270123347671s_9012",
+    "id": "job_202611270225052341t_363b",
     "project": "the-night-ferry",
     "op": "story.update",
     "title": "Update the story",
@@ -3947,8 +4054,8 @@ The answer to `POST .../answer`:
     "title_params": {},
     "params": { "instruction": "DECIDE whether the patrol knows the boy by name.", "source_upload": null },
     "status": "queued",
-    "created_at": "2026-11-27T01:23:34Z",
-    "started_at": "2026-11-27T01:23:34Z",
+    "created_at": "2026-11-27T02:25:05Z",
+    "started_at": "2026-11-27T02:25:05Z",
     "ended_at": null,
     "current_step": null,
     "steps": [
@@ -3958,8 +4065,8 @@ The answer to `POST .../answer`:
         "label_code": "step.story.update.update",
         "label_params": {},
         "status": "pending",
-        "started_at": "2026-11-27T01:23:34Z",
-        "ended_at": "2026-11-27T01:23:34Z",
+        "started_at": "2026-11-27T02:25:05Z",
+        "ended_at": "2026-11-27T02:25:05Z",
         "tool": "claude",
         "commit": null,
         "files": 0,
@@ -4026,7 +4133,7 @@ the time of the event. Codes and params come with it as in any response.
 
 <!-- example:event-hello -->
 ```json
-{ "project": "the-night-ferry", "at": "2026-11-27T01:23:13Z", "jobs": [] }
+{ "project": "the-night-ferry", "at": "2026-11-27T02:24:44Z", "jobs": [] }
 ```
 <!-- /example:event-hello -->
 
@@ -4034,7 +4141,7 @@ the time of the event. Codes and params come with it as in any response.
 ```json
 {
   "job": {
-    "id": "job_2026112701232321312_2c9e",
+    "id": "job_2026112702245425812_3dca",
     "project": "the-night-ferry",
     "op": "pages.generate",
     "title": "Draw pages",
@@ -4042,8 +4149,8 @@ the time of the event. Codes and params come with it as in any response.
     "title_params": {},
     "params": { "pages": ["PG_001_001", "PG_001_002", "PG_001_003"], "approve_plans": false, "regenerate": false },
     "status": "running",
-    "created_at": "2026-11-27T01:23:23Z",
-    "started_at": "2026-11-27T01:23:23Z",
+    "created_at": "2026-11-27T02:24:54Z",
+    "started_at": "2026-11-27T02:24:54Z",
     "ended_at": null,
     "current_step": "PG_001_001:prepare",
     "steps": [
@@ -4053,7 +4160,7 @@ the time of the event. Codes and params come with it as in any response.
         "label_code": "step.page.prepare",
         "label_params": { "n": 1 },
         "status": "running",
-        "started_at": "2026-11-27T01:23:23Z",
+        "started_at": "2026-11-27T02:24:54Z",
         "ended_at": null,
         "tool": null,
         "commit": null,
@@ -4111,9 +4218,9 @@ the time of the event. Codes and params come with it as in any response.
 <!-- example:event-log -->
 ```json
 {
-  "job": "job_202611270123160280e_62bf",
+  "job": "job_202611270224471210e_f0ca",
   "step": "bible",
-  "at": "2026-11-27T01:23:16Z",
+  "at": "2026-11-27T02:24:47Z",
   "line": "writing style/style-block.txt"
 }
 ```
@@ -4123,14 +4230,14 @@ the time of the event. Codes and params come with it as in any response.
 ```json
 {
   "entry": {
-    "id": "act_2026112701232425314_dc4f",
-    "at": "2026-11-27T01:23:24Z",
+    "id": "act_2026112702245523914_a386",
+    "at": "2026-11-27T02:24:55Z",
     "kind": "step",
     "title": "Draw pages: Page 1: draw",
     "title_code": "activity.step",
     "title_params": { "title": "Draw pages", "label": "Page 1: draw" },
     "actor": "codex",
-    "job": "job_2026112701232321312_2c9e",
+    "job": "job_2026112702245425812_3dca",
     "op": "pages.generate",
     "step": "PG_001_001:draw",
     "files": [
@@ -4139,7 +4246,7 @@ the time of the event. Codes and params come with it as in any response.
       "... 2 more"
     ],
     "images": ["issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V01.png"],
-    "commit": "0f106f6c661dda9ae34ca8410dee42340fa8d5a8"
+    "commit": "f568775aea3da3da14a521b455ea05cea4f653b8"
   }
 }
 ```
@@ -4153,8 +4260,8 @@ the time of the event. Codes and params come with it as in any response.
     "issues/ISS_001/pages/PG_001_001/prompts/codex-cli.yaml",
     "... 1 more"
   ],
-  "job": "job_2026112701232321312_2c9e",
-  "commit": "529433667a9ca99335f200da56653a81478c8d74"
+  "job": "job_2026112702245425812_3dca",
+  "commit": "ca2d035607ecfbf0e413e8fb8593efd1088619ed"
 }
 ```
 <!-- /example:event-files -->
@@ -4162,21 +4269,21 @@ the time of the event. Codes and params come with it as in any response.
 <!-- example:event-chat -->
 ```json
 {
-  "conversation": "conv_202611270123460352n_991e",
+  "conversation": "conv_202611270225162392o_1f36",
   "key": "page:PG_001_003",
   "message": {
-    "id": "msg_202611270123469202r_b018",
-    "at": "2026-11-27T01:23:46Z",
-    "conversation": "conv_202611270123460352n_991e",
+    "id": "msg_202611270225168112s_9e55",
+    "at": "2026-11-27T02:25:16Z",
+    "conversation": "conv_202611270225162392o_1f36",
     "role": "assistant",
     "text": "This is the fake assistant. You wrote: \"EDIT bring the last panel closer\". With a real tool installed, the answer comes from Claude Code or Codex. I a…",
-    "job": "job_202611270123460442p_3b12",
+    "job": "job_202611270225162472q_73b6",
     "tool": "claude",
-    "reply_to": "msg_202611270123460402o_a07c",
+    "reply_to": "msg_202611270225162432p_0277",
     "screen": { "key": "page:PG_001_003", "label": "Page 3", "route": "/p/the-night-ferry/pages/PG_001_003" },
     "key": "page:PG_001_003",
     "files": ["issues/ISS_001/pages/PG_001_003/page.yaml"],
-    "commit": "7a6e8fca53b87c06d8a0bfdfe9879672e3ff764b",
+    "commit": "052364e28c6b636e338a7c600a8e93a445d1710e",
     "decisions": [],
     "links": [],
     "proposal": null,
@@ -4192,7 +4299,7 @@ the time of the event. Codes and params come with it as in any response.
 
 <!-- example:event-heartbeat -->
 ```json
-{ "at": "2026-11-27T01:23:13.593Z" }
+{ "at": "2026-11-27T02:24:44.751Z" }
 ```
 <!-- /example:event-heartbeat -->
 
@@ -4327,16 +4434,16 @@ finished.
 ```json
 {
   "conversation": {
-    "id": "conv_202611270123460352n_991e",
-    "started_at": "2026-11-27T01:23:46Z",
+    "id": "conv_202611270225162392o_1f36",
+    "started_at": "2026-11-27T02:25:16Z",
     "current": true,
     "session": { "tool": "codex" },
     "folded": [],
     "messages": [
       {
-        "id": "msg_202611270123460402o_a07c",
-        "at": "2026-11-27T01:23:46Z",
-        "conversation": "conv_202611270123460352n_991e",
+        "id": "msg_202611270225162432p_0277",
+        "at": "2026-11-27T02:25:16Z",
+        "conversation": "conv_202611270225162392o_1f36",
         "role": "user",
         "text": "EDIT bring the last panel closer",
         "job": null,
@@ -4344,18 +4451,18 @@ finished.
         "key": "page:PG_001_003"
       },
       {
-        "id": "msg_202611270123469202r_b018",
-        "at": "2026-11-27T01:23:46Z",
-        "conversation": "conv_202611270123460352n_991e",
+        "id": "msg_202611270225168112s_9e55",
+        "at": "2026-11-27T02:25:16Z",
+        "conversation": "conv_202611270225162392o_1f36",
         "role": "assistant",
         "text": "This is the fake assistant. You wrote: \"EDIT bring the last panel closer\". With a real tool installed, the answer comes from Claude Code or Codex. I also added …",
-        "job": "job_202611270123460442p_3b12",
+        "job": "job_202611270225162472q_73b6",
         "tool": "claude",
-        "reply_to": "msg_202611270123460402o_a07c",
+        "reply_to": "msg_202611270225162432p_0277",
         "screen": { "key": "page:PG_001_003", "label": "Page 3", "route": "/p/the-night-ferry/pages/PG_001_003" },
         "key": "page:PG_001_003",
         "files": ["issues/ISS_001/pages/PG_001_003/page.yaml"],
-        "commit": "7a6e8fca53b87c06d8a0bfdfe9879672e3ff764b",
+        "commit": "052364e28c6b636e338a7c600a8e93a445d1710e",
         "decisions": [],
         "links": [],
         "proposal": null,
@@ -4366,14 +4473,14 @@ finished.
         "read_only": false
       },
       {
-        "id": "msg_202611270123470602w_1983",
-        "at": "2026-11-27T01:23:47Z",
-        "conversation": "conv_202611270123460352n_991e",
+        "id": "msg_202611270225169742x_d28c",
+        "at": "2026-11-27T02:25:16Z",
+        "conversation": "conv_202611270225162392o_1f36",
         "role": "assistant",
         "text": "This is the fake assistant. You wrote: \"LINK PROPOSE Where do I add the boy? He is twelve.\". With a real tool installed, the answer comes from Claude Code or Co…",
-        "job": "job_202611270123469322u_5081",
+        "job": "job_202611270225168502v_aa08",
         "tool": "claude",
-        "reply_to": "msg_202611270123469302t_e0cc",
+        "reply_to": "msg_202611270225168482u_704f",
         "screen": { "key": "style", "label": "Style", "route": "/p/the-night-ferry/style" },
         "key": "style",
         "files": [],
@@ -4389,7 +4496,7 @@ finished.
             "screen_label_params": {}
           }
         ],
-        "proposal": { "id": "prop_202611270123470562v_f8b7", "parts": 2 },
+        "proposal": { "id": "prop_202611270225169702w_ef54", "parts": 2 },
         "reverted": [],
         "story_proposal": null,
         "actions": [],
@@ -4397,14 +4504,14 @@ finished.
         "read_only": false
       },
       {
-        "id": "msg_2026112701234709030_da93",
-        "at": "2026-11-27T01:23:47Z",
-        "conversation": "conv_202611270123460352n_991e",
+        "id": "msg_2026112702251700331_7721",
+        "at": "2026-11-27T02:25:17Z",
+        "conversation": "conv_202611270225162392o_1f36",
         "role": "event",
         "text": "Codex answers from here on instead of Claude Code. It started a new session and was given a summary of the conversation so far.",
         "text_code": "conversation.tool_changed",
         "text_params": { "from": "Claude Code", "to": "Codex" },
-        "job": "job_202611270123470752z_aafe",
+        "job": "job_2026112702251698930_d282",
         "event": "tool_changed",
         "tool": "codex",
         "from_tool": "claude"
@@ -4414,11 +4521,11 @@ finished.
   },
   "conversations": [
     {
-      "id": "conv_202611270123460352n_991e",
-      "started_at": "2026-11-27T01:23:46Z",
+      "id": "conv_202611270225162392o_1f36",
+      "started_at": "2026-11-27T02:25:16Z",
       "current": true,
       "messages": 6,
-      "last_at": "2026-11-27T01:23:47Z",
+      "last_at": "2026-11-27T02:25:17Z",
       "folded": []
     }
   ]
@@ -4450,11 +4557,11 @@ an attachment that is not an upload of the project.
 <!-- example:conversation-post -->
 ```json
 {
-  "conversation": "conv_202611270123460352n_991e",
+  "conversation": "conv_202611270225162392o_1f36",
   "message": {
-    "id": "msg_202611270123460402o_a07c",
-    "at": "2026-11-27T01:23:46Z",
-    "conversation": "conv_202611270123460352n_991e",
+    "id": "msg_202611270225162432p_0277",
+    "at": "2026-11-27T02:25:16Z",
+    "conversation": "conv_202611270225162392o_1f36",
     "role": "user",
     "text": "EDIT bring the last panel closer",
     "job": null,
@@ -4462,7 +4569,7 @@ an attachment that is not an upload of the project.
     "key": "page:PG_001_003"
   },
   "job": {
-    "id": "job_202611270123460442p_3b12",
+    "id": "job_202611270225162472q_73b6",
     "project": "the-night-ferry",
     "op": "chat.turn",
     "title": "Chat",
@@ -4471,13 +4578,13 @@ an attachment that is not an upload of the project.
     "params": {
       "key": "page:PG_001_003",
       "screen": { "key": "page:PG_001_003", "label": "Page 3", "route": "/p/the-night-ferry/pages/PG_001_003" },
-      "conversation": "conv_202611270123460352n_991e",
+      "conversation": "conv_202611270225162392o_1f36",
       "text": "EDIT bring the last panel closer",
-      "message": "msg_202611270123460402o_a07c",
+      "message": "msg_202611270225162432p_0277",
       "attachments": []
     },
     "status": "queued",
-    "created_at": "2026-11-27T01:23:46Z",
+    "created_at": "2026-11-27T02:25:16Z",
     "started_at": null,
     "ended_at": null,
     "current_step": null,
@@ -4508,8 +4615,8 @@ ignored; send `{}`. Answers 201 with the new conversation and the list.
 ```json
 {
   "conversation": {
-    "id": "conv_2026112701234735638_f92f",
-    "started_at": "2026-11-27T01:23:47Z",
+    "id": "conv_2026112702251730539_8aa9",
+    "started_at": "2026-11-27T02:25:17Z",
     "current": true,
     "session": null,
     "folded": [],
@@ -4518,19 +4625,19 @@ ignored; send `{}`. Answers 201 with the new conversation and the list.
   },
   "conversations": [
     {
-      "id": "conv_2026112701234735638_f92f",
-      "started_at": "2026-11-27T01:23:47Z",
+      "id": "conv_2026112702251730539_8aa9",
+      "started_at": "2026-11-27T02:25:17Z",
       "current": true,
       "messages": 0,
       "last_at": null,
       "folded": []
     },
     {
-      "id": "conv_202611270123460352n_991e",
-      "started_at": "2026-11-27T01:23:46Z",
+      "id": "conv_202611270225162392o_1f36",
+      "started_at": "2026-11-27T02:25:16Z",
       "current": false,
       "messages": 8,
-      "last_at": "2026-11-27T01:23:47Z",
+      "last_at": "2026-11-27T02:25:17Z",
       "folded": []
     }
   ]
@@ -4549,19 +4656,19 @@ what the person and the tools said, not the events.
 {
   "conversations": [
     {
-      "id": "conv_2026112701234735638_f92f",
-      "started_at": "2026-11-27T01:23:47Z",
+      "id": "conv_2026112702251730539_8aa9",
+      "started_at": "2026-11-27T02:25:17Z",
       "current": true,
       "messages": 0,
       "last_at": null,
       "folded": []
     },
     {
-      "id": "conv_202611270123460352n_991e",
-      "started_at": "2026-11-27T01:23:46Z",
+      "id": "conv_202611270225162392o_1f36",
+      "started_at": "2026-11-27T02:25:16Z",
       "current": false,
       "messages": 8,
-      "last_at": "2026-11-27T01:23:47Z",
+      "last_at": "2026-11-27T02:25:17Z",
       "folded": []
     }
   ]
@@ -4578,16 +4685,16 @@ One conversation, current or earlier, with the fields of
 ```json
 {
   "conversation": {
-    "id": "conv_202611270123460352n_991e",
-    "started_at": "2026-11-27T01:23:46Z",
+    "id": "conv_202611270225162392o_1f36",
+    "started_at": "2026-11-27T02:25:16Z",
     "current": false,
     "session": { "tool": "claude" },
     "folded": [],
     "messages": [
       {
-        "id": "msg_202611270123460402o_a07c",
-        "at": "2026-11-27T01:23:46Z",
-        "conversation": "conv_202611270123460352n_991e",
+        "id": "msg_202611270225162432p_0277",
+        "at": "2026-11-27T02:25:16Z",
+        "conversation": "conv_202611270225162392o_1f36",
         "role": "user",
         "text": "EDIT bring the last panel closer",
         "job": null,
@@ -4595,18 +4702,18 @@ One conversation, current or earlier, with the fields of
         "key": "page:PG_001_003"
       },
       {
-        "id": "msg_202611270123469202r_b018",
-        "at": "2026-11-27T01:23:46Z",
-        "conversation": "conv_202611270123460352n_991e",
+        "id": "msg_202611270225168112s_9e55",
+        "at": "2026-11-27T02:25:16Z",
+        "conversation": "conv_202611270225162392o_1f36",
         "role": "assistant",
         "text": "This is the fake assistant. You wrote: \"EDIT bring the last panel closer\". With a real tool installed, the answer comes …",
-        "job": "job_202611270123460442p_3b12",
+        "job": "job_202611270225162472q_73b6",
         "tool": "claude",
-        "reply_to": "msg_202611270123460402o_a07c",
+        "reply_to": "msg_202611270225162432p_0277",
         "screen": { "key": "page:PG_001_003", "label": "Page 3", "route": "/p/the-night-ferry/pages/PG_001_003" },
         "key": "page:PG_001_003",
         "files": ["issues/ISS_001/pages/PG_001_003/page.yaml"],
-        "commit": "7a6e8fca53b87c06d8a0bfdfe9879672e3ff764b",
+        "commit": "052364e28c6b636e338a7c600a8e93a445d1710e",
         "decisions": [],
         "links": [],
         "proposal": null,
@@ -4677,6 +4784,7 @@ The actions:
 | `entities.derive` | op | Places and objects (plates draw). |
 | `pages.plan` | op | Plans pages from the person's words. |
 | `approve.plan` | direct, decision | Approves page plans: `{ pages, approved? }`. |
+| `page.lettering` | direct, decision | Changes the lettering of a page plan: `{ page, panels: [{ panel, lettering: [{ id?, type, speaker?, text }] }] }`, the whole new list of each panel it touches. Saved as `PUT .../pages/:page/plan`. The card carries a `preview` of the change. |
 | `pages.generate`, `page.review`, `page.correct`, `page.manual` | op | Drawing, checking, correcting (draws), a page made by hand. |
 | `approve.page` | direct, decision | `{ page, render?, overrule?, note? }` as `POST .../approve/page`. |
 | `cover.create`, `cover.correct` | op | The cover (draws). |
@@ -4702,6 +4810,8 @@ A card:
 | `title`, `summary` | What it will do, in the language of the request, with their codes. |
 | `details` | The parameters in plain form, `[{ name, value }]`, with upload names in place of ids and the names of characters, places and props in place of their IDs. The screens show a label per parameter and keep the raw names under a details toggle. |
 | `uploads` | The uploads the parameters name, with their URLs, for thumbnails. |
+| `preview` | For `page.lettering`: `{ page, changes, warnings, drawn }`, what the card will change before it runs. `changes` is one entry per element (`change`, `panel` number, `kind`, `speaker` name, `text`, `before`), `warnings` the budgets it passes, `drawn` whether the page already has a render. `null` for other actions. |
+| `choice`, `chosen` | For `page.correct` and `cover.correct` on an image at the touch-up warning: `{ touch_ups, warning, text, options: [{ mode, label }] }` with `touch_up` and `redraw`. Such a card has no Run: it runs with the option the person clicks, never on its own, even when the message asked for the correction. `chosen` is the mode that ran. |
 | `photo_rights` | `true` when a photo is used for a character: show the photo-rights notice of the Characters screen. |
 | `draws`, `decision`, `auto` | Whether it draws, whether it is the person's decision, and whether `chat_auto_run` may start it. |
 | `tools` | `[{ verb, tool, model, available }]`: which tool and model will do each part. |
@@ -4724,7 +4834,9 @@ which the reply proposes `job.answer`.
 ### `POST /api/projects/:id/conversation/:conversation/actions/:card/run`
 
 Runs a waiting card. An operation is queued as a job with
-`origin: { conversation, card, message }`; a decision is made now. Answers
+`origin: { conversation, card, message }`; a decision is made now. Body:
+`{}`, or `{ "choice": "touch_up" | "redraw" }` for a card with a `choice`
+(409 `choice_needed` without it). Answers
 `{ card, job }` with the card in its new state (`started`, `done` or
 `failed`) and the job, or `null`. When the action itself is refused (a
 review that is flagged, an approval of something that is not there), the
@@ -4752,8 +4864,8 @@ Deprecated. The screens that have messages in the current conversation:
 ```json
 {
   "chats": [
-    { "key": "cover:ISS_001", "messages": 2, "last_at": "2026-11-27T01:23:47Z" },
-    { "key": "page:PG_001_003", "messages": 2, "last_at": "2026-11-27T01:23:46Z" },
+    { "key": "cover:ISS_001", "messages": 2, "last_at": "2026-11-27T02:25:17Z" },
+    { "key": "page:PG_001_003", "messages": 2, "last_at": "2026-11-27T02:25:16Z" },
     "... 1 more"
   ]
 }
@@ -4776,12 +4888,12 @@ with the `files` the AI gets for that screen, the `conversation` id and
     "issues/ISS_001/pages/PG_001_003/reviews/PG_001_003_V01.review.yaml",
     "... 1 more"
   ],
-  "conversation": "conv_202611270123460352n_991e",
+  "conversation": "conv_202611270225162392o_1f36",
   "messages": [
     {
-      "id": "msg_202611270123460402o_a07c",
-      "at": "2026-11-27T01:23:46Z",
-      "conversation": "conv_202611270123460352n_991e",
+      "id": "msg_202611270225162432p_0277",
+      "at": "2026-11-27T02:25:16Z",
+      "conversation": "conv_202611270225162392o_1f36",
       "role": "user",
       "text": "EDIT bring the last panel closer",
       "job": null,
@@ -4789,18 +4901,18 @@ with the `files` the AI gets for that screen, the `conversation` id and
       "key": "page:PG_001_003"
     },
     {
-      "id": "msg_202611270123469202r_b018",
-      "at": "2026-11-27T01:23:46Z",
-      "conversation": "conv_202611270123460352n_991e",
+      "id": "msg_202611270225168112s_9e55",
+      "at": "2026-11-27T02:25:16Z",
+      "conversation": "conv_202611270225162392o_1f36",
       "role": "assistant",
       "text": "This is the fake assistant. You wrote: \"EDIT bring the last panel closer\". With a real tool installed, the answer comes from Claude Code or Codex. I a…",
-      "job": "job_202611270123460442p_3b12",
+      "job": "job_202611270225162472q_73b6",
       "tool": "claude",
-      "reply_to": "msg_202611270123460402o_a07c",
+      "reply_to": "msg_202611270225162432p_0277",
       "screen": { "key": "page:PG_001_003", "label": "Page 3", "route": "/p/the-night-ferry/pages/PG_001_003" },
       "key": "page:PG_001_003",
       "files": ["issues/ISS_001/pages/PG_001_003/page.yaml"],
-      "commit": "7a6e8fca53b87c06d8a0bfdfe9879672e3ff764b",
+      "commit": "052364e28c6b636e338a7c600a8e93a445d1710e",
       "decisions": [],
       "links": [],
       "proposal": null,
@@ -4826,9 +4938,9 @@ the stored message and the job.
 ```json
 {
   "message": {
-    "id": "msg_2026112701234722233_a2c4",
-    "at": "2026-11-27T01:23:47Z",
-    "conversation": "conv_202611270123460352n_991e",
+    "id": "msg_2026112702251716334_6074",
+    "at": "2026-11-27T02:25:17Z",
+    "conversation": "conv_202611270225162392o_1f36",
     "role": "user",
     "text": "Sent the old way.",
     "job": null,
@@ -4842,7 +4954,7 @@ the stored message and the job.
     "key": "style"
   },
   "job": {
-    "id": "job_2026112701234722334_570b",
+    "id": "job_2026112702251716535_1612",
     "project": "the-night-ferry",
     "op": "chat.turn",
     "title": "Chat",
@@ -4857,13 +4969,13 @@ the stored message and the job.
         "label_params": {},
         "route": "/p/the-night-ferry/style"
       },
-      "conversation": "conv_202611270123460352n_991e",
+      "conversation": "conv_202611270225162392o_1f36",
       "text": "Sent the old way.",
-      "message": "msg_2026112701234722233_a2c4",
+      "message": "msg_2026112702251716334_6074",
       "attachments": []
     },
     "status": "queued",
-    "created_at": "2026-11-27T01:23:47Z",
+    "created_at": "2026-11-27T02:25:17Z",
     "started_at": null,
     "ended_at": null,
     "current_step": null,
@@ -4959,7 +5071,7 @@ Every proposal, newest first, without its parts: `id`, `kind`, `status`,
 {
   "proposals": [
     {
-      "id": "prop_2026112701231406408_fee4",
+      "id": "prop_2026112702244522808_d41f",
       "kind": "suggest",
       "status": "open",
       "title": "Suggestion",
@@ -4967,14 +5079,14 @@ Every proposal, newest first, without its parts: `id`, `kind`, `status`,
       "title_params": {},
       "instruction": "Suggest an ending.",
       "summary": "This is the fake assistant. It proposes 3 kind(s) of story text for you to accept or reject.",
-      "created_at": "2026-11-27T01:23:14Z",
-      "updated_at": "2026-11-27T01:23:14Z",
-      "job": "job_2026112701231404207_e4bc",
+      "created_at": "2026-11-27T02:24:45Z",
+      "updated_at": "2026-11-27T02:24:45Z",
+      "job": "job_2026112702244519907_2931",
       "tool": "claude",
       "counts": { "parts": 3, "pending": 3, "accepted": 0, "edited": 0, "rejected": 0 }
     },
     {
-      "id": "prop_2026112701231402606_8d8d",
+      "id": "prop_2026112702244517406_9c19",
       "kind": "complete",
       "status": "discarded",
       "title": "What the story bible lacks",
@@ -4982,14 +5094,14 @@ Every proposal, newest first, without its parts: `id`, `kind`, `status`,
       "title_params": {},
       "instruction": null,
       "summary": "This is the fake assistant. It proposes 2 kind(s) of story text for you to accept or reject.",
-      "created_at": "2026-11-27T01:23:14Z",
-      "updated_at": "2026-11-27T01:23:14Z",
-      "job": "job_2026112701231400505_0317",
+      "created_at": "2026-11-27T02:24:45Z",
+      "updated_at": "2026-11-27T02:24:45Z",
+      "job": "job_2026112702244515705_7341",
       "tool": "claude",
       "counts": { "parts": 2, "pending": 2, "accepted": 0, "edited": 0, "rejected": 0 }
     },
     {
-      "id": "prop_2026112701231358003_f0ef",
+      "id": "prop_2026112702244474803_5573",
       "kind": "draft",
       "status": "open",
       "title": "Draft of the story bible",
@@ -4997,9 +5109,9 @@ Every proposal, newest first, without its parts: `id`, `kind`, `status`,
       "title_params": {},
       "instruction": null,
       "summary": "This is the fake assistant. It proposes 6 kind(s) of story text for you to accept or reject.",
-      "created_at": "2026-11-27T01:23:13Z",
-      "updated_at": "2026-11-27T01:23:14Z",
-      "job": "job_2026112701231355602_8af8",
+      "created_at": "2026-11-27T02:24:44Z",
+      "updated_at": "2026-11-27T02:24:45Z",
+      "job": "job_2026112702244471402_c727",
       "tool": "claude",
       "counts": { "parts": 9, "pending": 2, "accepted": 5, "edited": 1, "rejected": 1 }
     }
@@ -5016,16 +5128,16 @@ One proposal with its parts. 404 `proposal_not_found`.
 ```json
 {
   "proposal": {
-    "id": "prop_2026112701231358003_f0ef",
+    "id": "prop_2026112702244474803_5573",
     "kind": "draft",
     "title": "Draft of the story bible",
     "title_code": "proposal.title.draft",
     "title_params": {},
     "instruction": null,
     "status": "open",
-    "created_at": "2026-11-27T01:23:13Z",
-    "updated_at": "2026-11-27T01:23:13Z",
-    "job": "job_2026112701231355602_8af8",
+    "created_at": "2026-11-27T02:24:44Z",
+    "updated_at": "2026-11-27T02:24:44Z",
+    "job": "job_2026112702244471402_c727",
     "tool": "claude",
     "summary": "This is the fake assistant. It proposes 6 kind(s) of story text for you to accept or reject.",
     "decisions": [],
@@ -5117,16 +5229,16 @@ written, such as a request that only rejects). Refusals: 400 `bad_params`
 ```json
 {
   "proposal": {
-    "id": "prop_2026112701231358003_f0ef",
+    "id": "prop_2026112702244474803_5573",
     "kind": "draft",
     "title": "Draft of the story bible",
     "title_code": "proposal.title.draft",
     "title_params": {},
     "instruction": null,
     "status": "open",
-    "created_at": "2026-11-27T01:23:13Z",
-    "updated_at": "2026-11-27T01:23:14Z",
-    "job": "job_2026112701231355602_8af8",
+    "created_at": "2026-11-27T02:24:44Z",
+    "updated_at": "2026-11-27T02:24:45Z",
+    "job": "job_2026112702244471402_c727",
     "tool": "claude",
     "summary": "This is the fake assistant. It proposes 6 kind(s) of story text for you to accept or reject.",
     "decisions": [],
@@ -5138,7 +5250,7 @@ written, such as a request that only rejects). Refusals: 400 `bad_params`
         "type": "premise",
         "text": "A ferry pilot finds a stowaway the harbour patrol is hunting.",
         "status": "accepted",
-        "decided_at": "2026-11-27T01:23:13Z",
+        "decided_at": "2026-11-27T02:24:44Z",
         "final_text": "A ferry pilot finds a stowaway the harbour patrol is hunting.",
         "written": {}
       },
@@ -5147,20 +5259,20 @@ written, such as a request that only rejects). Refusals: 400 `bad_params`
         "type": "tone",
         "text": "Plain and direct.",
         "status": "edited",
-        "decided_at": "2026-11-27T01:23:13Z",
+        "decided_at": "2026-11-27T02:24:44Z",
         "final_text": "Quiet and tense, with dry humour.",
         "written": {}
       },
       "... 7 more"
     ],
-    "commits": ["a2ce71df00ec16beb4957ebbf27d143a46b54beb"],
+    "commits": ["a541bd578044087eda759b583988fd3302dbf682"],
     "counts": { "parts": 9, "pending": 2, "accepted": 5, "edited": 1, "rejected": 1 }
   },
   "accepted": 6,
   "rejected": 1,
   "comments_kept": true,
   "findings": [],
-  "commit": "a2ce71df00ec16beb4957ebbf27d143a46b54beb"
+  "commit": "a541bd578044087eda759b583988fd3302dbf682"
 }
 ```
 <!-- /example:proposal-decide -->
@@ -5176,16 +5288,16 @@ discarded.
 ```json
 {
   "proposal": {
-    "id": "prop_2026112701231402606_8d8d",
+    "id": "prop_2026112702244517406_9c19",
     "kind": "complete",
     "title": "What the story bible lacks",
     "title_code": "proposal.title.complete",
     "title_params": {},
     "instruction": null,
     "status": "discarded",
-    "created_at": "2026-11-27T01:23:14Z",
-    "updated_at": "2026-11-27T01:23:14Z",
-    "job": "job_2026112701231400505_0317",
+    "created_at": "2026-11-27T02:24:45Z",
+    "updated_at": "2026-11-27T02:24:45Z",
+    "job": "job_2026112702244515705_7341",
     "tool": "claude",
     "summary": "This is the fake assistant. It proposes 2 kind(s) of story text for you to accept or reject.",
     "decisions": [],
@@ -5204,7 +5316,7 @@ discarded.
       "... 1 more"
     ],
     "commits": [],
-    "discarded_at": "2026-11-27T01:23:14Z",
+    "discarded_at": "2026-11-27T02:24:45Z",
     "counts": { "parts": 2, "pending": 2, "accepted": 0, "edited": 0, "rejected": 0 }
   }
 }
@@ -5253,24 +5365,24 @@ for the next page.
 {
   "entries": [
     {
-      "id": "act_202611270123469152q_7689",
-      "at": "2026-11-27T01:23:46Z",
+      "id": "act_202611270225168072r_c217",
+      "at": "2026-11-27T02:25:16Z",
       "kind": "step",
       "title": "Chat: Answer the message",
       "title_code": "activity.step",
       "title_params": { "title": "Chat", "label": "Answer the message" },
       "actor": "claude",
-      "job": "job_202611270123460442p_3b12",
+      "job": "job_202611270225162472q_73b6",
       "op": "chat.turn",
       "step": "reply",
       "files": [{ "path": "issues/ISS_001/pages/PG_001_003/page.yaml", "change": "modified" }],
       "images": [],
-      "commit": "7a6e8fca53b87c06d8a0bfdfe9879672e3ff764b",
+      "commit": "052364e28c6b636e338a7c600a8e93a445d1710e",
       "restorable": true
     },
     {
-      "id": "act_202611270123460282m_2d11",
-      "at": "2026-11-27T01:23:46Z",
+      "id": "act_202611270225162332n_6796",
+      "at": "2026-11-27T02:25:16Z",
       "kind": "entity",
       "title": "Merged CHAR_TEODORO_TWIN into CHAR_TEODORO",
       "title_code": "activity.entity_merged",
@@ -5285,12 +5397,12 @@ for the next page.
         "... 1 more"
       ],
       "images": [],
-      "commit": "6123a934e59e43857bf90a2b6c87e1bc5af5b520",
+      "commit": "e071a1238f85cef1c722e701f5aa3e75a0a4860b",
       "restorable": true
     },
     "... 1 more"
   ],
-  "total": 67,
+  "total": 68,
   "more": true,
   "restore": { "available": true, "reason": null }
 }
@@ -5313,14 +5425,14 @@ that changed no files, 404 for an unknown entry or commit.
 <!-- example:restore -->
 ```json
 {
-  "commit": "a9540908f55d0d07a7c84856c76c4ff6e36cc62c",
-  "restored": "60dcc09f5991784c58d5ad5e481cd2d5436b5d58",
+  "commit": "f8eb776f1d0ac2c22dd00180c2b6665967980977",
+  "restored": "c7d85e7fdb1dd4d75190b69822afac228ad49cf2",
   "unchanged": false,
   "saved_first": null,
   "files": 17,
   "activity": {
-    "id": "act_2026112701234844139_6fe7",
-    "at": "2026-11-27T01:23:48Z",
+    "id": "act_202611270225183453a_5296",
+    "at": "2026-11-27T02:25:18Z",
     "kind": "restore",
     "title": "Went back to an earlier point: Approved the cover of ISS_001",
     "title_code": "activity.restore",
@@ -5335,8 +5447,8 @@ that changed no files, 404 for an unknown entry or commit.
       "... 15 more"
     ],
     "images": [],
-    "commit": "a9540908f55d0d07a7c84856c76c4ff6e36cc62c",
-    "restored_from": "60dcc09f5991784c58d5ad5e481cd2d5436b5d58"
+    "commit": "f8eb776f1d0ac2c22dd00180c2b6665967980977",
+    "restored_from": "c7d85e7fdb1dd4d75190b69822afac228ad49cf2"
   }
 }
 ```
@@ -5375,8 +5487,8 @@ A saved text file:
 <!-- example:diff -->
 ```json
 {
-  "from": "bfa5518019ed574a02639b38772c0c2af7fcb186",
-  "to": "8023e368fd3fffc14995650f85361771966de447",
+  "from": "fa010783c19fa85e2cf5fe6921202b4d9d0a4a27",
+  "to": "61179aa1504f673a8f19a70e6de360372beece0c",
   "files": [
     {
       "path": "story/series-plan.yaml",
@@ -5392,8 +5504,8 @@ A saved text file:
         "bytes": 369,
         "truncated": false
       },
-      "before_url": "/api/projects/the-night-ferry/at/bfa5518019ed574a02639b38772c0c2af7fcb186/raw/story/series-plan.yaml",
-      "after_url": "/api/projects/the-night-ferry/at/8023e368fd3fffc14995650f85361771966de447/raw/story/series-plan.yaml"
+      "before_url": "/api/projects/the-night-ferry/at/fa010783c19fa85e2cf5fe6921202b4d9d0a4a27/raw/story/series-plan.yaml",
+      "after_url": "/api/projects/the-night-ferry/at/61179aa1504f673a8f19a70e6de360372beece0c/raw/story/series-plan.yaml"
     }
   ],
   "total": 1,
@@ -5407,8 +5519,8 @@ A step that drew a page:
 <!-- example:diff-image -->
 ```json
 {
-  "from": "81bad15776acbe46ea85b57007335543db54dedd",
-  "to": "e10fc02c0cc443fdc28c9569c6c665b2bc157121",
+  "from": "dd1b23d1a3108c28c9a4f80f523917299f1d06b4",
+  "to": "853c7d80999d7cd2f07c7b7233e607f8c0916a79",
   "files": [
     {
       "path": "generations/PG_001_003/GEN_PG_001_003_01.request.json",
@@ -5417,11 +5529,11 @@ A step that drew a page:
       "before": null,
       "after": {
         "text": "{\n  \"provider\": \"codex-cli\",\n  \"kind\": \"image\",\n  \"model\": \"codex-cli\",\n  \"endpoint\": null…",
-        "bytes": 7345,
+        "bytes": 7383,
         "truncated": false
       },
       "before_url": null,
-      "after_url": "/api/projects/the-night-ferry/at/e10fc02c0cc443fdc28c9569c6c665b2bc157121/raw/generations/…"
+      "after_url": "/api/projects/the-night-ferry/at/853c7d80999d7cd2f07c7b7233e607f8c0916a79/raw/generations/…"
     },
     {
       "path": "generations/PG_001_003/GEN_PG_001_003_01.yaml",
@@ -5430,11 +5542,11 @@ A step that drew a page:
       "before": null,
       "after": {
         "text": "id: GEN_PG_001_003_01\npage: PG_001_003\nasset: null\nprovider: codex-cli\nmodel: unreported\nk…",
-        "bytes": 794,
+        "bytes": 913,
         "truncated": false
       },
       "before_url": null,
-      "after_url": "/api/projects/the-night-ferry/at/e10fc02c0cc443fdc28c9569c6c665b2bc157121/raw/generations/…"
+      "after_url": "/api/projects/the-night-ferry/at/853c7d80999d7cd2f07c7b7233e607f8c0916a79/raw/generations/…"
     },
     {
       "path": "issues/ISS_001/pages/PG_001_003/page.yaml",
@@ -5450,8 +5562,8 @@ A step that drew a page:
         "bytes": 3713,
         "truncated": false
       },
-      "before_url": "/api/projects/the-night-ferry/at/81bad15776acbe46ea85b57007335543db54dedd/raw/issues/ISS_0…",
-      "after_url": "/api/projects/the-night-ferry/at/e10fc02c0cc443fdc28c9569c6c665b2bc157121/raw/issues/ISS_0…"
+      "before_url": "/api/projects/the-night-ferry/at/dd1b23d1a3108c28c9a4f80f523917299f1d06b4/raw/issues/ISS_0…",
+      "after_url": "/api/projects/the-night-ferry/at/853c7d80999d7cd2f07c7b7233e607f8c0916a79/raw/issues/ISS_0…"
     },
     {
       "path": "issues/ISS_001/pages/PG_001_003/renders/PG_001_003_V01.png",
@@ -5460,7 +5572,7 @@ A step that drew a page:
       "before": null,
       "after": null,
       "before_url": null,
-      "after_url": "/api/projects/the-night-ferry/at/e10fc02c0cc443fdc28c9569c6c665b2bc157121/raw/issues/ISS_0…"
+      "after_url": "/api/projects/the-night-ferry/at/853c7d80999d7cd2f07c7b7233e607f8c0916a79/raw/issues/ISS_0…"
     }
   ],
   "total": 4,
@@ -5529,14 +5641,14 @@ also freezes the style block (`style_frozen: true` in the answer).
   "warnings": [],
   "image": {
     "path": "references/style/LOOK_NOIR_INK_MASTER_V01.png",
-    "url": "/api/projects/the-night-ferry/raw/references/style/LOOK_NOIR_INK_MASTER_V01.png?v=665mwyas01z",
+    "url": "/api/projects/the-night-ferry/raw/references/style/LOOK_NOIR_INK_MASTER_V01.png?v=665mwycz44v",
     "width": 600,
     "height": 900,
     "bytes": 7997,
-    "mtime": "2026-11-27T01:23:17.447Z"
+    "mtime": "2026-11-27T02:24:48.559Z"
   },
   "style_frozen": true,
-  "commit": "ac0b127052344d11247cc662dc2f286616169afe"
+  "commit": "c2301a94c045945a8e9a30ca67dd70c6c4814711"
 }
 ```
 <!-- /example:approve-asset -->
@@ -5576,7 +5688,7 @@ findings become `accepted`, and their ids come back in `accepted_notes`.
   "overruled": false,
   "accepted_notes": [],
   "status": "approved",
-  "commit": "d7f115edf89d8f290d36ae1514c20779c1184b78"
+  "commit": "027e6f7a328dc2d405f9cbded8b7e94e161d0799"
 }
 ```
 <!-- /example:approve-page -->
@@ -5641,7 +5753,7 @@ is read the same way.
   "overruled": true,
   "accepted_notes": [],
   "status": "approved",
-  "commit": "07e2d7656395ad71d154b2cf16079f809dac97a5"
+  "commit": "a5d56e0e2b15bfd857f32b6cae13c293f6778044"
 }
 ```
 <!-- /example:approve-page-overrule -->
@@ -5714,11 +5826,11 @@ The review of that render afterwards, and the summary of the page in
   "renders": 3,
   "image": {
     "path": "issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V03.png",
-    "url": "/api/projects/overlay-letters/raw/issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V03.png?v=7gcmwyasvou",
+    "url": "/api/projects/overlay-letters/raw/issues/ISS_001/pages/PG_001_002/renders/PG_001_002_V03.png?v=7gcmwyczyme",
     "width": 600,
     "height": 900,
     "bytes": 9660,
-    "mtime": "2026-11-27T01:23:58.446Z"
+    "mtime": "2026-11-27T02:25:28.070Z"
   },
   "verdict": "fixed",
   "outcome": "pass",
@@ -5756,7 +5868,7 @@ edition.
   "overruled": false,
   "accepted_notes": [],
   "status": "approved",
-  "commit": "60dcc09f5991784c58d5ad5e481cd2d5436b5d58"
+  "commit": "c7d85e7fdb1dd4d75190b69822afac228ad49cf2"
 }
 ```
 <!-- /example:approve-cover -->
@@ -5806,11 +5918,11 @@ notes, and `undo`: `history`, or `none` for an upload. `label`,
       "label": "Mara",
       "image": {
         "path": "characters/CHAR_MARA/refs/CHAR_MARA_EXPR_V02.png",
-        "url": "/api/projects/the-night-ferry/raw/characters/CHAR_MARA/refs/CHAR_MARA_EXPR_V02.png?v=8bpmwyasjm6",
+        "url": "/api/projects/the-night-ferry/raw/characters/CHAR_MARA/refs/CHAR_MARA_EXPR_V02.png?v=8bpmwyczmzi",
         "width": 900,
         "height": 900,
         "bytes": 10789,
-        "mtime": "2026-11-27T01:23:42.798Z"
+        "mtime": "2026-11-27T02:25:12.990Z"
       },
       "status": "candidate",
       "entity": "CHAR_MARA",
@@ -5835,11 +5947,11 @@ notes, and `undo`: `history`, or `none` for an upload. `label`,
       "label": "Mara",
       "image": {
         "path": "characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V01.png",
-        "url": "/api/projects/the-night-ferry/raw/characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V01.png?v=8bpmwyas1s8",
+        "url": "/api/projects/the-night-ferry/raw/characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V01.png?v=8bpmwycz5w5",
         "width": 900,
         "height": 900,
         "bytes": 10789,
-        "mtime": "2026-11-27T01:23:19.688Z"
+        "mtime": "2026-11-27T02:24:50.837Z"
       },
       "status": "approved",
       "entity": "CHAR_MARA",
@@ -5881,7 +5993,7 @@ can_undo }`.
     "generations/CHAR_MARA/GEN_CHAR_MARA_03.yaml"
   ],
   "check": { "ok": true, "new_errors": [], "errors": 0 },
-  "commit": "7d57eafd64dc85a84bf701b6b1893b015a2eb167",
+  "commit": "ab40bb614aa84f5f7b1b80cd20787398b9509a0f",
   "can_undo": true
 }
 ```
@@ -5956,11 +6068,11 @@ draft editions a later edition replaced. Deleting them is one
       "label": "Mara",
       "image": {
         "path": "characters/CHAR_MARA/refs/CHAR_MARA_EXPR_V01.png",
-        "url": "/api/projects/the-night-ferry/raw/characters/CHAR_MARA/refs/CHAR_MARA_EXPR_V01.png?v=8bpmwyas38d",
+        "url": "/api/projects/the-night-ferry/raw/characters/CHAR_MARA/refs/CHAR_MARA_EXPR_V01.png?v=8bpmwycz7ah",
         "width": 900,
         "height": 900,
         "bytes": 10789,
-        "mtime": "2026-11-27T01:23:21.565Z"
+        "mtime": "2026-11-27T02:24:52.649Z"
       },
       "status": "candidate",
       "entity": "CHAR_MARA",
@@ -6008,7 +6120,7 @@ Refused with 409 `merge_refused` when pages were drawn from a sheet of
   "files": ["characters/CHAR_TEODORO/character.yaml"],
   "removed": ["characters/CHAR_TEODORO_TWIN"],
   "check": { "ok": true, "new_errors": [], "errors": 0 },
-  "commit": "6123a934e59e43857bf90a2b6c87e1bc5af5b520"
+  "commit": "e071a1238f85cef1c722e701f5aa3e75a0a4860b"
 }
 ```
 <!-- /example:entities-merge -->
@@ -6031,7 +6143,7 @@ instead), 404 `id_not_found` when `from` is used nowhere, 409
   "files": ["characters/CHAR_TEO/character.yaml", "characters/CHAR_TEO/wardrobe.yaml"],
   "moved": [["characters/CHAR_TEO", "characters/CHAR_TEODORO"]],
   "check": { "ok": true, "new_errors": [], "errors": 0 },
-  "commit": "41315b5f43e0710335f98caa520cd76f57a6cbc4"
+  "commit": "a8bbe62d7d3de910116d06ddea5fcb1a92a2354a"
 }
 ```
 <!-- /example:entities-rename -->
@@ -6101,14 +6213,14 @@ and lists it in every draft edition that ships that render. Answers 201.
   "path": "issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V01.lettered.png",
   "image": {
     "path": "issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V01.lettered.png",
-    "url": "/api/projects/overlay-letters/raw/issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V01.lettered.png?v=39hmwyasxl2",
+    "url": "/api/projects/overlay-letters/raw/issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V01.lettered.png?v=39hmwyd00eu",
     "width": 400,
     "height": 600,
     "bytes": 4229,
-    "mtime": "2026-11-27T01:24:00.902Z"
+    "mtime": "2026-11-27T02:25:30.390Z"
   },
   "editions": [],
-  "commit": "ab4eb2346e0863732a0d9ffa83748bafc8632240"
+  "commit": "847ca663eaa7203d7f6c67d1c04317791636e97c"
 }
 ```
 <!-- /example:lettered-post -->
@@ -6157,7 +6269,7 @@ Steps: `source`, `story` (plan, read-only: the draft), `check`. Result:
     "decisions": [],
     "files": [],
     "tool": "claude",
-    "proposal": "prop_202611270124018754a_625d",
+    "proposal": "prop_202611270225313374b_07f9",
     "parts": 7,
     "problems": []
   }
@@ -6191,7 +6303,7 @@ many parts are questions), `summary`, `decisions`, `tool`.
   "params": { "source": null },
   "steps": [{ "id": "propose", "label": "Read your text and draft a proposal", "status": "done" }],
   "result": {
-    "proposal": "prop_2026112701231358003_f0ef",
+    "proposal": "prop_2026112702244474803_5573",
     "parts": 9,
     "questions": 1,
     "summary": "This is the fake assistant. It proposes 6 kind(s) of story text for you to accept or reject.",
@@ -6216,7 +6328,7 @@ Result as in `story.draft`.
   "params": {},
   "steps": [{ "id": "propose", "label": "Propose what the story bible lacks", "status": "done" }],
   "result": {
-    "proposal": "prop_2026112701231402606_8d8d",
+    "proposal": "prop_2026112702244517406_9c19",
     "parts": 2,
     "questions": 1,
     "summary": "This is the fake assistant. It proposes 2 kind(s) of story text for you to accept or reject.",
@@ -6246,7 +6358,7 @@ Step: `propose` (plan). Result as in `story.draft`.
   "params": { "instruction": "Suggest an ending." },
   "steps": [{ "id": "propose", "label": "Write a proposal for your request", "status": "done" }],
   "result": {
-    "proposal": "prop_2026112701231406408_fee4",
+    "proposal": "prop_2026112702244522808_d41f",
     "parts": 3,
     "questions": 1,
     "summary": "This is the fake assistant. It proposes 3 kind(s) of story text for you to accept or reject.",
@@ -6319,7 +6431,7 @@ At least one of `preset`, `description`, `uploads`. Steps: `prepare`, `bible`
   "params": {
     "preset": "noir-ink",
     "description": "Heavy ink and wet streets.",
-    "uploads": ["up_202611270123145100a_4808"],
+    "uploads": ["up_202611270224456550a_aec9"],
     "attach_references": true
   },
   "steps": [
@@ -6389,7 +6501,7 @@ approved, or with no drawing tool, the two sheet steps are skipped and
   "params": {
     "name": "Mara",
     "description": "Ferry pilot in her fifties, grey cropped hair.",
-    "uploads": ["up_202611270123183070l_de5a"],
+    "uploads": ["up_202611270224494530l_c37f"],
     "draw": true,
     "character": "CHAR_MARA"
   },
@@ -6820,16 +6932,26 @@ version is made and reviewed.
 | `panel` | string | Panel id the request is about. |
 | `region` | object | `{ x, y, w, h }` as fractions of the page from its top-left corner, each between 0 and 1. |
 | `lettering` | boolean | `true` when the request changes text in the image. |
+| `mode` | string | `touch_up` or `redraw`: the person's choice once the image has reached the touch-up warning. |
 
-A change request counts toward the page's repair cycles, and the project's
-limit (`repair_policy.max_cycles`) is never raised or bypassed. So the job
-takes one of two paths, and says which in `result.path` and in its steps:
+Every edit of an image counts toward its `repair_cycle`, and each one
+regenerates the whole image, so it wears a little more each round. Below the
+project's touch-up warning (`repair_policy.touch_up_warning`, default 2) a
+request is a touch-up. Once the render's `repair_cycle` has reached it, the
+person chooses: without `mode` the request is refused with 409
+`touch_up_choice`, whose `details` carry `render`, `touch_ups`, `warning`
+and `modes`, so the screen can say what more edits may cost and offer both.
+A touch-up the person chose may go past `repair_policy.max_cycles`: that
+limit stops only the automatic repairs, and the automatic repairs after the
+touch-up still keep it, so no loop runs on its own. `project.yaml` is not
+changed. The job takes one of two paths, and says which in `result.path`
+and in its steps:
 
 - `edit` (`path_label_code`: `path.edit`). Steps: `request`,
   `compile`, `draw` (draw), `review` (look). The existing image is edited
   into the next version, with everything the request does not name locked.
-- `redraw` (`path_label_code`: `path.redraw`). The render's
-  lineage has used its repair cycles. Steps: `request`, `plan` (plan),
+- `redraw` (`path_label_code`: `path.redraw`). The person chose a redraw
+  (`mode: "redraw"`). Steps: `request`, `plan` (plan),
   `compile`, `draw` (draw), `review` (look). The change is written into
   `page.yaml`, a fresh prompt is compiled, and the page is drawn again. The
   new render starts a new lineage (`repair_cycle` 0, `supersedes` null) and
@@ -6884,7 +7006,7 @@ page (`render`, `verdict`, `outcome`, `passes`, `flagged`, `repairs`, `open_find
 ```
 <!-- /example:op.page.correct -->
 
-The same operation once the limit is reached:
+The same operation when the person chose a redraw (`mode: "redraw"`):
 
 <!-- example:op.page.correct.redraw -->
 ```json
@@ -6896,15 +7018,12 @@ The same operation once the limit is reached:
     "panel": null,
     "region": null,
     "lettering": false,
+    "mode": "redraw",
     "path": "redraw"
   },
   "steps": [
     { "id": "request", "label": "Record your request", "status": "done" },
-    {
-      "id": "plan",
-      "label": "Repair limit reached: put the change into the plan of the page",
-      "status": "done"
-    },
+    { "id": "plan", "label": "Redraw chosen: put the change into the plan of the page", "status": "done" },
     { "id": "compile", "label": "Prepare a new drawing", "status": "done" },
     { "id": "draw", "label": "Draw the page again from the changed plan", "status": "done" },
     { "id": "review", "label": "Check the new page", "status": "done" }
@@ -6982,11 +7101,11 @@ file.
           "path": "references/style/LOOK_SOFT_PENCIL_WARM_MASTER_V01.png",
           "image": {
             "path": "references/style/LOOK_SOFT_PENCIL_WARM_MASTER_V01.png",
-            "url": "/api/projects/by-hand/raw/references/style/LOOK_SOFT_PENCIL_WARM_MASTER_V01.png?v=34omwyaszlh",
+            "url": "/api/projects/by-hand/raw/references/style/LOOK_SOFT_PENCIL_WARM_MASTER_V01.png?v=34omwyd0291",
             "width": 400,
             "height": 600,
             "bytes": 4056,
-            "mtime": "2026-11-27T01:24:03.509Z"
+            "mtime": "2026-11-27T02:25:32.773Z"
           }
         },
         {
@@ -6996,11 +7115,11 @@ file.
           "path": "characters/CHAR_NELL/refs/CHAR_NELL_TURN_MASTER_V01.png",
           "image": {
             "path": "characters/CHAR_NELL/refs/CHAR_NELL_TURN_MASTER_V01.png",
-            "url": "/api/projects/by-hand/raw/characters/CHAR_NELL/refs/CHAR_NELL_TURN_MASTER_V01.png?v=2dtmwyat0x4",
+            "url": "/api/projects/by-hand/raw/characters/CHAR_NELL/refs/CHAR_NELL_TURN_MASTER_V01.png?v=2dtmwyd03jb",
             "width": 400,
             "height": 400,
             "bytes": 3089,
-            "mtime": "2026-11-27T01:24:05.224Z"
+            "mtime": "2026-11-27T02:25:34.439Z"
           }
         }
       ],
@@ -7031,7 +7150,7 @@ when no tool is installed to check it.
     "sheet": null,
     "outfit": null,
     "repair": false,
-    "upload": "up_202611270124074634v_ac96"
+    "upload": "up_202611270225366374w_cbdc"
   },
   "steps": [
     { "id": "prepare", "label": "Prepare page 1", "status": "done" },
@@ -7191,6 +7310,7 @@ Steps on the `edit` path: `request`, `compile`, `draw` (draw), `review`
 | `render` | string | Default: the newest cover render. |
 | `region` | object | `{ x, y, w, h }` as fractions of the image. |
 | `lettering` | boolean | `true` when the request changes text in the image. |
+| `mode` | string | `touch_up` or `redraw`, as for `page.correct`: required once the cover has reached the touch-up warning. |
 
 <!-- example:op.cover.correct -->
 ```json
@@ -7356,28 +7476,28 @@ message, its cards, and the cards it ran.
   "params": {
     "key": "page:PG_001_003",
     "screen": { "key": "page:PG_001_003", "label": "Page 3", "route": "/p/the-night-ferry/pages/PG_001_003" },
-    "conversation": "conv_202611270123460352n_991e",
+    "conversation": "conv_202611270225162392o_1f36",
     "text": "EDIT bring the last panel closer",
-    "message": "msg_202611270123460402o_a07c",
+    "message": "msg_202611270225162432p_0277",
     "attachments": []
   },
   "steps": [{ "id": "reply", "label": "Answer the message", "status": "done" }],
   "result": {
-    "conversation": "conv_202611270123460352n_991e",
+    "conversation": "conv_202611270225162392o_1f36",
     "key": "page:PG_001_003",
     "message": {
-      "id": "msg_202611270123469202r_b018",
-      "at": "2026-11-27T01:23:46Z",
-      "conversation": "conv_202611270123460352n_991e",
+      "id": "msg_202611270225168112s_9e55",
+      "at": "2026-11-27T02:25:16Z",
+      "conversation": "conv_202611270225162392o_1f36",
       "role": "assistant",
       "text": "This is the fake assistant. You wrote: \"EDIT bring the last panel closer\". With a real tool installed, the answer comes from Claude Code or Codex. I a…",
-      "job": "job_202611270123460442p_3b12",
+      "job": "job_202611270225162472q_73b6",
       "tool": "claude",
-      "reply_to": "msg_202611270123460402o_a07c",
+      "reply_to": "msg_202611270225162432p_0277",
       "screen": { "key": "page:PG_001_003", "label": "Page 3", "route": "/p/the-night-ferry/pages/PG_001_003" },
       "key": "page:PG_001_003",
       "files": ["issues/ISS_001/pages/PG_001_003/page.yaml"],
-      "commit": "7a6e8fca53b87c06d8a0bfdfe9879672e3ff764b",
+      "commit": "052364e28c6b636e338a7c600a8e93a445d1710e",
       "decisions": [],
       "links": [],
       "proposal": null,

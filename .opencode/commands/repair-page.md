@@ -51,12 +51,15 @@ references, where the cause usually is.
 
 ## Process
 
-1. Read `reviews/<RENDER_ID>.review.yaml` and `repair_policy.max_cycles`
-   in `project.yaml` (default 2). If the review's `repair_cycle` has
-   already reached the limit, stop. Request no further generation for the
-   page, record the upstream issue and the decision needed, and return to
-   `/page-plan`, `/panel-ledger`, `/character-bible`, or
-   `/visual-development`.
+1. Read `reviews/<RENDER_ID>.review.yaml` and `repair_policy` in
+   `project.yaml` (`max_cycles` and `touch_up_warning`, 2 by default). If
+   the review's `repair_cycle` has already reached `max_cycles`, stop.
+   Request no further generation for the page, record the upstream issue
+   and the decision needed, and return to `/page-plan`, `/panel-ledger`,
+   `/character-bible`, or `/visual-development`. When the repair is a
+   person's change request and `repair_cycle` has reached
+   `touch_up_warning`, warn them that more edits may degrade the image and
+   offer a redraw from the plan. Go on only if they choose the touch-up.
 2. Mark the failed version superseded and keep it. Its file stays in
    `renders/`, its review keeps the verdict `flagged`, and its generation
    record takes `status: rejected`. Nothing is deleted or written over,
@@ -153,9 +156,13 @@ references, where the cause usually is.
 - Cost warning: every repair request is a generation. Dry run is the
   default and each repair run needs its own confirmation.
 - `validate-workspace.js` rejects a review whose `repair_cycle` exceeds
-  `repair_policy.max_cycles`, a `fixed` finding without recheck evidence,
+  `repair_policy.max_cycles` (unless the render it edited carries the
+  person's change request), a `fixed` finding without recheck evidence,
   and a `fixed` verdict with an open blocking finding or an open change
-  request. Changing `max_cycles` is a project decision for the user.
+  request. Changing either limit is a project decision for the user.
+- `compile-prompts.js --repair` on the command line stops at `max_cycles`
+  for every request. A person's touch-up past it runs from the web studio,
+  which passes their choice for that one edit.
 - Change requests are recorded by `addUserRequest()` in
   `scripts/lib/review-requests.js`. Nobody writes them by hand. A request on a
   render with no review opens one whose checks and gates are

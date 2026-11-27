@@ -5,25 +5,33 @@
  *
  * Two paths, and the job says which one it took:
  *
- * - "edit": the request is recorded as a finding on the review of the
- *   render (source: user_request), a repair package is compiled, and the
- *   existing image is edited into a sibling version. The request counts
- *   toward repair_cycle like any repair.
- * - "redraw": the lineage has reached project.repair_policy.max_cycles, and
- *   compile-prompts.js refuses another repair. By the scaffold's
- *   repair-limits rule the fix then goes into the plan: the request is
- *   applied to page.yaml (or cover.yaml) by the planning driver, a fresh
- *   generate package is compiled, and a new render starts a new lineage at
- *   repair_cycle 0. The review checks the requested change in it.
+ * - "edit" (a touch-up): the request is recorded as a finding on the review
+ *   of the render (source: user_request), a repair package is compiled, and
+ *   the existing image is edited into a sibling version. Every edit counts
+ *   toward repair_cycle.
+ * - "redraw": the request is applied to page.yaml (or cover.yaml) by the
+ *   planning driver, a fresh generate package is compiled, and a new render
+ *   starts a new lineage at repair_cycle 0. The review checks the requested
+ *   change in it.
  *
- * The limit is never raised and never bypassed.
+ * Who picks the path (rules/common/repair-limits.md): below the project's
+ * touch-up warning (project.repair_policy.touch_up_warning, default 2) a
+ * correction is a touch-up. At or past it the person chooses between
+ * "touch up anyway" (mode touch_up) and "redraw the whole page with the
+ * change" (mode redraw); without a choice the request is refused with the
+ * warning, never decided for them. A touch-up the person chose may go past
+ * project.repair_policy.max_cycles, which only stops the automatic repairs:
+ * the automatic repairs that follow it keep that limit, so no loop runs on
+ * its own.
  */
 
 const S = require('../scaffold');
 const pipeline = require('../pipeline');
+const projectOptions = require('../project-options');
 const { msg } = require('../i18n');
 const { runAi } = require('../ai');
 const { OpError } = require('../jobs');
+const { HttpError } = require('../util');
 const { renderReviewRepair, requireDrawTool } = require('./shared');
 
 /** What the result says about the path taken, for the person. */
@@ -32,17 +40,59 @@ const PATH_LABELS = {
   redraw: msg('path.redraw'),
 };
 
-/** The scaffold's own repair limit (project.repair_policy.max_cycles, default 2). */
+/** The choices a person has once an image reached the warning. */
+const MODES = ['touch_up', 'redraw'];
+
+/** The scaffold's limit on automatic repairs (project.repair_policy.max_cycles, default 2). */
 function scaffoldLimit(root) {
   const doc = S.ws.loadProject(root) || {};
   return doc.repair_policy && Number.isInteger(doc.repair_policy.max_cycles) ? doc.repair_policy.max_cycles : 2;
 }
 
-/** Which path a correction of this render takes right now. */
-function pathFor(root, render) {
+/** Edits of one image after which a touch-up comes with the warning (default 2). */
+function touchUpWarning(root) {
+  return projectOptions.touchUpWarning(S.ws.loadProject(root) || {});
+}
+
+/** How many times this image has been edited: the repair_cycle of its review. */
+function touchUps(root, render) {
   const review = S.ws.loadReview(root, render);
-  const cycle = review && Number.isInteger(review.repair_cycle) ? review.repair_cycle : 0;
-  return cycle >= scaffoldLimit(root) ? 'redraw' : 'edit';
+  return review && Number.isInteger(review.repair_cycle) ? review.repair_cycle : 0;
+}
+
+/**
+ * Which path a correction of this render takes: "edit", "redraw", or null
+ * when the image is at the warning and the person has not chosen.
+ */
+function pathFor(root, render, mode) {
+  if (mode === 'redraw') return 'redraw';
+  if (mode === 'touch_up') return 'edit';
+  return touchUps(root, render) >= touchUpWarning(root) ? null : 'edit';
+}
+
+/** The mode param: undefined, or one of MODES. */
+function checkMode(params) {
+  if (params.mode === undefined || params.mode === null || params.mode === '') return undefined;
+  if (!MODES.includes(params.mode)) {
+    throw new HttpError(400, 'bad_params', `"mode" must be ${MODES.join(' or ')}.`);
+  }
+  return params.mode;
+}
+
+/**
+ * The path of a correction being validated, or the 409 that asks the person
+ * to choose (its details carry the count and the warning, for the form and
+ * the chat card).
+ */
+function choosePath(root, render, mode, kind) {
+  const path = pathFor(root, render, mode);
+  if (path) return path;
+  const n = touchUps(root, render);
+  const warning = touchUpWarning(root);
+  throw new HttpError(409, 'touch_up_choice',
+    `${render} has had ${n} touch-up(s), the warning set for this project (repair_policy.touch_up_warning ${warning}). ` +
+    'More edits may degrade the image. Send mode "touch_up" to edit it anyway, or mode "redraw" to draw it again with the change in its plan.',
+    { render, touch_ups: n, warning, kind, modes: MODES }, { n, warning });
 }
 
 /** Step list for a correction, known when the job is created. */
@@ -76,9 +126,11 @@ async function run(ctx, spec) {
   const root = project.root;
   const target = requireDrawTool(ctx);
   const isCover = spec.owner.kind === 'cover';
-  const compileRepair = (review) => (isCover
-    ? pipeline.compileCover(root, spec.owner.issue, target.provider, { repair: review, model: target.model || undefined })
-    : pipeline.compilePage(root, spec.owner.id, target.provider, { repairReview: review, model: target.model || undefined }));
+  // The automatic repairs after the touch-up keep the scaffold's limit; only
+  // the person's own touch-up is compiled past it (touchUp).
+  const compileRepair = (review, options = {}) => (isCover
+    ? pipeline.compileCover(root, spec.owner.issue, target.provider, { repair: review, model: target.model || undefined, touchUp: options.touchUp })
+    : pipeline.compilePage(root, spec.owner.id, target.provider, { repairReview: review, model: target.model || undefined, touchUp: options.touchUp }));
 
   const request = await ctx.step('request', () => {
     let result;
@@ -97,25 +149,17 @@ async function run(ctx, spec) {
     return { finding: result.finding.id, review: S.ws.rel(root, result.reviewFile) };
   });
 
-  let path = pathFor(root, spec.render);
+  // The path was settled when the job was created (the person's choice at the warning).
+  const path = spec.path === 'redraw' ? 'redraw' : 'edit';
   let compiled = null;
   if (path === 'edit') {
-    try {
-      compiled = await ctx.step('compile', (h) => {
-        const result = compileRepair(S.ws.loadReview(root, spec.render));
-        for (const warning of result.warnings || []) h.log(`warning: ${warning}`);
-        return { file: result.file, package: result.rel };
-      });
-    } catch (err) {
-      if (err.code !== 'repair_limit') throw err;
-      // The scaffold refused: the lineage is at its limit after all.
-      path = 'redraw';
-      const compileStep = ctx.job.steps.find((s) => s.id === 'compile');
-      if (compileStep) {
-        compileStep.status = 'pending';
-        compileStep.note = null;
-      }
-    }
+    const n = touchUps(root, spec.render);
+    if (n >= touchUpWarning(root)) ctx.log(`${spec.render} has had ${n} touch-up(s), at or past the warning: the person chose to touch it up anyway`);
+    compiled = await ctx.step('compile', (h) => {
+      const result = compileRepair(S.ws.loadReview(root, spec.render), { touchUp: true });
+      for (const warning of result.warnings || []) h.log(`warning: ${warning}`);
+      return { file: result.file, package: result.rel };
+    });
   }
 
   if (path === 'edit') {
@@ -133,7 +177,7 @@ async function run(ctx, spec) {
 
   // Redraw: the change goes into the plan, then a fresh render starts a new lineage.
   ctx.addStep({ id: 'plan', label: msg(`step.correct.plan.${isCover ? 'cover' : 'page'}`) }, { after: 'request' });
-  ctx.log(`${spec.render} has used its ${scaffoldLimit(root)} repair cycle(s): the change goes into the plan and it is drawn again`);
+  ctx.log(`the person chose a redraw of ${spec.render}: the change goes into the plan and it is drawn again`);
   const old = S.ws.loadReview(root, spec.render);
   const open = (old && Array.isArray(old.findings) ? old.findings : [])
     .filter((f) => f && f.status === 'open' && f.source !== 'user_request');
@@ -145,7 +189,7 @@ async function run(ctx, spec) {
         vars: {
           issue: spec.owner.issue,
           update: true,
-          description: `${spec.text}\n\nThe cover has used its repair cycles and is drawn again from this file: write the change into the concept, the composition or the cast so that a fresh drawing shows it.`,
+          description: `${spec.text}\n\nThe person chose to have the cover drawn again from this file rather than edit the image once more: write the change into the concept, the composition or the cast so that a fresh drawing shows it.`,
           provider: target.provider,
         },
         fakeText: spec.text,
@@ -194,4 +238,4 @@ async function run(ctx, spec) {
   return Object.assign({ from: spec.render, finding: request.finding, path, path_label: PATH_LABELS[path] }, outcome);
 }
 
-module.exports = { run, steps, pathFor, scaffoldLimit, PATH_LABELS };
+module.exports = { run, steps, pathFor, choosePath, checkMode, scaffoldLimit, touchUpWarning, touchUps, PATH_LABELS, MODES };

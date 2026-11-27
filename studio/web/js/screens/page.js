@@ -2,11 +2,12 @@
 // mechanical checks; its drawing and earlier versions. The ledger, the
 // references and the prompt sit behind "advanced".
 
-import { h, nextId, mount } from '/js/dom.js';
+import { h, icon, nextId, mount } from '/js/dom.js';
 import { t, tn, tv } from '/js/i18n.js';
 import { api, errorText } from '/js/api.js';
 import { screenHead, bench } from '/js/components/bench.js';
-import { panel, actionButton, button, notice, tabs, facts, copyButton, caption } from '/js/components/ui.js';
+import { panel, actionButton, button, iconButton, notice, tabs, facts, copyButton, caption } from '/js/components/ui.js';
+import { queueOp } from '/js/components/ask.js';
 import { docEditor, findingsList } from '/js/components/editor.js';
 import { autoGrow } from '/js/components/schema-form.js';
 import { jobsFor } from '/js/components/jobs.js';
@@ -46,24 +47,48 @@ function planEditor(ctx, data) {
     return notice('warn', t('page.plan_unreadable'));
   }
   const edits = JSON.parse(JSON.stringify(source));
-  const status = h('div');
-  let dirty = false;
+  const lettering = data.lettering || {};
+  const limits = lettering.limits || { words_per_balloon: 25, words_per_panel: 50, per_panel: 4 };
+  const status = h('div', { class: 'stack-s' });
+  // What the last save said (findings, a drawn page that needs drawing again) survives the refresh it causes.
+  const lastSave = ctx.ui.planSaved && ctx.ui.planSaved.page === data.id ? ctx.ui.planSaved : null;
+  if (lastSave) status.replaceChildren(saveReport(ctx, data, lastSave.res));
+  let confirmed = false;
   const saveBtn = actionButton(t('page.save_plan'), async () => {
+    const empty = edits.panels.flatMap((p) => p.lettering || []).find((l) => !String(l.text || '').trim());
+    if (empty) {
+      toast(t('letter.empty_text'), { kind: 'warn' });
+      const field = root.querySelector('textarea.letter-text-empty');
+      if (field) field.focus();
+      return;
+    }
+    const over = overLimits(edits, plan, limits);
+    if (over.length && !confirmed) {
+      status.replaceChildren(notice('warn',
+        h('p', null, h('strong', null, t('letter.over_title'))),
+        h('ul', { class: 'bullets' }, over.map((w) => h('li', null, overText(w)))),
+        h('p', { class: 'small' }, t('letter.over_hint')),
+        h('div', { class: 'row' },
+          button(t('letter.save_anyway'), { kind: 'primary', small: true, onclick: () => { confirmed = true; saveBtn.click(); } }),
+          button(t('letter.keep_editing'), { kind: 'quiet', small: true, onclick: () => status.replaceChildren() }))));
+      return;
+    }
+    confirmed = false;
     try {
-      const res = await api.saveFile(ctx.projectId, { path: doc.path, data: edits, base_etag: doc.etag });
+      const res = await api.savePlan(ctx.projectId, data.id, { data: edits, base_etag: doc.etag });
       setDirty(false);
       toast(res.saved ? t('page.plan_saved') : t('editor.unchanged'), { kind: 'ok' });
-      const list = findingsList(res.findings);
-      status.replaceChildren(...[list, res.continuity && res.continuity.length ? mechanicalBox({ continuity: res.continuity }) : null].filter(Boolean));
+      ctx.ui.planSaved = { page: data.id, res: { findings: res.findings, continuity: res.continuity, lettering: res.lettering, redraw: res.redraw } };
+      status.replaceChildren(saveReport(ctx, data, ctx.ui.planSaved.res));
       ctx.refresh();
     } catch (err) {
       status.replaceChildren(notice('bad', errorText(err)));
     }
   }, { kind: 'primary', icon: 'check' });
   const setDirty = (value) => {
-    dirty = value;
     ctx.setDirty('plan', value);
     saveBtn.disabled = !value;
+    if (value) confirmed = false;
   };
   const area = (labelText, value, onInput, rows = 2) => {
     const id = nextId('pl');
@@ -76,6 +101,9 @@ function planEditor(ctx, data) {
     });
     return h('div', { class: 'field' }, h('label', { for: id }, labelText), el);
   };
+  // Every character of the page with a name, for a voice from off panel.
+  const pageCast = new Map();
+  for (const p of plan.panels) for (const c of p.cast) if (!pageCast.has(c.character)) pageCast.set(c.character, c);
   const byId = new Map(edits.panels.map((p) => [p.id, p]));
   const panels = plan.panels.map((p) => {
     const target = byId.get(p.id);
@@ -85,24 +113,225 @@ function planEditor(ctx, data) {
         h('span', { class: 'faint small' }, ` ${t('page.panel_meta', { size: tv('value', p.size, p.size), shot: tv('shot', p.shot, String(p.shot || '').replace(/_/g, ' ')) })}`,
           p.slot ? ` · ${slotWords(p.slot)}` : '')),
       area(t('page.moment'), target.moment, (v) => { target.moment = v; }),
-      (target.cast || []).map((c, i) => {
-        const shown = p.cast[i] || {};
+      (target.cast || []).map((c) => {
+        const shown = p.cast.find((s) => s.character === c.character) || {};
         return area(t('page.does', { name: shown.name || c.character }), c.action, (v) => { c.action = v; }, 1);
       }),
-      (target.lettering || []).map((l, i) => {
-        const shown = p.lettering[i] || {};
-        const who = shown.speaker_name || tv('lettering_type', l.type, l.type);
-        return area(l.type === 'balloon' ? t('page.says', { name: who }) : who, l.text, (v) => { l.text = v; }, 1);
-      }),
+      letteringBlock(target, p, { limits, pageCast, kinds: lettering.kinds, spoken: lettering.spoken, onChange: () => setDirty(true) }),
       p.cast.length ? h('p', { class: 'small faint' }, p.cast.map((c) => `${c.name}: ${c.where || ''}`).join(' · ')) : null);
   });
   setDirty(false);
-  return h('div', { class: 'stack-s plan-editor' },
+  const root = h('div', { class: 'stack-s plan-editor' },
     area(t('page.purpose'), edits.purpose, (v) => { edits.purpose = v; }),
     h('p', { class: 'small muted' }, t('page.layout', { grid: plan.grid || '' })),
     h('ol', { class: 'plan-panels' }, panels),
     status,
     h('div', { class: 'row' }, saveBtn, h('span', { class: 'small muted' }, t('page.save_plan_hint'))));
+  return root;
+}
+
+const KINDS = ['balloon', 'thought', 'shout', 'whisper', 'radio', 'caption', 'narration', 'sfx', 'sign'];
+const SPOKEN = ['balloon', 'thought', 'whisper', 'shout', 'radio'];
+
+/** Words as the lettering rules count them: punctuation alone is no word. */
+function words(text) {
+  return String(text || '').split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+}
+
+/** Where a panel goes over the budgets of the lettering rules. */
+function overLimits(edits, plan, limits) {
+  const out = [];
+  const numberOf = new Map(plan.panels.map((p) => [p.id, p.number]));
+  for (const panel of edits.panels) {
+    const list = panel.lettering || [];
+    const n = numberOf.get(panel.id) || panel.order;
+    let total = 0;
+    list.forEach((l, i) => {
+      const w = words(l.text);
+      total += w;
+      if (l.type !== 'sfx' && w > limits.words_per_balloon) out.push({ code: 'balloon_words', number: n, index: i + 1, words: w, limit: limits.words_per_balloon });
+    });
+    if (total > limits.words_per_panel) out.push({ code: 'panel_words', number: n, words: total, limit: limits.words_per_panel });
+    const counted = list.filter((l) => l.type !== 'sfx').length;
+    if (counted > limits.per_panel) out.push({ code: 'panel_count', number: n, count: counted, limit: limits.per_panel });
+  }
+  return out;
+}
+
+function overText(w) {
+  if (w.code === 'balloon_words') return t('letter.over_balloon', { panel: w.number, n: w.index, words: w.words, limit: w.limit });
+  if (w.code === 'panel_words') return t('letter.over_panel_words', { panel: w.number, words: w.words, limit: w.limit });
+  return t('letter.over_panel_count', { panel: w.number, count: w.count, limit: w.limit });
+}
+
+/** Where the tail of an element points, said in words (the rule derives it; nothing is stored). */
+function tailText(el, shownCast, pageCast) {
+  if (!SPOKEN.includes(el.type)) return t('letter.tail_none');
+  if (!el.speaker) return t('letter.tail_pick');
+  const inPanel = shownCast.find((c) => c.character === el.speaker);
+  const who = (inPanel || pageCast.get(el.speaker) || {}).name || el.speaker;
+  if (inPanel && !inPanel.off_panel) return el.type === 'thought' ? t('letter.tail_thought', { name: who }) : t('letter.tail_mouth', { name: who });
+  const side = (inPanel || pageCast.get(el.speaker) || {}).side;
+  return side && side !== 'center' ? t(`letter.tail_edge_${side}`, { name: who }) : t('letter.tail_edge', { name: who });
+}
+
+/**
+ * The lettering of one panel: each element with its kind, its speaker, its
+ * words and where its tail points; add, remove and reorder; the budgets of
+ * the lettering rules counted while typing.
+ */
+function letteringBlock(target, shown, { limits, pageCast, onChange }) {
+  if (!Array.isArray(target.lettering)) target.lettering = [];
+  const box = h('div', { class: 'letter-block' });
+  const meter = h('p', { class: 'small letter-meter', 'aria-live': 'polite' });
+  const drawn = shown.cast.filter((c) => !c.off_panel);
+  const updateMeter = () => {
+    const list = target.lettering;
+    const counted = list.filter((l) => l.type !== 'sfx').length;
+    const total = list.reduce((n, l) => n + words(l.text), 0);
+    const over = counted > limits.per_panel || total > limits.words_per_panel;
+    meter.classList.toggle('over', over);
+    meter.textContent = t('letter.meter', { count: counted, max: limits.per_panel, words: total, limit: limits.words_per_panel });
+  };
+  const paint = (focusIndex) => {
+    const items = target.lettering.map((el, i) => elementRow(el, i));
+    box.replaceChildren(
+      h('div', { class: 'row spread' }, h('h5', { class: 'letter-title' }, t('letter.title')), meter),
+      items.length ? h('ol', { class: 'letter-list' }, items) : h('p', { class: 'small faint' }, t('letter.none')),
+      h('div', { class: 'row' },
+        button(t('letter.add'), { kind: 'quiet', small: true, icon: 'plus', onclick: () => {
+          const first = drawn[0] || shown.cast[0];
+          target.lettering.push({ type: first ? 'balloon' : 'caption', speaker: first ? first.character : null, text: '' });
+          onChange();
+          paint(target.lettering.length - 1);
+        } })));
+    updateMeter();
+    if (focusIndex !== undefined) {
+      const field = box.querySelectorAll('textarea')[focusIndex];
+      if (field) field.focus();
+    }
+  };
+  const move = (i, by) => {
+    const j = i + by;
+    if (j < 0 || j >= target.lettering.length) return;
+    const [el] = target.lettering.splice(i, 1);
+    target.lettering.splice(j, 0, el);
+    onChange();
+    paint();
+    // Keep the focus on the moved element: the same arrow when it can go on, else the other one.
+    const btns = [...box.querySelectorAll(`.letter-item:nth-child(${j + 1}) .letter-tools button`)];
+    const next = [btns[by < 0 ? 0 : 1], btns[by < 0 ? 1 : 0], btns[2]].find((b) => b && !b.disabled);
+    if (next) next.focus();
+  };
+  function elementRow(el, i) {
+    const kindId = nextId('lk');
+    const whoId = nextId('lw');
+    const textId = nextId('lt');
+    const glyph = h('span', { class: 'letter-glyph', 'aria-hidden': 'true' }, icon(KINDS.includes(el.type) ? el.type : 'balloon'));
+    const kind = h('select', { id: kindId },
+      KINDS.map((k) => h('option', { value: k, selected: k === el.type }, t(`letter_kind.${k}`))));
+    // The speaker: the characters drawn in the panel, then a voice from off panel.
+    const options = [];
+    for (const c of shown.cast) options.push({ value: c.character, label: c.off_panel ? t('letter.off_panel_name', { name: c.name }) : c.name });
+    for (const [id, c] of pageCast) if (!shown.cast.some((x) => x.character === id)) options.push({ value: id, label: t('letter.off_panel_name', { name: c.name }) });
+    if (el.speaker && !options.some((o) => o.value === el.speaker)) options.push({ value: el.speaker, label: el.speaker });
+    const who = h('select', { id: whoId },
+      h('option', { value: '', selected: !el.speaker }, t('letter.pick_speaker')),
+      options.map((o) => h('option', { value: o.value, selected: o.value === el.speaker }, o.label)));
+    const whoField = h('div', { class: 'field letter-who' }, h('label', { for: whoId }, t('letter.speaker')), who);
+    const text = h('textarea', { id: textId, rows: 1, class: el.text ? '' : 'letter-text-empty' });
+    text.value = el.text || '';
+    autoGrow(text);
+    const count = h('span', { class: 'small letter-count' });
+    const tail = h('p', { class: 'small faint letter-tail' });
+    const refresh = () => {
+      const spoken = SPOKEN.includes(el.type);
+      whoField.hidden = !spoken;
+      glyph.replaceChildren(icon(el.type));
+      const w = words(el.text);
+      count.textContent = el.type === 'sfx' ? tn('letter.words_sfx', w) : t('letter.words', { words: w, limit: limits.words_per_balloon });
+      count.classList.toggle('over', el.type !== 'sfx' && w > limits.words_per_balloon);
+      text.classList.toggle('letter-text-empty', !String(el.text || '').trim());
+      tail.textContent = tailText(el, shown.cast, pageCast);
+      updateMeter();
+    };
+    kind.addEventListener('change', () => {
+      el.type = kind.value;
+      if (!SPOKEN.includes(el.type)) el.speaker = null;
+      else if (!el.speaker && options.length) {
+        el.speaker = (drawn[0] || {}).character || options[0].value;
+        who.value = el.speaker;
+      }
+      onChange();
+      refresh();
+    });
+    who.addEventListener('change', () => {
+      el.speaker = who.value || null;
+      onChange();
+      refresh();
+    });
+    text.addEventListener('input', () => {
+      el.text = text.value;
+      onChange();
+      refresh();
+    });
+    const item = h('li', { class: 'letter-item' },
+      h('div', { class: 'letter-head' },
+        glyph,
+        h('div', { class: 'field letter-kind' }, h('label', { for: kindId }, t('letter.kind')), kind),
+        whoField,
+        h('div', { class: 'letter-tools' },
+          iconButton('up', t('letter.move_up'), { onclick: () => move(i, -1), disabled: i === 0 }),
+          iconButton('down', t('letter.move_down'), { onclick: () => move(i, 1), disabled: i === target.lettering.length - 1 }),
+          iconButton('trash', t('letter.remove'), { onclick: () => { target.lettering.splice(i, 1); onChange(); paint(); } }))),
+      h('div', { class: 'field' }, h('label', { for: textId }, t('letter.words_label')), text),
+      h('div', { class: 'row spread' }, tail, count));
+    refresh();
+    return item;
+  }
+  paint();
+  return box;
+}
+
+/** What the last save of the plan said: its checks, voices added off panel, and what a drawn page needs now. */
+function saveReport(ctx, data, res) {
+  const out = [];
+  const list = findingsList(res.findings);
+  if (list) out.push(list);
+  if (res.continuity && res.continuity.length) out.push(mechanicalBox({ continuity: res.continuity }));
+  const numberOf = new Map((data.plan.panels || []).map((p) => [p.id, p.number]));
+  const names = new Map();
+  for (const p of data.plan.panels || []) for (const c of p.cast) names.set(c.character, c.name);
+  const lettering = res.lettering || {};
+  for (const a of lettering.added_cast || []) {
+    out.push(notice('info', t('letter.added_off_panel', { name: names.get(a.character) || a.character, panel: numberOf.get(a.panel) || '' })));
+  }
+  if (lettering.warnings && lettering.warnings.length) {
+    out.push(notice('warn', h('p', null, t('letter.saved_over')),
+      h('ul', { class: 'bullets' }, lettering.warnings.map((w) => h('li', null, overText({
+        code: w.code, number: w.number, words: w.words, count: w.count, limit: w.limit,
+        index: (data.plan.panels.find((p) => p.id === w.panel) || { lettering: [] }).lettering.findIndex((l) => l.id === w.element) + 1,
+      }))))));
+  }
+  if (res.redraw) {
+    const reletter = res.redraw.mode === 'reletter';
+    out.push(notice('warn',
+      h('p', null, reletter ? t('letter.needs_reletter', { version: versionName(res.redraw.render) }) : t('letter.needs_redraw', { version: versionName(res.redraw.render) })),
+      h('div', { class: 'row' },
+        reletter
+          ? actionButton(t('letter.reletter_now'), async () => {
+            await queueOp('lettering.apply', { issue: data.issue, pages: [data.id] });
+            ctx.ui.planSaved = null;
+          }, { kind: 'primary', small: true })
+          : actionButton(t('letter.redraw_now'), async () => {
+            const current = (data.renders || []).find((r) => r.current);
+            const passes = !!(current && current.review && current.review.passes);
+            const job = await drawPages(ctx, [data.id], { unapproved: [data.id], passing: passes ? [data.id] : [] });
+            if (job) ctx.ui.planSaved = null;
+          }, { kind: 'primary', small: true }),
+        button(t('letter.later'), { kind: 'quiet', small: true, onclick: () => { ctx.ui.planSaved = null; ctx.refresh(); } }))));
+  }
+  return out.length ? h('div', { class: 'stack-s' }, out) : h('div');
 }
 
 function ledger(data) {

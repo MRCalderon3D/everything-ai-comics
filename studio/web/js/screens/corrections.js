@@ -7,9 +7,8 @@ import { api } from '/js/api.js';
 import { state } from '/js/store.js';
 import { screenHead, bench } from '/js/components/bench.js';
 import { panel, emptyState, notice } from '/js/components/ui.js';
-import { queueOp } from '/js/components/ask.js';
 import { jobsFor } from '/js/components/jobs.js';
-import { correction, lastCorrection } from '/js/components/correction.js';
+import { correction, lastCorrection, queueCorrection } from '/js/components/correction.js';
 import { approveRender, verdictChip } from '/js/components/verdict.js';
 import { pageName, versionName } from '/js/labels.js';
 import { pageStrip } from '/js/screens/check.js';
@@ -64,8 +63,8 @@ export function view(ctx, { issue, page }) {
     key: page.id,
     render: current,
     panels: page.plan.panels.map((p) => ({ id: p.id, number: p.number, moment: p.moment, slot: p.slot || null })),
-    repairLimit: page.repair_limit,
-    send: (params) => queueOp('page.correct', Object.assign({ page: page.id }, params)),
+    touchUpWarning: page.touch_up_warning,
+    send: (params) => queueCorrection('page.correct', Object.assign({ page: page.id }, params)),
   });
   const asked = requests(renders);
   const last = lastCorrection(ctx, {

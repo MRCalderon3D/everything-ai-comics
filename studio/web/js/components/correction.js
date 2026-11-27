@@ -5,7 +5,8 @@
 import { h, nextId } from '/js/dom.js';
 import { t, tn } from '/js/i18n.js';
 import { findJob, ENDED } from '/js/store.js';
-import { textField, checkField, actionButton, button, notice } from '/js/components/ui.js';
+import { textField, checkField, radioField, actionButton, button, notice } from '/js/components/ui.js';
+import { confirmDialog } from '/js/components/dialog.js';
 import { regionPicker } from '/js/components/region.js';
 import { compare } from '/js/components/viewer.js';
 import { verdictChip } from '/js/components/verdict.js';
@@ -54,14 +55,51 @@ export function tierSchematic(panels, selected, onPick) {
   return { el: h('div', { class: 'schematic-box' }, grid, label), select };
 }
 
+/** The warning at the touch-up limit, in the words of rules/common/repair-limits.md. */
+function warningText(n, cover) {
+  return tn(cover ? 'correct.at_warning_cover' : 'correct.at_warning', Number(n) || 0);
+}
+
 /**
- * correction(ctx, { key, render, panels, repairLimit, send })
- *   render       the render the request is about (with image and review)
- *   panels       [{ id, number, moment, slot }] for a page; none for a cover
- *   send(params) starts the operation with { text, render, panel, region, lettering }
+ * Start a correction. When the image has reached the touch-up warning and no
+ * choice was made yet, the server says so (409 touch_up_choice): the person
+ * then chooses here between touching up anyway and a redraw with the change.
+ * Returns the job, or null when they cancel.
+ */
+export async function queueCorrection(op, params) {
+  try {
+    return await queueOp(op, params);
+  } catch (err) {
+    if (!err || err.code !== 'touch_up_choice' || params.mode) throw err;
+    const cover = op === 'cover.correct';
+    let mode = 'touch_up';
+    const choice = radioField({
+      legend: t('correct.choose'), value: mode,
+      options: [
+        { value: 'touch_up', label: t('correct.touch_up_anyway'), hint: t('correct.touch_up_hint') },
+        { value: 'redraw', label: t(cover ? 'correct.redraw_cover' : 'correct.redraw_page'), hint: t('correct.redraw_hint') },
+      ],
+      onchange: (value) => { mode = value; },
+    });
+    const ok = await confirmDialog({
+      title: t('correct.at_warning_title'),
+      body: h('div', { class: 'stack-s' }, h('p', null, warningText(err.details && err.details.touch_ups, cover)), choice.el),
+      confirm: t('correct.send'),
+    });
+    if (!ok) return null;
+    return queueOp(op, Object.assign({}, params, { mode }));
+  }
+}
+
+/**
+ * correction(ctx, { key, render, panels, touchUpWarning, send })
+ *   render          the render the request is about (with image and review)
+ *   panels          [{ id, number, moment, slot }] for a page; none for a cover
+ *   touchUpWarning  edits of one image after which the person chooses (project setting)
+ *   send(params)    starts the operation with { text, render, panel, region, lettering, mode }
  * -> { form, stage }: the form goes with the text, the stage with the images.
  */
-export function correction(ctx, { key, render, panels = [], repairLimit, send }) {
+export function correction(ctx, { key, render, panels = [], touchUpWarning, send }) {
   const ui = ctx.ui[`corr:${key}`] || (ctx.ui[`corr:${key}`] = { region: null, panel: '' });
   const review = render.review;
   const past = review ? (review.findings || []).filter((f) => f.region).map((f) => ({ region: f.region, label: f.repair })) : [];
@@ -100,10 +138,11 @@ export function correction(ctx, { key, render, panels = [], repairLimit, send })
           p.slot ? h('span', { class: 'small faint slot-words' }, ` (${slotWords(p.slot)})`) : null));
     })) : null;
 
+  const cover = String(render.id).startsWith('CV_');
   const cycle = review && typeof review.repair_cycle === 'number' ? review.repair_cycle : 0;
-  const willRedraw = typeof repairLimit === 'number' && cycle >= repairLimit;
+  const atWarning = Number.isInteger(touchUpWarning) && cycle >= touchUpWarning;
 
-  const go = async () => {
+  const go = async (mode) => {
     const text = what.value.trim();
     if (!text) {
       what.input.focus();
@@ -116,6 +155,7 @@ export function correction(ctx, { key, render, panels = [], repairLimit, send })
       panel: ui.panel || undefined,
       region: ui.region || undefined,
       lettering: lettering.value,
+      mode: mode || undefined,
     });
     what.clear();
     letteringDraft.clear();
@@ -134,14 +174,21 @@ export function correction(ctx, { key, render, panels = [], repairLimit, send })
     h('div', { class: 'row' }, h('span', { class: 'small muted' }, t('correct.region_help')), clearBtn),
     what.el,
     lettering.el,
-    notice(willRedraw ? 'warn' : 'info', willRedraw
-      ? t('correct.will_redraw', { limit: repairLimit })
-      : (Number.isInteger(repairLimit)
-        ? tn(String(render.id).startsWith('CV_') ? 'correct.will_edit_cover' : 'correct.will_edit', Math.max(0, repairLimit - cycle), { left: Math.max(0, repairLimit - cycle) })
-        : t('correct.will_edit_unknown'))),
-    h('div', { class: 'row' },
-      actionButton(t('correct.send'), go, { kind: 'primary' }),
-      h('span', { class: 'small muted' }, t('correct.time'))));
+    atWarning
+      // At the warning the person decides: both paths, side by side, with what each costs.
+      ? h('div', { class: 'stack-s touch-up-choice' },
+        notice('warn', warningText(cycle, cover)),
+        h('div', { class: 'row' },
+          actionButton(t('correct.touch_up_anyway'), () => go('touch_up'), { kind: 'primary' }),
+          actionButton(t(cover ? 'correct.redraw_cover' : 'correct.redraw_page'), () => go('redraw'), { kind: 'accent' })),
+        h('p', { class: 'small muted' }, t('correct.choice_hint')))
+      : h('div', { class: 'stack-s' },
+        notice('info', Number.isInteger(touchUpWarning)
+          ? tn(cover ? 'correct.will_edit_cover' : 'correct.will_edit', Math.max(0, touchUpWarning - cycle), { left: Math.max(0, touchUpWarning - cycle) })
+          : t('correct.will_edit_unknown')),
+        h('div', { class: 'row' },
+          actionButton(t('correct.send'), () => go(), { kind: 'primary' }),
+          h('span', { class: 'small muted' }, t('correct.time')))));
 
   return { form, stage: h('div', { class: 'stack-s' }, picker.el) };
 }

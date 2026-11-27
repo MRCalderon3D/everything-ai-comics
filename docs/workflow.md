@@ -112,7 +112,7 @@ one is marked superseded.
 |---|---|
 | Before moving on | Every page has a purpose, a grid, and one drawable moment per panel. Every panel says who is where, in what state, holding what. Every change between appearances is accounted for. The audit reports zero errors. |
 | Held in | `issues/<ISS_ID>/issue.yaml`, `scenes/<SC_ID>.yaml`, `pages/<PG_ID>/page.yaml` |
-| Checked by | `check-continuity.js` for the eleven ledger rules. The `page` schema for the shape. Travel and threat directions are not stored per panel, so no script checks them. |
+| Checked by | `check-continuity.js` for the eleven ledger rules, plus a `REFERENCE_BUDGET` warning for a page or panel whose cast needs more reference images than the image provider takes. The `page` schema for the shape. Travel and threat directions are not stored per panel, so no script checks them. |
 | Rules | [layout/page-composition.md](../rules/layout/page-composition.md), [layout/panel-transitions.md](../rules/layout/panel-transitions.md), [layout/pacing.md](../rules/layout/pacing.md), [writing/comic-script-format.md](../rules/writing/comic-script-format.md), [visual/spatial-continuity.md](../rules/visual/spatial-continuity.md), [visual/state-continuity.md](../rules/visual/state-continuity.md) |
 
 Planning is the cheap stage. A plan costs nothing to change. A rendered
@@ -320,7 +320,7 @@ handsome and wrong.
 |---|---|
 | Before moving on | Every finding has an expectation, an observation, a severity, and a repair. A repaired finding has a recheck against the new file. The page is `pass`, `fixed`, or back with its plan. |
 | Held in | The review files of the old and the new render, the repair prompt package, the new render |
-| Checked by | `validate-workspace.js`: a `fixed` finding needs a `recheck`, a `fixed` verdict cannot have an open blocking finding, `repair_cycle` cannot exceed the limit. `compile-prompts.js --repair` refuses at the limit. Whether a change happened is visual review. |
+| Checked by | `validate-workspace.js`: a `fixed` finding needs a `recheck`, a `fixed` verdict cannot have an open blocking finding, `repair_cycle` cannot exceed the limit unless the edit was a touch-up the person asked for. `compile-prompts.js --repair` refuses at the limit. Whether a change happened is visual review. |
 | Rules | [common/repair-limits.md](../rules/common/repair-limits.md) |
 
 "Continuity was checked" records nothing a later reader can verify. A

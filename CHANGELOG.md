@@ -2,6 +2,56 @@
 
 ## Unreleased
 
+- Web studio: the plan review of a page edits its lettering. Per panel,
+  balloons, captions and sound effects can be added, removed and reordered,
+  each with its kind by plain name and icon (speech, thought, shout,
+  whisper, radio or phone, caption, narration, sound effect, sign), its
+  speaker from the panel's cast or as a voice from off panel, and a line on
+  where its tail points. Words per balloon, words per panel and balloons per
+  panel are counted while typing, from `project.lettering` and the rule's
+  defaults, and a panel over them asks before saving. The plan saves through
+  `PUT .../pages/:page/plan` (`studio/server/lettering-plan.js`): ids kept,
+  reading order renumbered, an off-panel ledger row added for a voice from
+  outside the frame, the page validated and its continuity checked. On a
+  drawn page the answer says it needs drawing again, or lettering again in
+  overlay mode, and the screen offers it. The chat does the same with the
+  action `page.lettering`, whose card shows the change before it runs.
+- The touch-up limit is a warning the person decides on. New project field
+  `repair_policy.touch_up_warning` (default 2; schema, template, example,
+  `create-project.js`, `docs/data-model.md`): once an image has had that
+  many edits, a touch-up the person asks for comes with a warning that more
+  may degrade it and the offer of a redraw from the plan. `max_cycles` now
+  only stops the automatic repairs. `validate-workspace.js` accepts a review
+  past `max_cycles` when the render it edited holds the person's change
+  request. The rules (`repair-limits.md`, `cost-control.md`), the repair and
+  review skills and commands, and the guides say so.
+- Web studio: `page.correct` and `cover.correct` take `mode` (`touch_up` or
+  `redraw`). At the warning a request without it is refused with 409
+  `touch_up_choice`, and the correction form, the review's "correct this"
+  and the chat card offer both choices. Settings has "Touch-ups before a
+  warning", written to `project.yaml`.
+
+- Image provider `codex-cli`: the instruction lists the absolute path of
+  every input image and asks Codex to call its image tool with
+  `referenced_image_paths` set to those paths, in order, instead of relying
+  on attached images (`num_last_images_to_include`, which keeps 5 and drops
+  the rest silently). Codex reports `reference_mode` and
+  `references_count`; both go into the response summary, and a count lower
+  than the number of images sent fails the run and discards the image.
+  Measured with Codex CLI 0.167.1: the tool rejects 6, 8 and 10 paths
+  ("at most 5 paths") and holds every identity at 5, so the budget stays 5.
+- Reference plans record the `generation.mode` they were built for
+  (`mode: full_page | per_panel`). `compile-prompts.js` rebuilds and
+  rewrites a plan built for another mode, provider or budget before
+  compiling, or fails with the reason and the build error when the rebuilt
+  plan does not fit. `build-reference-plan.js --if-stale` runs the same
+  check. Found in a real run: switching a page to `per_panel` left the old
+  plan, and the next draw failed.
+- `check-continuity.js` warns at plan time (`REFERENCE_BUDGET`) about
+  pages and panels whose drawn cast needs more required reference images
+  than the image provider takes, naming the panels and saying whether
+  drawing panel by panel would fit. `--provider` (and `opts.provider`)
+  checks against a provider other than the page's.
 - Web studio: a commit holds only the files of its own step or action. A
   job step commits the files that changed while it ran; a save, an
   approval, a delete or a merge commits the files it names, through a

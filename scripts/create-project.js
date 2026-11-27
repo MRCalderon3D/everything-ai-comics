@@ -163,7 +163,7 @@ function buildProjectYaml(title, templateText, format = null) {
     lettering: { mode: 'in_image' },
     style: { style_block: 'style/style-block.txt' },
     default_providers: { image: 'harness-native' },
-    repair_policy: { max_cycles: 2 },
+    repair_policy: { max_cycles: 2, touch_up_warning: 2 },
     created_at: today(),
     version: '0.1.0',
   });

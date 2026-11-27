@@ -3,10 +3,11 @@
  * page.correct: a change the person asks for on a rendered page, optionally
  * tied to a panel or a region. The request is recorded as a finding
  * (source: user_request) on the review of that render. Then, by
- * ops/correction.js, the existing page is edited into a new version, or,
- * once the lineage has used the project's repair cycles, the change goes
- * into the plan and the page is drawn again as a new lineage. Either way the
- * new version is reviewed, and the result says which path was taken.
+ * ops/correction.js, the existing page is edited into a new version (a
+ * touch-up), or the change goes into the plan and the page is drawn again
+ * as a new lineage. Once the image has reached the project's touch-up
+ * warning the person picks one with `mode`. Either way the new version is
+ * reviewed, and the result says which path was taken.
  * Commands: repair-page, visual-review (and the plan commands on a redraw).
  */
 
@@ -39,6 +40,7 @@ module.exports = {
     { name: 'panel', type: 'string', required: false, description: 'Panel ID the request is about.' },
     { name: 'region', type: 'object', required: false, description: '{ x, y, w, h } as fractions of the page (0 to 1) from its top-left corner.' },
     { name: 'lettering', type: 'boolean', required: false, description: 'True when the request changes text in the image, which unlocks the lettering in the repair.' },
+    { name: 'mode', type: 'string', required: false, description: 'touch_up or redraw: what the person chose once the image has reached the touch-up warning of the project (the request is refused without it then). touch_up edits the image anyway; redraw writes the change into the plan and draws it again. Set it only when the person said which.' },
   ],
 
   validate(params, { project }) {
@@ -57,9 +59,10 @@ module.exports = {
       const ids = Array.isArray(page.panels) ? page.panels.map((p) => p && p.id) : [];
       if (!PANEL_RE.test(panel) || !ids.includes(panel)) throw bad(`"${panel}" is not a panel of ${pageId}.`);
     }
+    const mode = correction.checkMode(params);
     return {
       page: pageId, text, render, panel, region: checkRegion(params.region), lettering: params.lettering === true,
-      path: correction.pathFor(root, render),
+      mode, path: correction.choosePath(root, render, mode, 'page'),
     };
   },
 
@@ -76,6 +79,7 @@ module.exports = {
       panel: params.panel,
       region: params.region,
       lettering: params.lettering,
+      path: params.path,
     });
     return Object.assign({ page: params.page }, outcome);
   },

@@ -314,13 +314,18 @@ function testRefusals() {
       /aspect ratio 5:7 is not supported \(supported: 2:3, 3:4, 9:16, 1:1/);
     fx.editYaml(root, 'project.yaml', (project) => { project.page.aspect_ratio = '2:3'; });
 
-    // A plan built for a roomier provider is re-checked against this one.
+    // A plan built for another provider is rebuilt for this one and written back.
     writePlan(root, fx.PAGE_2, 'comfyui');
     const trimmed = compile(root, fx.PAGE_2);
     assert.strictEqual(trimmed.pkg.references.length, 4, 'optional references are trimmed to the budget');
-    assert.ok(trimmed.warnings.some((w) => /built for comfyui/.test(w)));
+    assert.ok(trimmed.warnings.some((w) => /^the reference plan was rebuilt: it was built for comfyui and the page is now drawn with harness-native/.test(w)),
+      trimmed.warnings.join(' | '));
+    const rewritten = yaml.parse(fs.readFileSync(path.join(fx.pageDir(root, fx.PAGE_2), 'reference-plan.yaml'), 'utf8'));
+    assert.deepStrictEqual([rewritten.provider, rewritten.budget, rewritten.mode], ['harness-native', 4, 'full_page']);
+    assert.ok(!compile(root, fx.PAGE_2).warnings.some((w) => /rebuilt/.test(w)), 'a current plan is kept as it is');
+    // A provider whose budget the required references cannot fit: a plain refusal that says why.
     expectError(() => compile(root, fx.PAGE_2, { providerId: 'replicate' }), 'budget_exceeded',
-      /Rebuild the reference plan for replicate/);
+      /^PG_001_002: the reference plan is out of date \(it was built for harness-native and the page is now drawn with replicate; it was budgeted for 4 images and replicate takes 1\) and could not be rebuilt: the page needs 3 required reference images/);
 
     // A required reference that lost its approval stops the compile.
     writePlan(root, fx.PAGE_2);
@@ -542,7 +547,7 @@ function testCli() {
     assert.strictEqual(gemini.provider, 'gemini');
     assert.strictEqual(gemini.model, 'gemini-2.5-flash-image');
     assert.strictEqual(gemini.references.length, 3, 'gemini takes 3 images; the optional previous page is trimmed');
-    assert.ok(/warning: the reference plan was built for harness-native/.test(other.stdout), other.stdout);
+    assert.ok(/warning: the reference plan was rebuilt: it was built for harness-native and the page is now drawn with gemini/.test(other.stdout), other.stdout);
     assert.strictEqual(fs.readFileSync(out, 'utf8'), before, 'another provider writes its own file');
 
     // Missing --page and a missing plan both exit 1 with a way forward.

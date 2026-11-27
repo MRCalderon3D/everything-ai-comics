@@ -399,6 +399,22 @@ t.test('c. repair_cycle above project.repair_policy.max_cycles is REVIEW_REPAIR_
   noError(run((w) => w.edit('project.yaml', (p) => { delete p.repair_policy; })), 'REVIEW_REPAIR_LIMIT');
 });
 
+t.test('c. a touch-up the person asked for may go past max_cycles', () => {
+  // The render it edited carries the person's change request: the edit was their choice, not a loop.
+  const asked = (w) => w.edit(REVIEW_P2_V1, (r) => {
+    r.findings.push({
+      id: 'F02', panel: null, source: 'user_request', expected: 'The requested change shows in the page, and nothing else differs.',
+      visible: 'The page as drawn in PG_001_002_V01, before the requested change.', severity: 'minor', repair: 'Make the beam wider.', status: 'open',
+    });
+  });
+  noError(run((w) => {
+    asked(w);
+    w.edit('project.yaml', (p) => { p.repair_policy.max_cycles = 0; });
+  }), 'REVIEW_REPAIR_LIMIT');
+  // Without the request the same count is a repair loop past the limit.
+  hasError(run((w) => w.edit('project.yaml', (p) => { p.repair_policy.max_cycles = 0; })), 'REVIEW_REPAIR_LIMIT', REVIEW_P2_V2);
+});
+
 t.test('c. a reviewed page without a passing review of its current render is PAGE_STATUS_UNREVIEWED', () => {
   hasError(run((w) => w.edit(PAGE_2, (p) => { p.current_render = 'PG_001_002_V01'; })), 'PAGE_STATUS_UNREVIEWED', PAGE_2);
   hasError(run((w) => w.remove(REVIEW_P1)), 'PAGE_STATUS_UNREVIEWED', PAGE_1);

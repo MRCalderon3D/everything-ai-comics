@@ -68,7 +68,13 @@ function checkOptions(patch) {
         if (!Number.isInteger(patch.repair_limit) || patch.repair_limit < 0 || patch.repair_limit > 10) {
           throw bad('"repair_limit" must be a whole number from 0 to 10.');
         }
-        out.repair_policy = { max_cycles: patch.repair_limit };
+        out.repair_policy = Object.assign(out.repair_policy || {}, { max_cycles: patch.repair_limit });
+        break;
+      case 'touch_up_warning':
+        if (!Number.isInteger(patch.touch_up_warning) || patch.touch_up_warning < 0 || patch.touch_up_warning > 10) {
+          throw bad('"touch_up_warning" must be a whole number from 0 to 10.');
+        }
+        out.repair_policy = Object.assign(out.repair_policy || {}, { touch_up_warning: patch.touch_up_warning });
         break;
       case 'page_size': {
         const size = PAGE_SIZES.find((s) => s.id === patch.page_size);
@@ -87,7 +93,7 @@ function checkOptions(patch) {
         break;
       }
       default:
-        throw bad(`"${key}" is not an option. Options: title, logline, genre, language, comic_format, publication, reading_direction, color_mode, lettering_mode, rating, repair_limit, page_size, page.`);
+        throw bad(`"${key}" is not an option. Options: title, logline, genre, language, comic_format, publication, reading_direction, color_mode, lettering_mode, rating, repair_limit, touch_up_warning, page_size, page.`);
     }
   }
   return out;
@@ -144,6 +150,15 @@ function applyToProject(root, partial) {
   return { changed: true, preserved: false, doc };
 }
 
+/**
+ * Edits of one image after which a person's touch-up comes with a warning
+ * and the offer of a redraw (project.repair_policy.touch_up_warning, default 2).
+ */
+function touchUpWarning(doc) {
+  const policy = doc && doc.repair_policy;
+  return policy && Number.isInteger(policy.touch_up_warning) && policy.touch_up_warning >= 0 ? policy.touch_up_warning : 2;
+}
+
 /** The options as the form shows them. */
 function readOptions(root) {
   const doc = S.ws.loadProject(root) || {};
@@ -161,6 +176,7 @@ function readOptions(root) {
     lettering_mode: (doc.lettering && doc.lettering.mode) || 'in_image',
     rating: (doc.content && doc.content.rating) || null,
     repair_limit: doc.repair_policy && Number.isInteger(doc.repair_policy.max_cycles) ? doc.repair_policy.max_cycles : 2,
+    touch_up_warning: touchUpWarning(doc),
     page: { aspect_ratio: page.aspect_ratio || '2:3', width_px: page.width_px || null, height_px: page.height_px || null },
     page_size: size ? size.id : null,
     image_provider: (doc.default_providers && doc.default_providers.image) || null,
@@ -177,4 +193,4 @@ const CHOICES = {
   page_size: PAGE_SIZES,
 };
 
-module.exports = { checkOptions, applyToProject, readOptions, CHOICES, PAGE_SIZES };
+module.exports = { checkOptions, applyToProject, readOptions, touchUpWarning, CHOICES, PAGE_SIZES };

@@ -38,7 +38,12 @@ section 12 are written for you). The studio also lists the characters,
 places and props a page plan created (the breakdown of section 6 can write
 them), flags one that looks like an ID the story already uses so the two can
 be merged, and deletes tries you do not keep without leaving the registry or
-the generation records behind.
+the generation records behind. Its plan review edits the lettering of each
+panel (the `lettering` list of the panel script in section 6: kind,
+speaker, words and reading order, with the budgets of
+`rules/lettering/balloons-and-captions.md` counted while you type), and
+its corrections ask you to choose once an image reaches
+`repair_policy.touch_up_warning` (section 10).
 
 ## 1. Get set up
 
@@ -124,8 +129,11 @@ shape the rest of the project:
   `harness-native`, which hands each request to your assistant's own image
   tool. `codex-cli` has the scripts start the Codex CLI and save the image
   themselves.
-- `repair_policy.max_cycles`: how many repairs a page gets before its plan
-  or its references are fixed instead. The default is 2.
+- `repair_policy.max_cycles`: how many automatic repairs a page gets before
+  its plan or its references are fixed instead. The default is 2.
+- `repair_policy.touch_up_warning`: how many edits an image takes before a
+  touch-up you ask for comes with a warning and the offer of a redraw. The
+  default is 2. You decide each time.
 
 Behind the command:
 
@@ -752,7 +760,11 @@ the request up with the reviewer's findings. The shape is in
 Repairs are counted. When `repair_cycle` reaches
 `repair_policy.max_cycles`, `compile-prompts.js --repair` refuses and
 `validate-workspace.js` rejects a review above the limit. At that point the
-page goes back to its plan or its references. The policy is
+page goes back to its plan or its references. Your own touch-ups count too,
+and they follow `repair_policy.touch_up_warning`: past it you are told that
+more edits may degrade the image and offered a redraw, and you choose. The
+web studio carries that choice through; a touch-up past `max_cycles` is
+valid because the render it edited holds your request. The policy is
 [rules/common/repair-limits.md](../rules/common/repair-limits.md).
 
 ## 11. Letter the pages

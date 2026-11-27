@@ -15,6 +15,13 @@
  * images as Image 1, Image 2, in that order; in repair mode Image 1 is the
  * page to edit.
  *
+ * The images are attached with -i so the session sees them, and the
+ * instruction also lists their absolute paths and tells Codex to call the
+ * image tool with referenced_image_paths set to exactly those paths, in
+ * order. Codex replies with the parameter it used (reference_mode) and how
+ * many images the call received (references_count). A count lower than the
+ * number sent fails the run, and the image is discarded.
+ *
  * generate() in live mode spawns
  *   codex exec --skip-git-repo-check --ephemeral -s workspace-write
  *              -C <outDir> --json -o <last message file> [-m <model>]
@@ -53,12 +60,19 @@ const DEFAULT_TIMEOUT_MS = 900000;
 const NATIVE_FRAMES = ['1:1', '2:3', '3:2'];
 
 const INSTRUCTIONS =
-  'Draw this image with your own image generation tool. Attach every image in ' +
-  'body.images as an input, in the listed order: the prompt refers to them as ' +
-  'Image 1, Image 2, and so on, and each has one role. In repair mode Image 1 ' +
-  'is the page to edit; change only what the prompt lists. Render the frame ' +
-  'body.frame names. Do not write code to draw the image. Save exactly one ' +
-  'PNG at the path the run gives you.';
+  'Draw this image with your own image generation tool. Pass every image in ' +
+  'body.images to the tool as a file path (referenced_image_paths), in the ' +
+  'listed order: the prompt refers to them as Image 1, Image 2, and so on, and ' +
+  'each has one role. In repair mode Image 1 is the page to edit; change only ' +
+  'what the prompt lists. Render the frame body.frame names. Do not write code ' +
+  'to draw the image. Save exactly one PNG at the path the run gives you.';
+
+/** How Codex says it handed the references to its image tool. */
+const REFERENCE_MODES = {
+  paths: 'referenced_image_paths',
+  conversation: 'num_last_images_to_include',
+  none: 'none',
+};
 
 function ratioValue(ratio) {
   const m = /^(\d+):(\d+)$/.exec(String(ratio));
@@ -86,10 +100,16 @@ function orientation(ratio) {
 
 /**
  * The text Codex reads on stdin. Model-facing.
+ *
+ * The images are attached with -i so the session sees them, and their
+ * absolute paths are listed so the image tool gets them as
+ * referenced_image_paths. Attached images reach the tool only as recent
+ * conversation images (num_last_images_to_include), which it caps at 5.
  * @param {object} body request spec body
  * @param {string} outputFile absolute path the PNG must be saved at
+ * @param {string[]} [imagePaths] absolute paths of the input images, in attachment order
  */
-function buildInstruction(body, outputFile) {
+function buildInstruction(body, outputFile, imagePaths = []) {
   const images = Array.isArray(body.images) ? body.images : [];
   const frame = body.frame || frameFor(body.aspect_ratio);
   const lines = [
@@ -100,10 +120,18 @@ function buildInstruction(body, outputFile) {
   ];
   if (images.length) {
     lines.push(`${images.length} image${images.length === 1 ? ' is' : 's are'} attached to this message, in this order:`);
-    for (const img of images) {
+    images.forEach((img, i) => {
       lines.push(`Image ${img.position}: ${String(img.role || 'reference').replace(/_/g, ' ')}${img.asset_id ? ` (${img.asset_id})` : ''}`);
+      if (imagePaths[i]) lines.push(`  file: ${imagePaths[i]}`);
+    });
+    lines.push('The prompt refers to them by these numbers.');
+    if (imagePaths.length) {
+      lines.push(
+        `Call the image tool once with referenced_image_paths set to exactly these ${imagePaths.length} file paths, in this order, ` +
+        'and nothing else. Do not use num_last_images_to_include: it passes at most 5 images and drops the rest without saying so.');
+    } else {
+      lines.push('Pass every one of them to the image tool as an input image, in this order.');
     }
-    lines.push('The prompt refers to them by these numbers. Pass every one of them to the image tool as an input image, in this order.');
     if (body.mode === 'repair') {
       lines.push('Image 1 is the page to edit. Change only what the prompt lists and keep everything else exactly as it is.');
     }
@@ -129,9 +157,28 @@ function buildInstruction(body, outputFile) {
     '',
     'REPLY',
     'When the file is saved, reply with one JSON object and nothing else:',
-    '{"saved_path": "<the absolute path>", "width": <pixels>, "height": <pixels>, "references_passed": <true or false>, "model": <"name of the image model" or null>, "notes": "<anything that went differently, or an empty string>"}',
-    '"references_passed" is true only when every attached image went into the image tool call. "model" is null when the tool does not name its model.');
+    '{"saved_path": "<the absolute path>", "width": <pixels>, "height": <pixels>, "reference_mode": "<referenced_image_paths, num_last_images_to_include or none>", "references_count": <number of images the image tool call received>, "model": <"name of the image model" or null>, "notes": "<anything that went differently, or an empty string>"}',
+    '"reference_mode" is the parameter the image tool call used for the input images. "references_count" is how many images that call actually received, counted from the call itself. "model" is null when the tool does not name its model.');
   return `${lines.join('\n')}\n`;
+}
+
+/**
+ * What Codex reports about the references, read from its reply.
+ * @returns {{mode: string|null, count: number|null, raw: string|null}}
+ *   mode is a key of REFERENCE_MODES (paths, conversation, none) or null
+ *   when the reply does not say; count is null when it is not reported.
+ */
+function reportedReferences(reply) {
+  if (!reply) return { mode: null, count: null, raw: null };
+  const raw = typeof reply.reference_mode === 'string' ? reply.reference_mode.trim() : null;
+  let mode = null;
+  if (raw) {
+    if (/referenced_image_paths|path/i.test(raw)) mode = 'paths';
+    else if (/num_last_images|conversation|attach|recent/i.test(raw)) mode = 'conversation';
+    else if (/^(none|no|null)$/i.test(raw)) mode = 'none';
+  }
+  const count = Number.isInteger(reply.references_count) && reply.references_count >= 0 ? reply.references_count : null;
+  return { mode, count, raw };
 }
 
 /** The JSON object in Codex's last message, or null. */
@@ -205,11 +252,12 @@ const provider = {
   label: 'Codex CLI (codex exec with its image tool)',
   env: [],
   capabilities: {
-    // Images attached with -i reach Codex's image tool as recent conversation
-    // images, and its tool definition caps those at 5 (num_last_images_to_include,
-    // asked of Codex CLI 0.167.1 on 2026-11-27). A page drawn with a look master
-    // plus four turnarounds kept every identity. Paths passed as
-    // referenced_image_paths declare no limit; not used here yet.
+    // Measured with Codex CLI 0.167.1 on 2026-11-27, real runs, a look master
+    // plus approved turnarounds of different characters named by letter only:
+    // the image tool takes at most 5 images either way. Attached images go in
+    // as num_last_images_to_include (up to 5, the rest dropped silently);
+    // referenced_image_paths rejected the call at 6, 8 and 10 paths ("at most
+    // 5 paths") and drew nothing. With 5 paths every identity held.
     referenceImages: 5,
     aspectRatios: ['2:3', '3:4', '9:16', '1:1', '4:5', '3:2', '4:3', '16:9'],
     imageEditing: true,
@@ -321,7 +369,7 @@ const provider = {
           bin,
           args,
           cwd: dir,
-          stdin: buildInstruction(body, outputFile),
+          stdin: buildInstruction(body, outputFile, images),
           signal,
           timeoutMs,
           onStdout: (line) => tell(progressLine(line, state)),
@@ -363,12 +411,27 @@ const provider = {
           `the file Codex saved is not an image (${err.message}); ${buffer.length} bytes were discarded`));
       }
 
+      // A run whose image tool got fewer references than were sent drew
+      // without some of them: identities can be wrong in ways the person
+      // only notices later, so it is a failure, never a success.
+      const refs = reportedReferences(reply);
+      const how = refs.mode ? REFERENCE_MODES[refs.mode] : (refs.raw || 'an unreported parameter');
+      if (images.length && refs.count !== null && refs.count < images.length) {
+        return markFailed(record, new Error(
+          `Codex passed ${refs.count} of the ${images.length} reference images to its image tool (as ${how}), ` +
+          `so the image was drawn without ${images.length - refs.count} of them and was discarded. ` +
+          `Draw again, or send fewer references per request (draw the page panel by panel, or use a provider that takes ${images.length}).`));
+      }
+      if (images.length && refs.mode === 'none') {
+        return markFailed(record, new Error(
+          `Codex reports that its image tool received none of the ${images.length} reference images, ` +
+          'so the image was drawn unconditioned and was discarded. Draw again.'));
+      }
+
       record._media = [{ data_base64: buffer.toString('base64'), format: info.format }];
-      const passed = reply && typeof reply.references_passed === 'boolean' ? reply.references_passed : null;
       const refsText = !images.length ? 'no reference images'
-        : passed === null ? `${images.length} reference image(s) attached, use not reported`
-          : passed ? `${images.length} reference image(s) passed to the image tool, as Codex reports`
-            : `${images.length} reference image(s) attached, and Codex reports they were NOT passed to the image tool`;
+        : refs.count === null ? `${images.length} reference image(s) sent, how many reached the image tool not reported`
+          : `${refs.count} of ${images.length} reference image(s) passed to the image tool as ${how}, as Codex reports`;
       markSucceeded(record,
         `Codex saved one ${info.width}x${info.height} ${info.format.toUpperCase()} in ${seconds} s; ${refsText}.`,
         [`inline image 1 (${info.format})`], state.threadId);
@@ -379,8 +442,10 @@ const provider = {
       const notes = [];
       if (sessionModel) notes.push(`Codex session model: ${sessionModel} (the image model is recorded separately).`);
       if (run.code !== 0) notes.push(`codex exec exited with code ${run.code} after saving the image.`);
-      if (images.length && passed === false) {
-        notes.push('Codex reports the reference images did not reach the image tool: review identity and style as unconditioned.');
+      if (images.length && refs.count === null) {
+        notes.push('Codex did not report how many reference images reached its image tool: check every identity against its sheet.');
+      } else if (images.length && refs.mode !== 'paths') {
+        notes.push(`Codex passed the references as ${how}, not as referenced_image_paths: that way takes at most 5 images.`);
       }
       const frame = body.frame || frameFor(body.aspect_ratio);
       const want = ratioValue(frame.target);

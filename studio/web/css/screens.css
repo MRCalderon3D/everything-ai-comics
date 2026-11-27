@@ -209,6 +209,20 @@
 .plan-panels { display: flex; flex-direction: column; gap: 12px; }
 .plan-panel { border: 2px solid var(--panel-ink); border-radius: var(--r-art); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; background: var(--sheet); }
 .plan-panel h4 { font-size: var(--step-1); }
+.letter-block { border-top: 1px dashed var(--line-2); padding-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+.letter-title { font-size: var(--step-0); margin: 0; }
+.letter-meter, .letter-count { color: var(--ink-3); margin: 0; }
+.letter-meter.over, .letter-count.over { color: var(--warn); font-weight: 600; }
+.letter-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.letter-item { border: 1px solid var(--line-2); border-radius: var(--r-ctl); padding: 8px 10px; background: var(--sheet-2); display: flex; flex-direction: column; gap: 6px; }
+.letter-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+.letter-head .field { margin: 0; min-width: 9rem; flex: 1 1 9rem; }
+.letter-glyph { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border: 1.5px solid var(--panel-ink); border-radius: 50%; background: var(--sheet); flex: none; }
+.letter-glyph .icon { width: 18px; height: 18px; }
+.letter-tools { display: flex; gap: 4px; margin-left: auto; }
+.letter-tail { margin: 0; }
+textarea.letter-text-empty { border-color: var(--warn); }
+.touch-up-choice .row { flex-wrap: wrap; }
 .assumptions { display: flex; flex-direction: column; gap: 8px; }
 .assumption {
   display: flex; flex-direction: column; gap: 8px; padding: 10px 12px;

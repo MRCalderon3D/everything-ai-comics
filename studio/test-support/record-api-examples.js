@@ -286,13 +286,21 @@ async function record() {
       keys: { renders: { maxArray: 2 }, tiers: { maxArray: 4 }, prompts: { maxDepth: 2 }, lettering: { maxDepth: 2 }, entries: { maxArray: 1 } },
     });
 
+    // The plan review saves a lettering change; the page is drawn, so it needs drawing again.
+    const planDoc = (await s.api('GET', `${P}/pages/PG_001_001`)).body.page;
+    const planData = JSON.parse(JSON.stringify(planDoc.data));
+    planData.panels[0].lettering = (planData.panels[0].lettering || []).concat([{ type: 'caption', speaker: null, text: 'Later that night.' }]);
+    r = await s.api('PUT', `${P}/pages/PG_001_001/plan`, { data: planData, base_etag: planDoc.etag });
+    if (r.status !== 200) throw new Error(`plan save: ${JSON.stringify(r.body)}`);
+    cap('page-plan-put', r.body, { maxArray: 2, maxString: 110, keys: { file: { maxDepth: 1 } } });
+
     job = done(await s.runOp(id, 'page.review', { page: 'PG_001_003' }), 'page.review');
     cap('op.page.review', jobExample(job));
     job = done(await s.runOp(id, 'page.correct', {
       page: 'PG_001_001', text: 'The lamp over the wheel must be lit.', panel: 'PN_001_001_02', region: { x: 0.1, y: 0.5, w: 0.3, h: 0.2 },
     }), 'page.correct edit');
     cap('op.page.correct', jobExample(job));
-    job = done(await s.runOp(id, 'page.correct', { page: 'PG_001_002', text: 'The boy must wear his hood up.' }), 'page.correct redraw');
+    job = done(await s.runOp(id, 'page.correct', { page: 'PG_001_002', text: 'The boy must wear his hood up.', mode: 'redraw' }), 'page.correct redraw');
     cap('op.page.correct.redraw', jobExample(job));
     r = await s.api('POST', `${P}/approve/page`, { page: 'PG_001_001' });
     cap('approve-page', r.body);

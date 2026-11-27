@@ -50,7 +50,8 @@ content:
   violence_treatment: "TODO: say how violence is shown, e.g. implied, never anatomical."
 
 repair_policy:
-  max_cycles: 2                        # repairs per page before the plan or the references get fixed instead
+  max_cycles: 2                        # automatic repairs per page before the plan or the references get fixed instead
+  touch_up_warning: 2                  # edits of one image before a touch-up the person asks for comes with a warning and a redraw offer
 
 created_at: "{{DATE}}"                 # set by create-project.js
 version: "0.1.0"                       # workspace metadata version

@@ -18,6 +18,7 @@ const { parseOverrule } = require('./approvals');
 const projectOptions = require('./project-options');
 const publish = require('./ops/publish-build');
 const lettering = require('./ops/lettering-apply');
+const letteringPlan = require('./lettering-plan');
 const { lookState } = require('./ops/shared');
 const identity = require('./identity');
 const { msg } = require('./i18n');
@@ -282,6 +283,8 @@ function readablePlan(project, page) {
       off_panel: row.off_panel === true,
       action: row.action || '',
       where: row.position ? [row.position.level, row.position.landmark || row.position.side].filter(Boolean).join(', ') : '',
+      // Where a tail to this character points when they speak from off panel (rules/lettering).
+      side: row.position && row.position.side ? row.position.side : null,
       holding: Array.isArray(row.holding) ? row.holding : [],
       state: Array.isArray(row.state) ? row.state : [],
     })),
@@ -823,9 +826,14 @@ function page(project, pageId, drivers, jobs) {
       mode: overlayMode ? 'overlay' : 'in_image',
       geometry: files.readDoc(project, `${base}/lettering.yaml`),
       needs_placement: overlayMode ? safe(() => lettering.needsPlacement(root, pageId), false) : false,
+      // The budgets the plan editor shows while typing, and the kinds it offers.
+      limits: letteringPlan.limitsOf(project_doc),
+      kinds: letteringPlan.KINDS,
+      spoken: letteringPlan.SPOKEN,
     },
     draw: { available: draw.available && S.providerIds().includes('codex-cli'), tool: draw.name, reason: draw.reason },
     repair_limit: pipeline.repairLimit(project),
+    touch_up_warning: projectOptions.touchUpWarning(project_doc),
     neighbors: { previous: at > 0 ? pagesInOrder[at - 1] : null, next: at !== -1 && at < pagesInOrder.length - 1 ? pagesInOrder[at + 1] : null },
     // What the planner filled in that the person's text did not say.
     assumptions: require('./assumptions').ofPage(project, pageId),
@@ -1105,6 +1113,7 @@ function overview(project, services) {
     first_issue: firstIssue,
     look: { id: look.lookId, approved: look.frozen },
     repair_limit: pipeline.repairLimit(project),
+    touch_up_warning: projectOptions.touchUpWarning(doc),
     history: { git: require('./git').isRepo(project.dir) && require('./git').detect().installed },
   };
 }

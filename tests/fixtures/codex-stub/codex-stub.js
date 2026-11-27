@@ -18,7 +18,10 @@
  *   CODEX_STUB_LOG     file that receives { argv, stdin } as JSON
  *   CODEX_STUB_SIZE    "WxH" of the PNG, default 20x30
  *   CODEX_STUB_MODEL   image model named in the reply (default: null)
- *   CODEX_STUB_PASSED  "false" makes the reply say the references were not used
+ *   CODEX_STUB_COUNT   references_count in the reply (default: the number of
+ *                      -i images, when every one of them exists)
+ *   CODEX_STUB_REF_MODE  reference_mode in the reply (default:
+ *                      referenced_image_paths); "omit" leaves both fields out
  *
  * Every run writes noise to stderr, the way the real tool does.
  */
@@ -99,7 +102,7 @@ async function main() {
   }
   if (mode === 'notimage') {
     fs.writeFileSync(target, 'this is not an image\n');
-    say(JSON.stringify({ saved_path: target, width: 0, height: 0, references_passed: true, model: null, notes: '' }));
+    say(JSON.stringify({ saved_path: target, width: 0, height: 0, reference_mode: 'referenced_image_paths', references_count: images.length, model: null, notes: '' }));
     process.exit(0);
   }
 
@@ -108,14 +111,16 @@ async function main() {
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(target, png.encode({ width, height, data, colorType: 'rgb' }));
   emit({ type: 'item.completed', item: { id: 'item_0', type: 'image_generation' } });
-  say(JSON.stringify({
-    saved_path: target,
-    width,
-    height,
-    references_passed: process.env.CODEX_STUB_PASSED === 'false' ? false : images.every((file) => fs.existsSync(file)),
-    model: process.env.CODEX_STUB_MODEL || null,
-    notes: '',
-  }));
+  const reply = { saved_path: target, width, height };
+  if (process.env.CODEX_STUB_REF_MODE !== 'omit') {
+    reply.reference_mode = process.env.CODEX_STUB_REF_MODE || 'referenced_image_paths';
+    reply.references_count = process.env.CODEX_STUB_COUNT !== undefined
+      ? Number(process.env.CODEX_STUB_COUNT)
+      : images.filter((file) => fs.existsSync(file)).length;
+  }
+  reply.model = process.env.CODEX_STUB_MODEL || null;
+  reply.notes = '';
+  say(JSON.stringify(reply));
   emit({ type: 'turn.completed', usage: { input_tokens: 100, cached_input_tokens: 0, output_tokens: 20 } });
   process.exit(mode === 'exit-after' ? 2 : 0);
 }

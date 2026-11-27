@@ -2,8 +2,9 @@
 /**
  * Studio: the whole fake pipeline through the HTTP API, the way the browser
  * drives it. Setup, style, look approval, characters, page plans, drawing
- * with a forced flagged page and its repair, corrections by both paths (an
- * edit, and a redraw once the repair limit is reached), cover, publishing in
+ * with a forced flagged page and its repair, corrections by both paths (a
+ * touch-up, and at the touch-up warning the person's choice: a redraw, or a
+ * touch-up past the repair limit), cover, publishing in
  * every format, history and restore, chat.
  *
  * Fake mode: no CLI runs. What is checked is the plumbing and the files; a
@@ -89,11 +90,13 @@ async function main() {
     assert.deepStrictEqual(r.body.screens.map((x) => x.key),
       ['story', 'style', 'characters', 'places', 'pages', 'check', 'corrections', 'cover', 'publish']);
 
-    // The repair limit of this project is one cycle, so the redraw path is reachable below.
-    r = await s.api('PUT', `${P}/options`, { repair_limit: 1 });
+    // The repair limit of this project is one cycle and a touch-up warns after one edit, so the choice is reachable below.
+    r = await s.api('PUT', `${P}/options`, { repair_limit: 1, touch_up_warning: 1 });
     assert.strictEqual(r.status, 200, JSON.stringify(r.body));
-    assert.strictEqual(r.body.options.repair_limit, 1);
-    assert.strictEqual(ws.loadProject(root).repair_policy.max_cycles, 1);
+    assert.deepStrictEqual([r.body.options.repair_limit, r.body.options.touch_up_warning], [1, 1]);
+    assert.deepStrictEqual(ws.loadProject(root).repair_policy, { max_cycles: 1, touch_up_warning: 1 });
+    r = await s.api('PUT', `${P}/options`, { touch_up_warning: 11 });
+    assert.strictEqual(r.status, 400, 'the warning is 0 to 10');
     assert.ok(fs.readFileSync(path.join(root, 'project.yaml'), 'utf8').includes('# working title'), 'options keep the comments of project.yaml');
 
     // --- style: preset + words + an uploaded reference image ---------------------------
@@ -333,22 +336,27 @@ async function main() {
     assert.strictEqual(repairPackage.mode, 'repair');
     assert.ok(repairPackage.prompt.includes('La lámpara tiene que verse encendida'));
 
-    // --- corrections, path two: the repair limit is reached, so the plan changes and the page is redrawn
+    // --- corrections, path two: at the touch-up warning the person chooses; a redraw puts the change in the plan
     assert.strictEqual(ws.loadReview(root, 'PG_001_002_V02').repair_cycle, 1);
     const planBefore = fs.readFileSync(path.join(ws.pageDir(root, 'PG_001_002'), 'page.yaml'), 'utf8');
-    job = await s.runOp(id, 'page.correct', { page: 'PG_001_002', text: 'El chico tiene que llevar la capucha puesta.' });
+    r = await s.api('POST', `${P}/ops`, { op: 'page.correct', params: { page: 'PG_001_002', text: 'El chico tiene que llevar la capucha puesta.' } });
+    assert.deepStrictEqual([r.status, r.body.error.code], [409, 'touch_up_choice'], 'without a choice nothing is decided for the person');
+    assert.deepStrictEqual([r.body.error.details.touch_ups, r.body.error.details.warning, r.body.error.details.modes], [1, 1, ['touch_up', 'redraw']]);
+    r = await s.api('POST', `${P}/ops`, { op: 'page.correct', params: { page: 'PG_001_002', text: 'x', mode: 'again' } });
+    assert.strictEqual(r.status, 400);
+    job = await s.runOp(id, 'page.correct', { page: 'PG_001_002', text: 'El chico tiene que llevar la capucha puesta.', mode: 'redraw' });
     assertDone(job, 'page.correct (redraw)');
     assert.strictEqual(job.result.path, 'redraw');
     assert.deepStrictEqual([job.result.path_label_code, job.result.path_label], ['path.redraw', 'Se dibujó otra vez con el plan cambiado.']);
     assert.deepStrictEqual(job.steps.map((x) => x.id), ['request', 'plan', 'compile', 'draw', 'review']);
     assert.strictEqual(job.steps[1].label_code, 'step.correct.plan.page');
-    assert.ok(/^Límite de arreglos alcanzado/.test(job.steps[1].label));
+    assert.ok(/^Elegiste redibujar/.test(job.steps[1].label));
     assert.strictEqual(job.steps[3].label_code, 'step.correct.draw.redraw.page');
     assert.deepStrictEqual([job.result.from, job.result.render], ['PG_001_002_V02', 'PG_001_002_V03']);
     assert.strictEqual(job.result.passes, true);
     const redrawn = ws.loadReview(root, 'PG_001_002_V03');
     assert.deepStrictEqual([redrawn.repair_cycle, redrawn.supersedes], [0, null], 'a redraw starts a new lineage');
-    assert.ok(/PG_001_002_V02 había llegado al límite de arreglos/.test(redrawn.notes));
+    assert.ok(/en lugar de editar PG_001_002_V02/.test(redrawn.notes));
     const carried = redrawn.findings.find((f) => f.source === 'user_request');
     assert.deepStrictEqual([carried.status, carried.recheck.render], ['fixed', 'PG_001_002_V03'], 'the requested change is checked in the new drawing');
     const planAfter = fs.readFileSync(path.join(ws.pageDir(root, 'PG_001_002'), 'page.yaml'), 'utf8');
@@ -358,10 +366,11 @@ async function main() {
       'the redraw is a fresh generate package, not a repair');
     assert.strictEqual(ws.loadProject(root).repair_policy.max_cycles, 1, 'the limit was not raised');
     assert.strictEqual(ws.loadPage(root, 'PG_001_002').current_render, 'PG_001_002_V03');
-    // The same request by the edit path would have been refused by the scaffold.
     r = await s.api('GET', `${P}/pages/PG_001_002`);
     assert.strictEqual(r.body.renders.length, 3);
-    assert.strictEqual(r.body.repair_limit, 1);
+    assert.deepStrictEqual([r.body.repair_limit, r.body.touch_up_warning], [1, 1]);
+
+
 
     // --- approving a page -----------------------------------------------------------------------------------
     // A page that passed with a note: the note is in the API as an open minor finding, and approving the page accepts it.
@@ -534,6 +543,23 @@ async function main() {
     });
     assert.strictEqual(r.body.next, null);
     assert.deepStrictEqual(r.body.active_jobs, []);
+
+    // --- corrections, path three: the person touches up anyway, past the repair limit -----------------------
+    // Page 3, approved as drawn: one touch-up brings it to the warning (and to max_cycles 1).
+    job = await s.runOp(id, 'page.correct', { page: 'PG_001_003', text: 'La gaviota más pequeña.' });
+    assertDone(job, 'page.correct (first touch-up)');
+    assert.deepStrictEqual([job.result.path, job.result.render, ws.loadReview(root, 'PG_001_003_V02').repair_cycle], ['edit', 'PG_001_003_V02', 1]);
+    r = await s.api('POST', `${P}/ops`, { op: 'page.correct', params: { page: 'PG_001_003', text: 'Más niebla sobre el agua.' } });
+    assert.deepStrictEqual([r.status, r.body.error.code], [409, 'touch_up_choice']);
+    job = await s.runOp(id, 'page.correct', { page: 'PG_001_003', text: 'Más niebla sobre el agua.', mode: 'touch_up' });
+    assertDone(job, 'page.correct (touch up anyway)');
+    assert.deepStrictEqual(job.steps.map((x) => x.id).slice(0, 4), ['request', 'compile', 'draw', 'review']);
+    assert.deepStrictEqual([job.result.path, job.result.from, job.result.render], ['edit', 'PG_001_003_V02', 'PG_001_003_V03']);
+    const past = ws.loadReview(root, 'PG_001_003_V03');
+    assert.deepStrictEqual([past.repair_cycle, past.supersedes], [2, 'PG_001_003_V02'], 'the touch-up went past max_cycles 1');
+    assert.strictEqual(ws.loadYaml(path.join(ws.pageDir(root, 'PG_001_003'), 'prompts', 'codex-cli.yaml')).mode, 'repair');
+    assert.strictEqual(ws.loadProject(root).repair_policy.max_cycles, 1, 'the limit in project.yaml was not raised');
+    assert.ok(!validateWorkspace(root).errors.some((e) => e.code === 'REVIEW_REPAIR_LIMIT'), 'a touch-up the person chose passes validate-workspace');
 
     // --- delete moves the project to the trash -------------------------------------------------------------------------------------
     r = await s.api('DELETE', P);

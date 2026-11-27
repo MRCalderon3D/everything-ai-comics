@@ -169,7 +169,13 @@
           "type": "integer",
           "minimum": 0,
           "default": 2,
-          "description": "Maximum repair cycles per page before the plan or the references are fixed instead. Default 2."
+          "description": "Maximum automatic repair cycles per page (repairs an agent or the studio starts after a blocking review) before the plan or the references are fixed instead. Default 2."
+        },
+        "touch_up_warning": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 2,
+          "description": "Edits of one image after which a touch-up the person asks for comes with a warning that more edits may degrade it, and the choice of a redraw from the plan. The person decides; the touch-up may go past max_cycles. Default 2."
         }
       }
     },

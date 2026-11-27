@@ -182,6 +182,37 @@ function toolsForm(ctx, data) {
     h('div', { class: 'job-setting' }, autoRun.el));
 }
 
+/**
+ * How many touch-ups an image takes before a correction warns and offers a
+ * redraw (project.repair_policy.touch_up_warning). It lives in project.yaml,
+ * so the scaffold reads the same number.
+ */
+function touchUpPanel(ctx) {
+  const result = h('div');
+  const current = state.overview && Number.isInteger(state.overview.touch_up_warning) ? state.overview.touch_up_warning : 2;
+  const field = textField({
+    label: t('settings.touch_up_warning'), type: 'number', min: 0, max: 10, value: String(current),
+    hint: t('settings.touch_up_warning_hint'),
+  });
+  field.input.addEventListener('change', async () => {
+    result.replaceChildren();
+    const value = Number(field.value);
+    if (field.value === '' || !Number.isInteger(value) || value < 0 || value > 10) {
+      result.append(notice('bad', t('settings.touch_up_warning_bad')));
+      return;
+    }
+    try {
+      await api.saveOptions(ctx.projectId, { touch_up_warning: value });
+      toast(t('settings.saved'), { kind: 'ok' });
+      await refreshOverview();
+      ctx.refresh();
+    } catch (err) {
+      result.append(notice('bad', errorText(err)));
+    }
+  });
+  return panel(t('settings.touch_up_title'), field.el, result);
+}
+
 export function view(ctx, data) {
   ctx.title = t('nav.settings');
   const base = ctx.projectId ? `/p/${encodeURIComponent(ctx.projectId)}` : null;
@@ -193,6 +224,7 @@ export function view(ctx, data) {
     }),
     h('div', { class: 'stack' },
       data.settings ? toolsForm(ctx, data) : null,
+      data.settings ? touchUpPanel(ctx) : null,
       interfacePanel(ctx),
       base ? h('p', { class: 'muted' }, icon('right'), ' ', t('settings.options_link_before'), ' ', h('a', { href: `${base}/style` }, t('screen.style')), '.') : null,
       panel(t('tools.title'), toolsPanel(data.health, { onChecked: () => ctx.refresh() })),

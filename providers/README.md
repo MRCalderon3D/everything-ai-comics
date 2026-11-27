@@ -45,13 +45,17 @@ module.exports = {
 | comfyui | 8 | false | none | The default graph is text-to-image. The budget describes your own graph with reference nodes. Use overlay lettering. |
 | gemini | 3 | true | unreliable | Reads inline images and edits a given image. |
 | harness-native | 4 | true | unreliable | Handoff to the harness's image tool. No network. |
-| codex-cli | 4 | true | unreliable | Runs `codex exec` and returns the image it draws. The tool renders 1:1, 2:3 and 3:2; any other ratio comes back in the nearest frame and needs a crop. |
+| codex-cli | 5 | true | unreliable | Runs `codex exec` and returns the image it draws. The image tool takes at most 5 input images (measured, see below). It renders 1:1, 2:3 and 3:2; any other ratio comes back in the nearest frame and needs a crop. |
 | manual | 4 | true | unreliable | Handoff to a person. No network. |
 
 What each key means for the pipeline:
 
 - `referenceImages` is the budget `build-reference-plan.js` plans against. The
-  edit target of a repair counts as one of the images.
+  edit target of a repair counts as one of the images. A reference plan
+  records the provider, budget and `generation.mode` it was built for, and
+  `compile-prompts.js` rebuilds it when any of them changed.
+  `check-continuity.js` warns at plan time (`REFERENCE_BUDGET`) about pages
+  and panels whose cast needs more images than the budget.
 - `aspectRatios` always includes the portrait page ratios 2:3, 3:4, 9:16 and
   the square 1:1. A package with any other ratio is rejected with the list of
   supported ones. fal and ComfyUI take pixel sizes, so their adapters map each
@@ -163,12 +167,15 @@ handoff leaves to the harness:
    The images are the package's inputs in attachment order, as absolute
    paths. The instruction goes in on stdin, because `-i` takes several
    values and a prompt on the command line would be read as one more image.
-3. The instruction tells Codex to use its own image tool, to pass every
-   attached image as an input in order, to render the stated frame, to write
-   no code that draws the picture, and to save exactly one PNG at a temporary
-   path inside `outDir`. Codex answers with a small JSON object: the saved
-   path, the pixel size, whether the references were passed, and the image
-   model if the tool names it.
+3. The instruction lists the absolute path of every input image and tells
+   Codex to call its image tool once with `referenced_image_paths` set to
+   exactly those paths, in order, and never with
+   `num_last_images_to_include`. It also asks Codex to render the stated
+   frame, to write no code that draws the picture, and to save exactly one
+   PNG at a temporary path inside `outDir`. Codex answers with a small JSON
+   object: the saved path, the pixel size, `reference_mode` (the parameter
+   the tool call used), `references_count` (how many images the call
+   received), and the image model if the tool names it.
 4. When the process ends, the file is checked with
    `scripts/lib/image-info.js`, read into `_media`, and deleted together
    with the message file. `generate-assets.js` names the render or the
@@ -183,6 +190,27 @@ drawn in the nearest of 1:1, 2:3 and 3:2 with the content kept inside a
 centred area of the target ratio. `compile()` warns about it, and the
 record's notes say the file needs a crop.
 
+The reference budget is 5. Codex's image tool takes input images two ways:
+`num_last_images_to_include` (images attached to the conversation, which is
+what `-i` gives it) and `referenced_image_paths` (file paths). Measured with
+Codex CLI 0.167.1 on 2026-11-27, with a look master and turnarounds of
+different characters named in the prompt by letter only:
+
+| Images | Codex reported | Result |
+|---|---|---|
+| 5 | `referenced_image_paths`, 5 | Page drawn in 97 s, every identity held |
+| 6 | `referenced_image_paths`, 6 | Tool call rejected: at most 5 paths; nothing drawn |
+| 8 | `referenced_image_paths`, 8 | Same rejection |
+| 10 | `referenced_image_paths`, 10 | Same rejection |
+
+Attached images go over 5 without an error: the tool keeps 5 and drops the
+rest, and the page looks fine as long as the prompt describes the missing
+character in words. Paths make the limit visible, and the reported count
+makes a drop visible: a run whose `references_count` is lower than the
+number of images sent fails, and the image is discarded. A run whose reply
+leaves the count out keeps the image, and the notes say the count is
+unknown.
+
 A failed run gives a `failed` record with a plain message in
 `response.error`, and the rest of the batch goes on:
 
@@ -194,6 +222,8 @@ A failed run gives a `failed` record with a plain message in
 | Time limit passed | `timed out after N s`; the process tree is stopped |
 | Signal aborted | `cancelled`; the process tree is stopped |
 | Saved file is not an image | `not an image`; the bytes are discarded |
+| Fewer references reached the tool than were sent | `Codex passed N of the M reference images`; the image is discarded |
+| No reference reached the tool (`reference_mode: none`) | `received none of the M reference images`; the image is discarded |
 
 Text on stderr alone is never a failure. Codex prints unrelated noise there,
 such as MCP servers that are not running. A non-zero exit after the image

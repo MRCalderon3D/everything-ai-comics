@@ -288,7 +288,11 @@ async function spanishProject() {
     assert.deepStrictEqual([job.error.code, job.error.message_code], ['not_ready', 'error.not_ready']);
     assert.ok(job.error.message.startsWith('Todavía no se puede hacer una edición definitiva'), job.error.message);
     assert.ok(job.error.details.blockers.every((b) => b.code && b.message_code && !ENGLISH.test(b.message)), JSON.stringify(job.error.details.blockers));
-    job = await s.runOp(id, 'page.correct', { page: 'PG_001_001', text: 'La lámpara tiene que verse encendida.' });
+    // The page is at the touch-up warning: the refusal asks for the person's choice, in Spanish.
+    r = await s.api('POST', `${P}/ops`, { op: 'page.correct', params: { page: 'PG_001_001', text: 'La lámpara tiene que verse encendida.' } });
+    assert.deepStrictEqual([r.status, r.body.error.code, r.body.error.params.n], [409, 'touch_up_choice', 2]);
+    assert.ok(/^Esta imagen ya se ha retocado 2 veces/.test(r.body.error.message), r.body.error.message);
+    job = await s.runOp(id, 'page.correct', { page: 'PG_001_001', text: 'La lámpara tiene que verse encendida.', mode: 'redraw' });
     assert.strictEqual(job.status, 'done', JSON.stringify(job.error));
     assert.deepStrictEqual([job.result.path, job.result.path_label_code], ['redraw', 'path.redraw']);
     job = await s.runOp(id, 'publish.build', { formats: ['cbz'] });

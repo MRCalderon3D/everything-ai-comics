@@ -156,9 +156,9 @@ review is marked as not independent.
 | Story | Describe what the comic is about. The studio writes the story bible and the series plan, and you edit them. |
 | Style | Pick a preset, describe a style, or upload reference images. Approve a look page, which freezes the style. |
 | Characters | Add each character from a description, a photo, or both. Approve the drawn sheet: it becomes the face everything else is drawn from. Refine the full character sheet round by round. |
-| Pages | Write what happens, on one page or several. Read the plan per page, then start the drawing queue. |
+| Pages | Write what happens, on one page or several. Read the plan per page, change what it shows and its lettering (add, remove or reorder balloons, pick their kind and who says them, with the word limits counted as you type), then start the drawing queue. |
 | Check | Read the verdict of each page with its evidence: what was expected and what is on the page. |
-| Corrections | Mark a region or pick a panel, write the change, and compare the new version with the old one. |
+| Corrections | Mark a region or pick a panel, write the change, and compare the new version with the old one. After a few touch-ups on one image the studio warns that more may wear it down, and you choose between touching up anyway and redrawing the page with the change. |
 | Cover | Optional. Describe it or let the AI propose one. |
 | Publish | Build PDF, CBZ, EPUB, a web reader, or one image per page. |
 
@@ -323,10 +323,15 @@ separate field on the review.
 
 A repair names the edit target, the failing panels, the exact changes, and
 what must stay locked. It produces a sibling version. `repair_policy.max_cycles`
-in `project.yaml` caps the attempts at 2 by default. `compile-prompts.js
---repair` refuses once the limit is reached, and `validate-workspace.js`
-rejects a review whose `repair_cycle` exceeds it. After that, the plan or the
-references are fixed before anything else is generated.
+in `project.yaml` caps the automatic attempts at 2 by default.
+`compile-prompts.js --repair` refuses once the limit is reached, and
+`validate-workspace.js` rejects a review whose `repair_cycle` exceeds it.
+After that, the plan or the references are fixed before anything else is
+generated. Touch-ups a person asks for follow `repair_policy.touch_up_warning`
+instead: at that count they are warned that more edits may degrade the
+image and offered a redraw, and they choose. In the web studio that choice
+is two buttons on the correction form and on the chat's card, and the
+number is in Settings.
 
 ### Nothing is overwritten
 

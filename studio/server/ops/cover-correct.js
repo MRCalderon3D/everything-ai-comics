@@ -1,9 +1,10 @@
 'use strict';
 /**
  * cover.correct: a change the person asks for on a rendered cover. Same two
- * paths as page.correct (ops/correction.js): an edit of the existing cover,
- * or, once the repair limit is reached, the change goes into cover.yaml and
- * the cover is drawn again as a new lineage.
+ * paths as page.correct (ops/correction.js): an edit of the existing cover
+ * (a touch-up), or the change goes into cover.yaml and the cover is drawn
+ * again as a new lineage. At the project's touch-up warning the person
+ * picks one with `mode`.
  */
 
 const S = require('../scaffold');
@@ -20,6 +21,7 @@ module.exports = {
     { name: 'render', type: 'string', required: false, description: 'The cover render the request is about. Default: the newest one.' },
     { name: 'region', type: 'object', required: false, description: '{ x, y, w, h } as fractions of the image (0 to 1).' },
     { name: 'lettering', type: 'boolean', required: false, description: 'True when the request changes text in the image.' },
+    { name: 'mode', type: 'string', required: false, description: 'touch_up or redraw: what the person chose once the image has reached the touch-up warning of the project (the request is refused without it then). touch_up edits the image anyway; redraw writes the change into the plan and draws it again. Set it only when the person said which.' },
   ],
 
   validate(params, { project }) {
@@ -31,10 +33,12 @@ module.exports = {
     const render = params.render ? String(params.render) : renders[renders.length - 1];
     if (!render) throw new HttpError(409, 'no_render', 'The cover has no render to correct yet. Draw it first.');
     if (!RENDER_RE.test(render) || !renders.includes(render)) throw bad(`"${render}" is not a render of this cover.`);
+    const text = str(params, 'text', { required: true, max: 4000 });
+    const mode = correction.checkMode(params);
     return {
-      issue, render, text: str(params, 'text', { required: true, max: 4000 }),
+      issue, render, text,
       region: checkRegion(params.region), lettering: params.lettering === true,
-      path: correction.pathFor(root, render),
+      mode, path: correction.choosePath(root, render, mode, 'cover'),
     };
   },
 
@@ -50,6 +54,7 @@ module.exports = {
       text: params.text,
       region: params.region,
       lettering: params.lettering,
+      path: params.path,
     });
     return Object.assign({ issue: params.issue }, outcome);
   },

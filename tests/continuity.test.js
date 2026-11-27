@@ -1,6 +1,7 @@
 'use strict';
 /**
- * check-continuity.js: the eleven ledger rules of docs/data-model.md.
+ * check-continuity.js: the eleven ledger rules of docs/data-model.md, and
+ * the plan-time reference budget warning (REFERENCE_BUDGET).
  * Each rule gets a clean workspace broken in exactly one place and must
  * surface its own code; the untouched workspace must surface nothing.
  */
@@ -428,6 +429,47 @@ t.test('human report groups by page and prints a fix hint per finding', () => {
   assert.strictEqual(lines[1].trim(), 'PG_001_002');
   assert.ok(lines[2].includes('PN_001_002_01') && lines[2].includes('[CUSTODY_JUMP]'), lines[2]);
   assert.ok(lines[3].trim().startsWith('fix: '), lines[3]);
+});
+
+// --- reference budget (plan time) ----------------------------------------------
+
+const budgetOf = (findings) => findings.filter((f) => f.code === 'REFERENCE_BUDGET');
+
+t.test('REFERENCE_BUDGET: a cast over the provider budget is a warning per page and per panel', () => {
+  // replicate takes one image: the look master plus Mara is already two.
+  const tight = budgetOf(audit(null, { provider: 'replicate' }));
+  assert.ok(tight.length && tight.every((f) => f.severity === 'warning' && f.entity === 'replicate'), JSON.stringify(tight, null, 1));
+  const page1 = tight.filter((f) => f.page === 'PG_001_001');
+  assert.deepStrictEqual(page1.map((f) => f.panel), ['PN_001_001_01', 'PN_001_001_02', null]);
+  assert.ok(/^PN_001_001_01 draws a cast that needs 2 required reference images \(the look master, CHAR_MARA\) and replicate takes 1/
+    .test(page1[0].message), page1[0].message);
+  assert.ok(/^PG_001_001 is drawn as one image and its cast needs 2 required reference images .* Per panel: PN_001_001_01 2, PN_001_001_02 2\. Panel by panel it still does not fit: PN_001_001_01, PN_001_001_02 go over\.$/
+    .test(page1[2].message), page1[2].message);
+
+  // gemini takes three. Oskar and Mara drawn in separate panels plus a required
+  // plate: four for the whole page, three for each panel.
+  const split = budgetOf(audit((w) => w.edit(PAGE_2, (p) => {
+    castRow(p, 0, 'CHAR_OSKAR').off_panel = false;
+    castRow(p, 0, 'CHAR_MARA').off_panel = true;
+    castRow(p, 1, 'CHAR_OSKAR').off_panel = true;
+    p.references.required.push('LOC_FERRY_DECK_PLATE_MASTER_V01');
+  }), { provider: 'gemini' }));
+  assert.strictEqual(split.length, 1, JSON.stringify(split, null, 1));
+  assert.strictEqual(split[0].panel, null);
+  assert.ok(/needs 4 required reference images \(the look master, CHAR_OSKAR, CHAR_MARA, LOC_FERRY_DECK_PLATE_MASTER_V01\) but gemini takes 3\. Per panel: PN_001_002_01 3, PN_001_002_02 3\. Panel by panel it fits: the fullest panel, PN_001_002_01, needs 3\.$/
+    .test(split[0].message), split[0].message);
+
+  // The same page set to per_panel: each panel fits, so nothing to warn about.
+  assert.deepStrictEqual(budgetOf(audit((w) => w.edit(PAGE_2, (p) => {
+    castRow(p, 0, 'CHAR_OSKAR').off_panel = false;
+    castRow(p, 0, 'CHAR_MARA').off_panel = true;
+    castRow(p, 1, 'CHAR_OSKAR').off_panel = true;
+    p.references.required.push('LOC_FERRY_DECK_PLATE_MASTER_V01');
+    p.generation.mode = 'per_panel';
+  }), { provider: 'gemini' })), []);
+
+  // Without opts.provider the page's own provider applies (harness-native, 4): no warning.
+  assert.deepStrictEqual(budgetOf(audit()), []);
 });
 
 t.test('CLI: exit 0 and [] when clean; exit 1 and the findings when not', () => {

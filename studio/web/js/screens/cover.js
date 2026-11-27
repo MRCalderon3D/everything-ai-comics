@@ -12,7 +12,7 @@ import { queueOp } from '/js/components/ask.js';
 import { jobsFor } from '/js/components/jobs.js';
 import { frame, openViewer, versionStrip } from '/js/components/viewer.js';
 import { reviewPanel, verdictChip, verdictWords, outcomeOf, approveRender, confirmCorrection } from '/js/components/verdict.js';
-import { correction, lastCorrection } from '/js/components/correction.js';
+import { correction, lastCorrection, queueCorrection } from '/js/components/correction.js';
 import { handoff, noDrawTool } from '/js/components/handoff.js';
 import { versionName } from '/js/labels.js';
 import { toast } from '/js/components/toast.js';
@@ -110,15 +110,15 @@ export function view(ctx, { issue, cover, repairLimit }) {
   const correctFinding = async (finding) => {
     const text = await confirmCorrection(finding);
     if (!text) return;
-    await queueOp('cover.correct', { issue, render: current.id, text, region: finding.region || undefined, lettering: finding.check === 'lettering' });
+    await queueCorrection('cover.correct', { issue, render: current.id, text, region: finding.region || undefined, lettering: finding.check === 'lettering' });
   };
   let box = null;
   if (current) {
     box = correction(ctx, {
       key: 'cover',
       render: current,
-      repairLimit,
-      send: (params) => queueOp('cover.correct', { issue, text: params.text, render: params.render, region: params.region, lettering: params.lettering }),
+      touchUpWarning: state.overview.touch_up_warning,
+      send: (params) => queueCorrection('cover.correct', { issue, text: params.text, render: params.render, region: params.region, lettering: params.lettering, mode: params.mode }),
     });
   }
   const last = current ? lastCorrection(ctx, {

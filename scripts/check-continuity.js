@@ -24,9 +24,17 @@
  *   11 UNKNOWN_REFERENCE  character, prop, location, wardrobe, level or
  *                         landmark that the workspace does not define
  *      UNREADABLE_FILE    a page.yaml or state file that cannot be read
+ *      REFERENCE_BUDGET   a page or panel whose drawn cast needs more required
+ *                         reference images than the image provider takes
  *
  * Rules 1-10 are errors. Rule 11 is an error, except for levels and landmarks
- * of a location that has no map.yaml, which is a warning.
+ * of a location that has no map.yaml, which is a warning. REFERENCE_BUDGET is
+ * a warning: the plan is valid, but the page cannot be drawn as planned with
+ * that provider. It counts what build-reference-plan.js will require (the
+ * look master, one identity master per character drawn, non-default
+ * wardrobe sheets, references.required) against the provider's
+ * referenceImages: the page's generation.provider, else the project's
+ * default_providers.image, or the one passed in opts.provider.
  *
  * This audits the written plan. It says nothing about the drawn pages.
  */
@@ -37,17 +45,23 @@ const ws = require('./lib/workspace');
 const { readYaml } = require('./lib/artifacts');
 const { parseArgs, helpIfRequested, fatal } = require('./lib/cli');
 const { PASS, FAIL } = require('./lib/report');
+const { referenceDemand, pageMode } = require('./build-reference-plan');
+const { loadImageProvider, resolveProviderId } = require('./lib/providers');
 
 const HELP = `
 check-continuity.js — audit the panel ledger of a workspace.
 
 Usage:
-  node scripts/check-continuity.js --root <workspace> [--issue ISS_001] [--json]
+  node scripts/check-continuity.js --root <workspace> [--issue ISS_001] [--provider <id>] [--json]
 
 Options:
   --root <dir>     Workspace root (the directory holding project.yaml).
                    Default: the nearest workspace above the current directory.
   --issue <id>     Audit one issue only.
+  --provider <id>  Image provider whose reference budget the plan is checked
+                   against (REFERENCE_BUDGET warnings). Default: each page's
+                   generation.provider, then the project's
+                   default_providers.image.
   --json           Print the findings array as JSON.
   --help           Show this help.
 
@@ -67,6 +81,7 @@ const CODES = {
   PAGE_CHAIN: 'PAGE_CHAIN',
   UNKNOWN_REFERENCE: 'UNKNOWN_REFERENCE',
   UNREADABLE_FILE: 'UNREADABLE_FILE',
+  REFERENCE_BUDGET: 'REFERENCE_BUDGET',
 };
 
 /** One-line fix hint per code, printed under each finding. */
@@ -83,6 +98,7 @@ const HINTS = {
   PAGE_CHAIN: 'Point enters_from at the previous page and exits_to at the next one; null only at the two ends of the issue.',
   UNKNOWN_REFERENCE: 'Create the missing bible entry, or correct the id to one the workspace defines.',
   UNREADABLE_FILE: 'Fix the YAML so the file parses, or restore the missing file.',
+  REFERENCE_BUDGET: 'Draw the page panel by panel (generation.mode per_panel), split the cast across panels or pages, or use an image provider that takes more reference images. Changing who is in a panel is a story change: propose it, do not make it silently.',
 };
 
 // --- small helpers -----------------------------------------------------------
@@ -554,7 +570,64 @@ function auditPage(page, lookups, tracker, add) {
   }
 }
 
-function auditIssue(root, issueId, lookups, findings) {
+/**
+ * Plan-time reference budget: warn on pages and panels whose drawn cast
+ * needs more required reference images than the image provider takes.
+ * A full_page page is one request; a per_panel page is one per panel, and
+ * a panel over the budget is over it in both modes.
+ */
+function auditBudget(root, issueId, pages, opts, add) {
+  let project = {};
+  try {
+    project = ws.loadProject(root) || {};
+  } catch (err) { /* no project: the provider default applies */ }
+  const budgets = new Map();
+  const budgetOf = (providerId) => {
+    if (!budgets.has(providerId)) {
+      let capacity = null;
+      try {
+        const caps = loadImageProvider(providerId).capabilities || {};
+        capacity = typeof caps.referenceImages === 'number' ? caps.referenceImages : null;
+      } catch (err) {
+        capacity = null; // an unknown provider is the validator's finding, not this one
+      }
+      budgets.set(providerId, capacity);
+    }
+    return budgets.get(providerId);
+  };
+  const named = (items) => items.map((i) => (i === 'look master' ? 'the look master' : i)).join(', ');
+
+  for (const page of pages) {
+    if (!page.doc) continue;
+    const providerId = resolveProviderId(opts.provider, page.doc, project);
+    const capacity = budgetOf(providerId);
+    if (capacity === null) continue;
+    let demand;
+    try {
+      demand = referenceDemand(root, page.doc);
+    } catch (err) {
+      continue; // a page the other rules cannot read either
+    }
+    const over = demand.panels.filter((p) => p.count > capacity);
+    for (const p of over) {
+      add(CODES.REFERENCE_BUDGET, 'warning', page.id, p.id, providerId,
+        `${p.id} draws a cast that needs ${p.count} required reference images (${named(p.items)}) and ${providerId} takes ${capacity}: ` +
+        'this panel cannot be drawn as planned, not even panel by panel.');
+    }
+    if (pageMode(page.doc) === 'full_page' && demand.page.count > capacity) {
+      const heaviest = demand.panels.reduce((a, b) => (b.count > a.count ? b : a), { id: null, count: 0 });
+      const perPanel = demand.panels.map((p) => `${p.id} ${p.count}`).join(', ');
+      add(CODES.REFERENCE_BUDGET, 'warning', page.id, null, providerId,
+        `${page.id} is drawn as one image and its cast needs ${demand.page.count} required reference images ` +
+        `(${named(demand.page.items)}) but ${providerId} takes ${capacity}. Per panel: ${perPanel}. ` +
+        (over.length
+          ? `Panel by panel it still does not fit: ${over.map((p) => p.id).join(', ')} ${over.length === 1 ? 'goes' : 'go'} over.`
+          : `Panel by panel it fits: the fullest panel, ${heaviest.id}, needs ${heaviest.count}.`));
+    }
+  }
+}
+
+function auditIssue(root, issueId, lookups, findings, opts = {}) {
   const add = (code, severity, page, panel, entity, message) => {
     findings.push({ code, severity, issue: issueId, page, panel, entity, message });
   };
@@ -601,13 +674,16 @@ function auditIssue(root, issueId, lookups, findings) {
   for (const page of pages) {
     if (page.doc) auditPage(page, lookups, tracker, add);
   }
+  auditBudget(root, issueId, pages, opts, add);
   return { pages: pages.length, panels: pages.reduce((n, p) => n + (p.doc ? arr(p.doc.panels).length : 0), 0) };
 }
 
 /**
  * Audit the panel ledger of a workspace.
  * @param {string} root  workspace root (the directory holding project.yaml)
- * @param {{issue?: string}} [opts]
+ * @param {{issue?: string, provider?: string}} [opts] provider: the image
+ *   provider whose reference budget the plan is checked against (default:
+ *   each page's generation.provider, then the project's default)
  * @returns {{findings: Array<{code: string, severity: 'error'|'warning', issue: string, page: string|null, panel: string|null, entity: string|null, message: string}>}}
  */
 function checkContinuity(root, opts = {}) {
@@ -637,7 +713,7 @@ function checkContinuity(root, opts = {}) {
   const lookups = createLookups(wsRoot);
   for (const issueId of issues) {
     try {
-      auditIssue(wsRoot, issueId, lookups, findings);
+      auditIssue(wsRoot, issueId, lookups, findings, opts);
     } catch (err) {
       findings.push({
         code: CODES.UNREADABLE_FILE,
@@ -692,6 +768,7 @@ function main(argv = process.argv.slice(2)) {
   const { flags } = parseArgs(argv);
   if (flags.root === true) fatal('--root needs a directory (see --help)');
   if (flags.issue === true) fatal('--issue needs an issue ID such as ISS_001 (see --help)');
+  if (flags.provider === true) fatal('--provider needs an image provider ID such as codex-cli (see --help)');
   const root = ws.findWorkspaceRoot(flags.root ? path.resolve(String(flags.root)) : process.cwd());
   if (!root) {
     fatal(`no workspace found at ${flags.root || process.cwd()} (a workspace root holds project.yaml)`);
@@ -700,7 +777,10 @@ function main(argv = process.argv.slice(2)) {
     fatal(`issue not found: ${flags.issue} (looked in ${path.join(root, 'issues')})`);
   }
 
-  const { findings } = checkContinuity(root, { issue: flags.issue ? String(flags.issue) : undefined });
+  const { findings } = checkContinuity(root, {
+    issue: flags.issue ? String(flags.issue) : undefined,
+    provider: flags.provider ? String(flags.provider) : undefined,
+  });
   const errors = findings.filter((f) => f.severity === 'error');
   const warnings = findings.filter((f) => f.severity !== 'error');
 

@@ -9,6 +9,7 @@ import { state } from '/js/store.js';
 import { screenHead, bench } from '/js/components/bench.js';
 import { panel, actionButton, notice, emptyState } from '/js/components/ui.js';
 import { queueOp } from '/js/components/ask.js';
+import { queueCorrection } from '/js/components/correction.js';
 import { jobsFor } from '/js/components/jobs.js';
 import { frame, openViewer, versionStrip, compareBox } from '/js/components/viewer.js';
 import { reviewPanel, verdictChip, verdictWords, verdictClass, outcomeOf, approveRender, confirmCorrection } from '/js/components/verdict.js';
@@ -93,7 +94,7 @@ export function view(ctx, { issue, page }) {
   const correctFinding = async (finding) => {
     const text = await confirmCorrection(finding);
     if (!text) return;
-    await queueOp('page.correct', {
+    await queueCorrection('page.correct', {
       page: page.id, render: shown.id, text, panel: finding.panel || undefined, region: finding.region || undefined,
       lettering: finding.check === 'lettering',
     });

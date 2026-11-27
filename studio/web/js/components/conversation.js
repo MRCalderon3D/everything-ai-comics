@@ -167,9 +167,9 @@ function cardTools(card) {
   return h('span', null, names.join(' · '));
 }
 
-async function runCard(card) {
+async function runCard(card, choice) {
   try {
-    const res = await api.runAction(state.projectId, card.conversation, card.id);
+    const res = await api.runAction(state.projectId, card.conversation, card.id, choice);
     if (res.job) rememberJob(res.job);
     updateCard(res.card);
   } catch (err) {
@@ -200,11 +200,45 @@ function cardDetails(card) {
   const details = card.details || [];
   if (!details.length) return null;
   return h('div', { class: 'action-params' },
-    h('dl', { class: 'action-details plain' }, details.map((d) => [h('dt', null, paramLabel(d.name)), h('dd', null, d.name === 'sheet' ? tv('sheet', d.value, d.value) : d.value)])),
+    h('dl', { class: 'action-details plain' }, details.map((d) => [h('dt', null, paramLabel(d.name)), h('dd', null, d.name === 'sheet' ? tv('sheet', d.value, d.value) : d.name === 'mode' ? tv('correct_mode', d.value, d.value) : d.value)])),
     h('details', { class: 'action-raw' },
       h('summary', { class: 'small muted' }, t('card.raw_details')),
       h('dl', { class: 'action-details' }, Object.entries(card.params || {}).map(([name, value]) => [h('dt', null, h('code', null, name)),
         h('dd', null, h('code', null, typeof value === 'string' ? value : JSON.stringify(value)))]))));
+}
+
+/**
+ * What a lettering card will change, before it runs: one line per balloon
+ * added, removed, changed or moved, with the budgets it passes.
+ */
+function cardPreview(card) {
+  const p = card.preview;
+  if (!p || !Array.isArray(p.changes)) return null;
+  return h('div', { class: 'action-preview' },
+    p.changes.length
+      ? h('ul', { class: 'letter-changes' }, p.changes.map((c) => h('li', { class: `letter-change ${c.change}` },
+        h('span', { class: 'letter-change-kind' }, t(`letter.change_${c.change}`, { panel: c.panel })), ' ',
+        h('span', { class: 'letter-glyph', 'aria-hidden': 'true' }, icon(c.kind)),
+        h('span', null, ` ${t(`letter_kind.${c.kind}`)}${c.speaker ? `, ${c.speaker}` : ''}: `),
+        c.before && c.change === 'changed' ? [h('del', null, c.before), ' '] : null,
+        h('q', null, c.text))))
+      : h('p', { class: 'small muted' }, t('letter.no_change')),
+    (p.warnings || []).length ? h('p', { class: 'small action-warn' }, icon('alert'), ' ', tn('letter.card_over', p.warnings.length)) : null,
+    p.drawn ? h('p', { class: 'small muted' }, t('letter.card_drawn')) : null);
+}
+
+/** A correction card at the touch-up warning: the warning and the person's two choices instead of Run. */
+function cardChoice(card) {
+  const c = card.choice;
+  if (!c) return null;
+  if (card.status !== 'pending') {
+    return card.chosen ? h('p', { class: 'small muted' }, t('card.chosen', { choice: (c.options.find((o) => o.mode === card.chosen) || {}).label || card.chosen })) : null;
+  }
+  return h('div', { class: 'stack-s action-choice' },
+    h('p', { class: 'small action-warn' }, icon('alert'), ' ', c.text),
+    h('div', { class: 'row' },
+      c.options.map((o, i) => button(o.label, { kind: i === 0 ? 'primary' : 'accent', small: true, onclick: () => runCard(card, o.mode) })),
+      button(t('card.dismiss'), { kind: 'quiet', small: true, onclick: () => dismissCard(card) })));
 }
 
 /** The news marker of a screen a card or result links to (unseen.js). */
@@ -231,16 +265,18 @@ function actionCard(card) {
     h('p', { class: 'small muted' }, card.summary),
     card.why ? h('p', { class: 'action-why' }, h('span', { class: 'muted' }, t('card.why')), ' ', card.why) : null,
     cardDetails(card),
+    cardPreview(card),
     card.after ? h('p', { class: 'small action-after' }, icon('right'), ' ', t('card.after', { n: card.after.n, title: card.after.title || '' })) : null,
     card.uploads && card.uploads.length ? uploadThumbs(card.uploads) : null,
     card.photo_rights ? h('p', { class: 'notice warn small' }, t('characters.photo_rights')) : null,
     h('p', { class: 'action-meta small' }, cardTools(card), card.tools && card.tools.length ? ' · ' : '', cardTime(card)),
-    pending && card.draws ? h('p', { class: 'small action-warn' }, icon('alert'), ' ', t('card.draws')) : null,
+    pending && card.draws && !card.choice ? h('p', { class: 'small action-warn' }, icon('alert'), ' ', t('card.draws')) : null,
     pending && card.decision ? h('p', { class: 'small action-warn' }, icon('alert'), ' ', t('card.decision')) : null,
     pending && card.always_confirm ? h('p', { class: 'small action-warn' }, icon('alert'), ' ', t('card.always_confirm')) : null,
     card.status === 'waiting' ? h('p', { class: 'small muted' }, t('card.waiting_for', { n: card.after ? card.after.n : '?' })) : null,
     card.status === 'cancelled' && card.error ? h('p', { class: 'small muted' }, error) : null,
-    pending
+    cardChoice(card),
+    pending && !card.choice
       ? h('div', { class: 'row' },
         button(t('card.run'), { kind: card.draws ? 'accent' : 'primary', small: true, onclick: () => runCard(card) }),
         button(t('card.dismiss'), { kind: 'quiet', small: true, onclick: () => dismissCard(card) }))
