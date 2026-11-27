@@ -76,12 +76,14 @@ line without lending anyone its characters.
    role.
 7. Decide how each asset will be used. An identity photograph is not
    attached to page requests, since a photograph on a page request drags
-   the rendering toward photography. It reaches the page through the
-   written description: `compile-prompts.js --asset <CHAR_ID> --sheet
-   turnaround` builds the turnaround from `character.yaml` with the look
-   master attached, and the approved turnaround becomes the page-level
-   identity reference. List the sheet in `character.references` and leave
-   the photograph out, so reference plans pick the sheet. A style sample
+   the rendering toward photography. It is a likeness source for the
+   character's first sheet only: `compile-prompts.js --asset <CHAR_ID>
+   --sheet turnaround` (or `--sheet model`, the full character sheet) builds
+   the sheet from `character.yaml` with the look master and the approved
+   photographs attached, the photographs for likeness only. Once a drawn
+   sheet is approved it is the identity master, and expressions, wardrobe,
+   pages, and the cover are drawn from it, never from the photograph. Keep
+   the photograph's `kind: detail` so the scripts can tell it from a sheet. A style sample
    reaches the look page the same way, through the style bible and the
    style block.
 8. Report conflicts and do not merge them. A file that contradicts an

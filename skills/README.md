@@ -24,7 +24,7 @@ authoritative one-liners from [docs/conventions.md](../docs/conventions.md).
 | Skill | Description |
 |---|---|
 | [character-consistency](character-consistency/SKILL.md) | Lock canonical character identity so every drawn appearance matches every other. |
-| [character-sheet-generation](character-sheet-generation/SKILL.md) | Produce reference sheets (turnarounds, expressions, wardrobe) that become approved identity masters. |
+| [character-sheet-generation](character-sheet-generation/SKILL.md) | Produce reference sheets (turnarounds, full character sheets, expressions, wardrobe) that become approved identity masters. |
 | [location-design](location-design/SKILL.md) | Define each location's architecture, dressing, light, and time-of-day states. |
 | [location-mapping](location-mapping/SKILL.md) | Map levels, sides, landmarks, and exits so panels can state positions precisely. |
 | [visual-style-development](visual-style-development/SKILL.md) | Define the comic's visual language (line, tone, texture, rendering) as an enforceable style bible. |

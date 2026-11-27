@@ -31,4 +31,12 @@ wardrobe_file: wardrobe.yaml
 references:                            # asset IDs registered in references/manifest.yaml
   - CHAR_EXAMPLE_TURN_MASTER_V01
 
+sheet:                                 # optional. what the full character sheet shows besides the turnaround
+  closeups:                            # labelled close-ups, "label: what it shows". Labels are lettered in the project language
+    - "TODO: left forearm: a long scar from wrist to elbow"
+  poses:                               # labelled expressions and key poses or states the story needs
+    - neutral
+    - "TODO: tired"
+    - "TODO: sitting"
+
 status: draft                          # draft | review | approved

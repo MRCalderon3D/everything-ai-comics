@@ -41,7 +41,7 @@
     {
       "name": "character-sheet-generation",
       "file": "skills/character-sheet-generation/SKILL.md",
-      "description": "Produce reference sheets (turnarounds, expressions, wardrobe) that become approved identity masters.",
+      "description": "Produce reference sheets (turnarounds, full character sheets, expressions, wardrobe) that become approved identity masters.",
       "category": "visual"
     },
     {

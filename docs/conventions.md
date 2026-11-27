@@ -141,7 +141,7 @@ All agents use `model: sonnet`.
 | comic-scripting | story | Write panel-by-panel script: one drawable moment per panel, exact dialogue, captions, and sound effects. |
 | text-humanization | story | Write and rewrite prose so it reads like a person wrote it, removing the catalogued AI-writing tells. |
 | character-consistency | visual | Lock canonical character identity so every drawn appearance matches every other. |
-| character-sheet-generation | visual | Produce reference sheets (turnarounds, expressions, wardrobe) that become approved identity masters. |
+| character-sheet-generation | visual | Produce reference sheets (turnarounds, full character sheets, expressions, wardrobe) that become approved identity masters. |
 | location-design | visual | Define each location's architecture, dressing, light, and time-of-day states. |
 | location-mapping | visual | Map levels, sides, landmarks, and exits so panels can state positions precisely. |
 | visual-style-development | visual | Define the comic's visual language (line, tone, texture, rendering) as an enforceable style bible. |
@@ -308,8 +308,9 @@ rows above. `validate.js` cross-checks every listed name against the manifests.
 - Wardrobe states: `WARD_<CHARACTER>_<NAME>` (e.g. `WARD_MARA_OILSKIN`).
 - Prompt packages: `PP_<page-or-entity-id>_<PROVIDER>`, or
   `PP_<COVER_ID>_<PROVIDER>` for a cover (`PP_CV_001_FAL`), with a `-P##` suffix for
-  a single panel and a `-<TAG>` suffix for a reference sheet (`TURN`, `EXPR`,
-  `WARD`, `PLATE`, `SHEET` for a prop, `LOOK`, `DETAIL`). A wardrobe sheet
+  a single panel and a `-<TAG>` suffix for a reference sheet (`TURN`,
+  `MODEL` for a full character sheet, `EXPR`, `WARD`, `PLATE`, `SHEET` for a
+  prop, `LOOK`, `DETAIL`). A wardrobe sheet
   appends its outfit, a detail its subject, and a plate a non-default time
   of day: `PP_CHAR_MARA_FAL-WARD-OILSKIN`.
 - Reference candidates: `<ENTITY_ID>_<TAG>_V##`, with the same variant after

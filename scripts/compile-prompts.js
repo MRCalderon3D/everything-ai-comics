@@ -35,9 +35,15 @@
  * style block, a sheet brief for the kind, the reference legend, the
  * entity's canonical description from its bible, and hard constraints. The
  * approved look master is attached with role style (a LOOK entity with no
- * approved master yet compiles its first look with no image), and wardrobe
- * and expression sheets also attach the character's approved identity
- * master. The package is asset-scoped (page: null) and is written into the
+ * approved master yet compiles its first look with no image). A character
+ * has one identity chain: its first turnaround or full character sheet
+ * (kind model) attaches the approved photos or drawings the person supplied
+ * as likeness sources; once a drawn turnaround or full sheet is approved it
+ * is the identity master, and wardrobe and expression sheets (which refuse
+ * without one) and pages and covers attach it, never a photo. --revise
+ * edits a version of the full sheet into the next one: the previous image
+ * is the edit target, the change list is the only change, and everything
+ * else is locked. The package is asset-scoped (page: null) and is written into the
  * entity's refs/prompts/ directory. A wardrobe sheet carries its outfit, a
  * detail study its subject, and a plate at a non-default time of day that
  * state in the file name, the package ID, and the candidate name
@@ -59,6 +65,7 @@
  * pin the model.
  */
 
+const fs = require('fs');
 const path = require('path');
 const { writeFileEnsuring, toPosix } = require('./lib/fsx');
 const { loadImageProvider, listProviders, resolveProviderId } = require('./lib/providers');
@@ -75,7 +82,8 @@ const { selectRepairFindings } = require('./lib/review-requests');
 const ws = require('./lib/workspace');
 const yaml = require('./lib/yaml');
 const {
-  bestApproved, entityAssets, findLookMaster, findIdentityMaster, roomierProviders,
+  bestApproved, entityAssets, findLookMaster, findIdentityMaster, findIdentityChain, identityKindOf, isLikenessSource,
+  identityRefusal, roomierProviders, MASTER_KINDS,
 } = require('./build-reference-plan');
 const { attachments, providerTag } = require('../providers/lib/common');
 
@@ -109,9 +117,28 @@ Page options:
 
 Asset options:
   --asset <ID>       A CHAR_*, LOC_*, PROP_* or LOOK_* entity.
-  --sheet <kind>     CHAR: turnaround | expressions | wardrobe
+  --sheet <kind>     CHAR: turnaround | model | expressions | wardrobe
                      LOC:  plate        PROP: prop        LOOK: look
                      any entity: detail (needs --subject)
+                     model is the full character sheet: name and line,
+                     turnaround, labelled close-ups, labelled expressions
+                     and poses, landscape.
+                     A character's first turnaround or full sheet attaches
+                     the approved photos the person supplied as likeness
+                     sources. Expressions and wardrobe need an approved
+                     turnaround or full sheet and attach it, never a photo.
+  --closeups "<label: what>; ..."
+                     model only. Default: the character file's
+                     sheet.closeups, else its distinguishing features.
+  --poses "<label>; ..."
+                     model only. Default: the character file's sheet.poses,
+                     else four defaults plus the states the pages give.
+  --revise <version> model only: edit this version of the full sheet
+                     (CHAR_X_MODEL_V02, or its path) into the next one.
+  --changes "<change>; <change>"
+                     with --revise: what to change. Everything else is locked.
+  --likeness <ID,ID> with --revise: approved photos of the character to
+                     attach for this round, for likeness only.
   --outfit <WARD_ID> wardrobe only. Default: the character's default_wardrobe.
   --time <state>     plate only: one of the location's time_of_day_states.
                      Default: the first one.
@@ -143,7 +170,7 @@ Output, status "compiled":
                        for a --time that is not the default
           references/style/prompts/<provider>.<LOOK_ID>.yaml for a look
 Package ID: PP_<ENTITY_ID>_<PROVIDER>-<TAG>[-<VARIANT>], TAG one of TURN,
-EXPR, WARD, PLATE, SHEET (props), LOOK, DETAIL.
+MODEL, EXPR, WARD, PLATE, SHEET (props), LOOK, DETAIL.
 `;
 
 const DEFAULT_MAX_REPAIR_CYCLES = 2;
@@ -435,11 +462,18 @@ function letteringSection(page, project, mode, bibles, options = {}) {
   return lines.join('\n');
 }
 
-/** One legend line per attached image, by position, each with its single role. */
-function legendSection(images, entityByAsset, bibles) {
+/**
+ * One legend line per attached image, by position, each with its single role.
+ * options.likeness: asset IDs attached as likeness sources (a photo or
+ * drawing a person supplied) rather than as a drawn identity sheet.
+ * options.editTarget: what the edit target is ('sheet' for a character
+ * sheet revision; a rendered page otherwise).
+ */
+function legendSection(images, entityByAsset, bibles, options = {}) {
   if (!images.length) {
     return 'REFERENCE IMAGES\nNo reference images are attached.';
   }
+  const likeness = options.likeness || new Set();
   const lines = ['REFERENCE IMAGES', 'Each attached image has one role. Use it for that role only.'];
   for (const att of images) {
     const label = `Image ${att.position}`;
@@ -447,13 +481,20 @@ function legendSection(images, entityByAsset, bibles) {
     const name = entity ? bibles.entityName(entity) : null;
     switch (att.role) {
       case 'edit_target':
-        lines.push(`${label}: the rendered page to edit. Keep everything in it that CHANGES does not name.`);
+        lines.push(options.editTarget === 'sheet'
+          ? `${label}: the previous version of this character sheet, to edit. Keep everything in it that CHANGES does not name.`
+          : `${label}: the rendered page to edit. Keep everything in it that CHANGES does not name.`);
         break;
       case 'style':
         lines.push(`${label}: drawing style only (line, tone, texture, rendering). Do not copy its characters, composition, or text.`);
         break;
       case 'identity':
-        lines.push(`${label}: identity of ${name || 'the character'}. Match the face, hair, build, and proportions exactly. Do not copy the sheet's poses, layout, background, or labels.`);
+        lines.push(likeness.has(att.asset_id)
+          ? `${label}: a photo or drawing of the person ${name || 'the character'} is based on, for likeness only. ` +
+            'Translate this person into the comic style above: match the face, hair, and build. ' +
+            "Do not copy the photo's rendering, light, clothes, or background."
+          : `${label}: identity of ${name || 'the character'}. Match the face, hair, build, and proportions exactly. ` +
+            "Do not copy the sheet's poses, layout, background, or labels, and letter none of its text.");
         break;
       case 'wardrobe':
         lines.push(`${label}: wardrobe of ${name || 'the character'}. Match the clothing and accessories. Do not take a face or a pose from it.`);
@@ -946,6 +987,109 @@ function adjacentInCast(root, charId, bibles) {
   return out.filter((id) => id !== charId);
 }
 
+/** A list of IDs from an array or a comma-separated string. */
+function idList(input) {
+  if (input === undefined || input === null || input === true) return [];
+  const raw = Array.isArray(input) ? input : String(input).split(',');
+  return [...new Set(raw.map((x) => String(x).trim()).filter(Boolean))];
+}
+
+/**
+ * The change list of a sheet revision: [{ text, region }]. Takes an array of
+ * strings or of { text, region } (region as fractions of the image, the
+ * shape page corrections use), or text separated by semicolons or new lines.
+ */
+function sheetChanges(input) {
+  if (input === undefined || input === null || input === true) return [];
+  const raw = Array.isArray(input) ? input : String(input).split(/[;\n]/);
+  const out = [];
+  for (const item of raw) {
+    const text = String(item && typeof item === 'object' ? item.text || '' : item || '').replace(/\s+/g, ' ').trim();
+    if (!text) continue;
+    out.push({ text, region: item && typeof item === 'object' && item.region ? item.region : null });
+  }
+  return out;
+}
+
+/**
+ * Physical states the pages give a character (wounded, soaked), in plain
+ * words and in story order, at most four: the states a full character sheet
+ * shows by default.
+ */
+function storyStates(root, charId) {
+  const out = [];
+  for (const issueId of ws.listIssues(root)) {
+    for (const entry of ws.listPages(root, issueId)) {
+      const hasPanels = entry.doc && Array.isArray(entry.doc.panels) && entry.doc.panels.length > 0;
+      for (const panel of hasPanels ? layout.readingSequence(entry.doc) : []) {
+        for (const row of drawnCast(panel)) {
+          if (row.character !== charId) continue;
+          for (const tag of Array.isArray(row.state) ? row.state : []) {
+            const text = lang.humanize(String(tag));
+            if (text && !out.includes(text)) out.push(text);
+          }
+        }
+      }
+    }
+  }
+  return out.slice(0, 4);
+}
+
+/** The refusal for an expressions or wardrobe sheet of a character with no approved identity master. */
+function masterRequired(entityId, name, kind, chain) {
+  const what = kind === 'wardrobe' ? 'wardrobe sheet' : 'expressions sheet';
+  const waiting = chain.pool.filter((a) => MASTER_KINDS.includes(identityKindOf(a)) && a.status !== 'approved' && a.status !== 'superseded');
+  let text = `${entityId}: the ${what} is drawn from the approved identity master of ${name} (the turnaround or the full character sheet), and there is none yet`;
+  if (waiting.length) text += ` (${waiting.map((a) => `${a.id} is ${a.status}`).join(', ')})`;
+  text += '. Draw the turnaround or the full character sheet, approve it, then draw this sheet.';
+  if (chain.likeness.length) {
+    text += ` The photos on file (${chain.likeness.map((a) => a.id).join(', ')}) are likeness sources for that first sheet only.`;
+  }
+  return pipelineError('master_required', text);
+}
+
+/**
+ * The version of a sheet a revision edits: a candidate or master image of
+ * that sheet in the entity's refs directory, by stem or by path.
+ * @returns {{id: string, rel: string}}
+ */
+function sheetVersion(root, entityId, kind, given) {
+  const tag = assetPaths.SHEET_TAGS[kind];
+  const stemRe = new RegExp(`^${entityId}_${tag}(?:_MASTER)?_V\\d{2}$`);
+  const dir = assetPaths.refsDir(entityId);
+  let rel = null;
+  if (/[\\/]/.test(given) || ws.IMAGE_EXTENSIONS.includes(path.extname(given).toLowerCase())) {
+    const absolute = path.isAbsolute(given) ? given : ws.abs(root, given);
+    rel = toPosix(ws.rel(root, absolute));
+    if (!fs.existsSync(absolute)) rel = null;
+  } else {
+    for (const ext of ws.IMAGE_EXTENSIONS) {
+      if (fs.existsSync(ws.abs(root, `${dir}/${given}${ext}`))) {
+        rel = `${dir}/${given}${ext}`;
+        break;
+      }
+    }
+  }
+  const stem = rel ? path.posix.basename(rel).replace(/\.[^.]+$/, '') : '';
+  if (!rel || path.posix.dirname(rel) !== dir || !stemRe.test(stem)) {
+    throw pipelineError('revise_target_missing',
+      `--revise ${given}: no image of the ${kind === 'model' ? 'full character sheet' : kind} of ${entityId} by that name in ${dir}/ ` +
+      `(expected ${entityId}_${tag}_V## or ${entityId}_${tag}_MASTER_V##)`);
+  }
+  return { id: stem, rel };
+}
+
+/** A likeness source named for a revision round: registered for the entity, approved, a photo or drawing. */
+function likenessAsset(assets, entityId, id) {
+  const asset = assets.get(id);
+  if (!asset || asset.entity !== entityId || asset.status !== 'approved' || !isLikenessSource(asset)) {
+    throw pipelineError('bad_arguments',
+      `--likeness ${id}: not an approved photo or drawing of ${entityId} in references/manifest.yaml ` +
+      '(a likeness source has role identity and a kind that is not a drawn sheet)');
+  }
+  return asset;
+}
+
 /**
  * Compile the prompt package of a reference sheet (asset scope).
  * @param {string} root workspace root
@@ -981,6 +1125,25 @@ function compileAsset(root, entityId, options = {}) {
   let variant = kind === 'detail' ? assetPaths.sheetVariant(entityId, kind, { subject }) : null;
   if (kind === 'detail' && !variant) {
     throw pipelineError('bad_arguments', `--subject "${subject}" has no letter or digit to name the detail by`);
+  }
+  // A revision of a full character sheet: the previous version is edited
+  // into the next one with a list of changes.
+  const reviseWanted = options.revise && options.revise !== true ? String(options.revise).trim() : '';
+  const changes = sheetChanges(options.changes);
+  const likenessWanted = idList(options.likeness);
+  if ((reviseWanted || changes.length || likenessWanted.length) && kind !== 'model') {
+    throw pipelineError('bad_arguments', '--revise, --changes, and --likeness apply to --sheet model only');
+  }
+  if (reviseWanted && !changes.length) {
+    throw pipelineError('bad_arguments', '--revise needs --changes "<what to change>; <another change>"');
+  }
+  if (!reviseWanted && (changes.length || likenessWanted.length)) {
+    throw pipelineError('bad_arguments', '--changes and --likeness need --revise <the version to edit>');
+  }
+  const corrections = (Array.isArray(options.corrections) ? options.corrections : [])
+    .map((c) => String(c || '').replace(/\s+/g, ' ').trim()).filter(Boolean);
+  if (corrections.length && reviseWanted) {
+    throw pipelineError('bad_arguments', 'corrections apply to a fresh drawing, not to a revision');
   }
 
   const project = options.project || ws.loadProject(root) || {};
@@ -1030,6 +1193,16 @@ function compileAsset(root, entityId, options = {}) {
     }
     if (kind === 'wardrobe') variant = assetPaths.sheetVariant(entityId, kind, { outfit: outfit.id });
     if (kind === 'expressions') briefCtx.expressions = sheets.expressionList(options.expressions);
+    if (kind === 'model') {
+      const lists = sheets.modelLists(character, { closeups: options.closeups, poses: options.poses }, storyStates(root, entityId));
+      briefCtx.closeups = lists.closeups;
+      briefCtx.poses = lists.poses;
+      briefCtx.line = sheets.sheetLine({
+        title: project.title,
+        language: project.language,
+        number: assetPaths.nextCandidate(root, entityId, assetPaths.SHEET_TAGS.model).version,
+      });
+    }
     subjectLines.push(...sheets.characterSubject(character, name));
     if (kind === 'wardrobe') {
       extraSections.push(['OUTFIT', ...sheets.outfitLines(outfit, 'The outfit on this sheet')].join('\n'));
@@ -1082,10 +1255,51 @@ function compileAsset(root, entityId, options = {}) {
         'compile and generate a look page (--asset <LOOK_ID> --sheet look), approve it, and list it under style.look_refs.');
     }
     picked.push({ asset: look, role: 'style' });
-    if (type === 'CHAR' && (kind === 'wardrobe' || kind === 'expressions')) {
-      const { identity } = findIdentityMaster(assets, entityId, bibles.character(entityId));
-      if (identity) picked.push({ asset: identity, role: 'identity' });
-      else notes.push(`${entityId} has no approved identity master yet: the ${kind} sheet is drawn from the written description only.`);
+  }
+
+  // The identity chain of a character: one identity master, drawn, approved.
+  let editTarget = null;
+  if (type === 'CHAR') {
+    const chain = findIdentityChain(assets, entityId, bibles.character(entityId));
+    const sheetName = kind === 'model' ? 'full character sheet' : kind;
+    // Photos or drawings a person supplied, attached for likeness only, as
+    // far as the provider's budget allows (the look master and an edit
+    // target come first).
+    const addLikeness = (list) => {
+      for (const asset of list) {
+        if (picked.length + (editTarget ? 1 : 0) >= capacity) {
+          warnings.push(`${asset.id} not attached as a likeness source: ${providerId} takes ${capacity} image(s)`);
+          continue;
+        }
+        picked.push({ asset, role: 'identity', likeness: true });
+      }
+    };
+    if (kind === 'expressions' || kind === 'wardrobe') {
+      // Drawn from the approved master only: never from a photo, and never
+      // from a candidate the person has not said is right.
+      if (!chain.master) throw masterRequired(entityId, name, kind, chain);
+      picked.push({ asset: chain.master, role: 'identity' });
+    } else if (MASTER_KINDS.includes(kind)) {
+      if (reviseWanted) {
+        // The previous version carries the identity; a photo the person
+        // attached to this round is used for this round only.
+        editTarget = sheetVersion(root, entityId, kind, reviseWanted);
+        addLikeness(likenessWanted.map((id) => likenessAsset(assets, entityId, id)));
+      } else if (!chain.master) {
+        if (chain.likeness.length) {
+          addLikeness(chain.likeness);
+          notes.push(`${entityId} has no approved drawn sheet yet: the ${sheetName} is drawn from the description and ` +
+            `${chain.likeness.map((a) => a.id).join(', ')} as likeness source(s), translated into the comic style.`);
+        } else {
+          notes.push(`${entityId} has no approved drawn sheet and no photo on file: the ${sheetName} is drawn from the written description only.`);
+        }
+      } else if (identityKindOf(chain.master) === kind) {
+        notes.push(`${chain.master.id} is the approved ${sheetName}: this new version is drawn from the written description, as a redesign` +
+          `${kind === 'model' ? '. To change the sheet and keep the rest, revise it (--revise)' : ''}.`);
+      } else {
+        // The other master kind exists: the new sheet is drawn from it.
+        picked.push({ asset: chain.master, role: 'identity' });
+      }
     }
   }
   for (const p of picked) {
@@ -1093,10 +1307,11 @@ function compileAsset(root, entityId, options = {}) {
       throw pipelineError('reference_unusable', `${p.asset.id} has no path in references/manifest.yaml`);
     }
   }
-  if (picked.length > capacity) {
-    const roomier = roomierProviders(picked.length, providerId, listProviders('image'));
+  const imageCount = picked.length + (editTarget ? 1 : 0);
+  if (imageCount > capacity) {
+    const roomier = roomierProviders(imageCount, providerId, listProviders('image'));
     throw pipelineError('budget_exceeded',
-      `${entityId}: the ${kind} sheet needs ${picked.length} reference image(s) (${picked.map((p) => p.asset.id).join(', ')}) ` +
+      `${entityId}: the ${kind} sheet needs ${imageCount} reference image(s) (${[...(editTarget ? [editTarget.id] : []), ...picked.map((p) => p.asset.id)].join(', ')}) ` +
       `but ${providerId} takes ${capacity}. ` +
       (roomier.length ? `Use a provider with a larger budget: ${roomier.join(', ')}.` : 'No listed provider takes that many images.'));
   }
@@ -1116,7 +1331,7 @@ function compileAsset(root, entityId, options = {}) {
     asset: entityId,
     provider: providerId,
     model: 'pending',
-    mode: 'generate',
+    mode: editTarget ? 'repair' : 'generate',
     prompt: '',
     negative_prompt: sheets.negativePrompt(kind, letteringMode),
     parameters,
@@ -1125,24 +1340,61 @@ function compileAsset(root, entityId, options = {}) {
       role: p.role,
       image_path: String(p.asset.path).replace(/\\/g, '/'),
     })),
-    edit_target: null,
+    edit_target: editTarget ? editTarget.rel : null,
   };
+  if (editTarget) {
+    // What was right stays right: everything the change list does not name is locked.
+    pkg.repair = {
+      changes: changes.map((c) => {
+        const where = regionPhrase(c.region);
+        return `${where ? `In ${where}: ` : ''}${capitalize(lang.sentence(c.text))}`;
+      }),
+      locked: [
+        'Everything CHANGES does not name: the face, hair, build, and clothing, every view, close-up, and pose, their labels, and their places on the sheet.',
+        'The name header and the line under it, except for the sheet number.',
+        'The drawing style, the plain background, and the flat, even light.',
+      ],
+    };
+  }
 
   const entityByAsset = new Map(picked.map((p) => [p.asset.id, p.asset.entity || null]));
-  const sections = [
-    String(styleBlock).trim(),
-    ['SHEET', ...sheets.sheetBrief(kind, briefCtx),
+  const legend = legendSection(attachments(pkg), entityByAsset, bibles, {
+    likeness: new Set(picked.filter((p) => p.likeness).map((p) => p.asset.id)),
+    editTarget: editTarget ? 'sheet' : null,
+  });
+  const sections = [String(styleBlock).trim()];
+  if (editTarget) {
+    sections.push(['REVISION',
+      `Edit Image 1, the previous version of the full character sheet of ${name}. This is the next version of the same sheet, not a new drawing. ` +
+        `Change only what CHANGES lists and return the whole sheet with the same layout, ${orientationOf(ratio)}, aspect ratio ${ratio}.`,
+      ...colorLines(project)].join('\n'));
+    sections.push(legend);
+    sections.push(['CHANGES', ...pkg.repair.changes.map((c, i) => `${i + 1}. ${c}`)].join('\n'));
+    if (subjectLines.length) sections.push(['SUBJECT, as the character file now describes them', ...subjectLines].join('\n'));
+    sections.push(...extraSections);
+    sections.push(['THE SHEET', ...sheets.modelLayout(briefCtx)].join('\n'));
+    sections.push(['LOCKED, DO NOT CHANGE', ...pkg.repair.locked.map((l) => `- ${l}`)].join('\n'));
+  } else {
+    sections.push(['SHEET', ...sheets.sheetBrief(kind, briefCtx),
       `One image, ${orientationOf(ratio)}, aspect ratio ${ratio}.`,
-      ...colorLines(project)].join('\n'),
-    legendSection(attachments(pkg), entityByAsset, bibles),
-  ];
-  if (subjectLines.length) sections.push(['SUBJECT', ...subjectLines].join('\n'));
-  sections.push(...extraSections);
+      ...colorLines(project)].join('\n'));
+    sections.push(legend);
+    if (subjectLines.length) sections.push(['SUBJECT', ...subjectLines].join('\n'));
+    sections.push(...extraSections);
+    if (corrections.length) {
+      sections.push(['CORRECTIONS',
+        'The last drawing of this sheet did not match the identity reference. This drawing must fix each of these:',
+        ...corrections.map((c, i) => `${i + 1}. ${capitalize(lang.sentence(c))}`)].join('\n'));
+    }
+  }
   sections.push(['HARD CONSTRAINTS', ...sheets.sheetConstraints(kind, briefCtx)].join('\n'));
   pkg.prompt = sections.join('\n\n');
 
-  // A sheet carries no story lettering: nothing for a review to compare.
-  pkg.lettering_text = [];
+  // A sheet carries no story lettering. A full character sheet letters its
+  // name, its line, and its labels, which a look at the image can compare.
+  pkg.lettering_text = kind === 'model'
+    ? [name, briefCtx.line, ...briefCtx.closeups.map((c) => c.label), ...briefCtx.poses.map((p) => p.label)]
+    : [];
   pkg.status = 'compiled';
   // The schema defines page, reference_plan, and style_block hashes and
   // requires none. An asset package has neither a page nor a reference
@@ -1322,8 +1574,11 @@ function coverReferences(root, cover, project, bibles, options) {
   add(look, 'style', true);
 
   for (const row of (Array.isArray(cover.cast) ? cover.cast : []).filter((r) => r && r.character)) {
-    const { identity } = findIdentityMaster(assets, row.character, bibles.character(row.character));
+    const chain = findIdentityMaster(assets, row.character, bibles.character(row.character));
+    const { identity } = chain;
     if (identity) add(identity, 'identity', true);
+    // Photos are likeness sources for the first sheet, never cover references.
+    else if (chain.likeness.length && !chain.pool.length) throw identityRefusal(coverId, row.character, chain);
     else warnings.push(`${row.character} has no approved identity master: the cover draws ${bibles.characterName(row.character)} from the written description only`);
   }
   if (cover.location) {
@@ -1611,6 +1866,11 @@ function mainAsset(flags) {
       subject: flags.subject,
       time: flags.time,
       expressions: flags.expressions && flags.expressions !== true ? String(flags.expressions) : undefined,
+      closeups: flags.closeups !== undefined && flags.closeups !== true ? String(flags.closeups) : undefined,
+      poses: flags.poses !== undefined && flags.poses !== true ? String(flags.poses) : undefined,
+      revise: flags.revise,
+      changes: flags.changes !== undefined && flags.changes !== true ? String(flags.changes) : undefined,
+      likeness: flags.likeness !== undefined && flags.likeness !== true ? String(flags.likeness) : undefined,
       providerId: flags.provider,
       model: flags.model && flags.model !== true ? flags.model : undefined,
     });
@@ -1624,7 +1884,8 @@ function mainAsset(flags) {
   const outFile = ws.abs(root, result.fileRel);
   writeFileEnsuring(outFile, yaml.stringify(pkg));
   console.log(`prompt package: ${pkg.id} (asset ${pkg.asset}, ${pkg.provider}, model ${pkg.model}) -> ${toPosix(outFile)}`);
-  console.log(`  prompt: ${pkg.prompt.length} characters, ${pkg.references.length} reference image(s), aspect ${pkg.parameters.aspect_ratio}`);
+  console.log(`  prompt: ${pkg.prompt.length} characters, ${pkg.references.length} reference image(s)${pkg.edit_target ? ' + edit target' : ''}, aspect ${pkg.parameters.aspect_ratio}`);
+  if (pkg.repair) console.log(`  revision of ${pkg.edit_target}: ${pkg.repair.changes.length} change(s), everything else locked`);
   console.log(`  request endpoint: ${endpointText(spec)}`);
   for (const n of notes) console.log(`  note: ${n}`);
   for (const w of warnings) console.log(`  warning: ${w}`);
@@ -1693,6 +1954,8 @@ module.exports = {
   resolveReferences,
   letteringElements,
   differenceLine,
+  storyStates,
+  sheetChanges,
 };
 
 if (require.main === module) main();

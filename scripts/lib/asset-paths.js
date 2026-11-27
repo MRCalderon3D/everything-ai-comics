@@ -35,6 +35,7 @@ const ENTITY_DIRS = { CHAR: 'characters', LOC: 'locations', PROP: 'props' };
 
 /** Sheet kind (the registry's `kind`) -> tag used in package IDs and file names. */
 const SHEET_TAGS = {
+  model: 'MODEL',
   turnaround: 'TURN',
   expressions: 'EXPR',
   wardrobe: 'WARD',
@@ -46,7 +47,7 @@ const SHEET_TAGS = {
 
 /** Sheet kinds each entity type accepts. */
 const SHEET_KINDS = {
-  CHAR: ['turnaround', 'expressions', 'wardrobe', 'detail'],
+  CHAR: ['turnaround', 'expressions', 'wardrobe', 'detail', 'model'],
   LOC: ['plate', 'detail'],
   PROP: ['prop', 'detail'],
   LOOK: ['look', 'detail'],

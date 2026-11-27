@@ -1,6 +1,6 @@
 ---
 name: character-sheet-generation
-description: Produce reference sheets (turnarounds, expressions, wardrobe) that become approved identity masters.
+description: Produce reference sheets (turnarounds, full character sheets, expressions, wardrobe) that become approved identity masters.
 origin: everything-ai-comics
 category: visual
 ---
@@ -39,7 +39,8 @@ describe them again from text.
    in, and `compile-prompts.js` refuses the sheet. Stop and finish the look
    first.
 2. Plan the set by role. A protagonist or antagonist gets a turnaround
-   (front, three-quarter, profile, back, full figure), an expression sheet
+   (front, three-quarter, profile, back, full figure) or a full character
+   sheet (see "The full character sheet" below), an expression sheet
    with the five or six expressions the script calls for, and one wardrobe
    sheet per outfit beyond the default. A recurring secondary character gets
    at least a turnaround. Background characters get nothing.
@@ -52,8 +53,8 @@ describe them again from text.
    study of one feature. The script writes
    `characters/<CHAR_ID>/refs/prompts/<provider>.<kind>.yaml`, an
    asset-scoped package (`page: null`, `asset: <CHAR_ID>`, id
-   `PP_<CHAR_ID>_<PROVIDER>-<TAG>`, with TAG `TURN`, `EXPR`, `WARD`, or
-   `DETAIL`). A wardrobe package carries its outfit in the file name and
+   `PP_<CHAR_ID>_<PROVIDER>-<TAG>`, with TAG `TURN`, `MODEL`, `EXPR`,
+   `WARD`, or `DETAIL`). A wardrobe package carries its outfit in the file name and
    the ID (`<provider>.wardrobe.WARD_MARA_OILSKIN.yaml`,
    `...-WARD-OILSKIN`), and a detail package a slug of its subject
    (`<provider>.detail.torn-left-cuff.yaml`, `...-DETAIL-TORN_LEFT_CUFF`).
@@ -61,11 +62,11 @@ describe them again from text.
    subject from `prompt_summary`, the `description` fields,
    `distinguishing_features`, and the outfit entry, plus one line for each
    character in `visually_adjacent_to` that states the difference. The
-   look master is attached with role `style`. Expression and wardrobe
-   sheets also attach the character's approved identity master with role
-   `identity`, so approve the turnaround before compiling them. Without an
-   approved one the script still compiles and notes that the sheet is drawn
-   from the written description only. Each outfit and each detail subject
+   look master is attached with role `style`. The rest follows the
+   identity chain (see "One identity chain" below): the first turnaround or
+   full sheet attaches the photos the person supplied as likeness sources,
+   and expression and wardrobe sheets attach the approved identity master
+   and refuse to compile without one (`master_required`). Each outfit and each detail subject
    has its own package file, so every sheet of a character can be compiled
    before the first is generated.
 4. Read the brief the script wrote. It asks for sheet conditions and
@@ -117,6 +118,72 @@ describe them again from text.
     with `approve-asset.js --supersede`: the old asset becomes `superseded`
     and its file stays on disk.
 
+## One identity chain
+
+A character has one face, and every drawing of it comes from the same
+place.
+
+- Photos and drawings the person supplied are likeness sources. Ingestion
+  registers them with role `identity` and a kind that is not a drawn sheet
+  (`detail`, ID `<CHAR_ID>_REF_V##`). They are attached to the first
+  turnaround or full character sheet, and to its redraws, while no drawn
+  master is approved. The legend tells the model to translate the person
+  into the comic style and to take nothing from the photo's rendering,
+  light, clothes, or background.
+- The approved turnaround or full character sheet is the identity master.
+  A full sheet outranks a turnaround. Expression and wardrobe sheets, pages,
+  and covers attach the master and never a photo. A turnaround compiled next
+  to an approved full sheet is drawn from it, and the other way round.
+- A new version of the master's own kind is a redesign: it is compiled from
+  the written description, with neither the old sheet nor the photos. To
+  change a full sheet and keep the rest, revise it.
+- A page or a cover whose character has only photos is refused: approve a
+  drawn sheet first.
+- Registries where ingestion already filed photos as approved identity
+  assets work as they are. The scripts tell photos from sheets by kind, so
+  nobody has to edit the manifest.
+
+After a sheet is drawn from the master, compare it with the master before
+offering it for approval: same face, hair, build, and marks on the same
+side. If it fails, draw it once more with what the comparison found, then
+show the result with a warning if it still differs. The person decides.
+
+## The full character sheet
+
+`--sheet model` compiles what a comic team calls a model sheet: one
+landscape image (3:2 where the provider offers it) with
+
+- the character's name lettered large and a short line under it, the
+  series title and "Character sheet NN" in the project's language;
+- the turnaround: front, three-quarter, profile, back, full figure, same
+  scale, neutral pose;
+- labelled close-ups of what identifies the character (a scar, a tattoo,
+  glasses, a ring), each "label: what it shows" with the side of the body in
+  the label;
+- a labelled row of expressions and key poses or states the story needs.
+
+The close-ups and poses come from `--closeups` and `--poses` (separated by
+semicolons), else from the `sheet` block of `character.yaml`, else from the
+distinguishing features and four default expressions or poses plus the
+physical states the pages give the character. Edit the lists in the
+character file before drawing. The package's `lettering_text` holds the
+name, the line, and every label, so a look at the image can check them.
+Pages that attach the sheet are told to take the identity only and letter
+none of its text.
+
+Refine the sheet in rounds. Each round is
+
+`node scripts/compile-prompts.js --asset <CHAR_ID> --sheet model --revise <CHAR_ID>_MODEL_V## --changes "shorter hair; the wound on the other arm" --root <workspace>`
+
+The named version is the edit target (`mode: repair`), the changes are the
+only changes, and everything else is locked: the face, the other views, the
+close-ups and poses, their labels and places. `--likeness <REF_ID>` attaches
+a photo the person added for that round. Update the character file to match
+the change before compiling (a story fact goes to the story bible as a
+proposal, never silently). Generation saves the next `_MODEL_V##`.
+Approving a version makes it the identity master; approve another with
+`--supersede` to go back.
+
 ## Outputs
 
 - Sheet packages under `production/characters/<CHAR_ID>/refs/prompts/`
@@ -131,6 +198,8 @@ describe them again from text.
 
 - Every sheet is drawn in the look master's style; none is a photograph or
   a grayscale render.
+- Every sheet after the first is drawn from the approved master, never from
+  a photo or an unapproved candidate.
 - The face is readable and the same person in every view and expression.
 - Plain background, even light, consistent scale.
 - Every outfit in `wardrobe.yaml` that appears on a page has a sheet or is
@@ -154,6 +223,9 @@ describe them again from text.
 - No sheet for the deckhand who appears on six pages, because he is "only
   secondary".
 - Citing a draft sheet from a reference plan before anyone approved it.
+- Drawing the expressions from the photo while the turnaround is still a
+  candidate: two sheets of one character with two faces.
+- Labels of a full sheet lettered into a page that attached it.
 
 ## Related Agents
 

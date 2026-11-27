@@ -151,8 +151,18 @@ default_wardrobe: WARD_MARA_OILSKIN
 wardrobe_file: wardrobe.yaml
 references:                            # required. asset IDs registered in references/manifest.yaml
   - CHAR_MARA_TURN_MASTER_V01
+sheet:                                 # what the full character sheet (kind model) shows besides the turnaround
+  closeups:                            # at most 8. "label: what it shows"; the label is lettered on the sheet
+    - "broken nose: the bridge bent to her left"
+    - "left cuff: the tear in the oilskin, three fingers long"
+  poses: [neutral, wary, steering, soaked]   # at most 8 labelled expressions, poses, or states
 status: approved                       # draft | review | approved
 ```
+
+`sheet` is optional. Without it a full character sheet shows the
+distinguishing features as close-ups and four expressions or poses plus the
+physical states the pages give the character. The person can change both
+lists before a sheet is drawn.
 
 ## characters/<CHAR_ID>/wardrobe.yaml (`wardrobe`)
 
@@ -241,7 +251,7 @@ Not schema-validated as a whole; scripts read these fields:
 assets:
   - id: CHAR_MARA_TURN_MASTER_V01      # required
     entity: CHAR_MARA                  # required
-    kind: turnaround                   # turnaround | expressions | wardrobe | plate | look | prop | detail
+    kind: turnaround                   # turnaround | model | expressions | wardrobe | plate | look | prop | detail
     path: characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V01.png   # required. relative to workspace root
     status: approved                   # required. draft | review | approved | superseded
     default_role: identity             # the role this asset plays when attached
@@ -262,6 +272,26 @@ Registry rules (`validate-workspace.js` enforces them mechanically):
 - An ID that carries `_MASTER` has status `approved` or `superseded`.
 - Every asset ID in a character, wardrobe, location, or prop file is
   registered here for that entity.
+
+The identity chain of a character (`build-reference-plan.js` and
+`compile-prompts.js` read the registry this way):
+
+- A likeness source is a photo or drawing a person supplied: role
+  `identity` and a kind that is not a drawn sheet (ingestion registers it as
+  `kind: detail`, ID `<CHAR_ID>_REF_V##`). An entry with no `kind` is read
+  from the tag of its ID.
+- The identity master is the best approved drawn sheet of kind `model` (the
+  full character sheet) or `turnaround`. A full sheet outranks a turnaround;
+  among sheets of one kind, the ones `character.references` lists come
+  first, then masters, then the highest version.
+- Likeness sources are attached only to the character's first turnaround or
+  full sheet, and to its redraws, while no drawn master is approved. Once
+  one is, expression and wardrobe sheets, pages, and covers attach the
+  master and never a likeness source. Expression and wardrobe sheets refuse
+  to compile without an approved master, and a page or cover whose
+  character has only likeness sources is refused.
+- Registries where ingestion filed photos as approved identity assets need
+  no edit: the photos are told apart by kind.
 
 Approving a candidate (`scripts/approve-asset.js`, exported as
 `approveAsset({ root, candidate, note, supersede })`):
@@ -526,8 +556,9 @@ Three variants use the same schema:
   `--asset <ENTITY_ID> --sheet <kind>`) are written to
   `<entity dir>/refs/prompts/<provider>.<kind>.yaml`, and for LOOK entities to
   `references/style/prompts/<provider>.<LOOK_ID>.yaml`. Their id is
-  `PP_<ENTITY_ID>_<PROVIDER>-<TAG>` with TAG one of `TURN`, `EXPR`, `WARD`,
-  `PLATE`, `SHEET` (props), `LOOK`, `DETAIL`. A sheet with a variant carries
+  `PP_<ENTITY_ID>_<PROVIDER>-<TAG>` with TAG one of `TURN`, `MODEL` (the
+  full character sheet), `EXPR`, `WARD`, `PLATE`, `SHEET` (props), `LOOK`,
+  `DETAIL`. A sheet with a variant carries
   it in all three names: a wardrobe sheet its outfit
   (`<provider>.wardrobe.<WARD_ID>.yaml`, `-WARD-<OUTFIT>`), a detail a slug
   of its subject (`<provider>.detail.<slug>.yaml`, `-DETAIL-<SUBJECT>`), and
@@ -538,6 +569,14 @@ Three variants use the same schema:
   `references/style/`). A candidate never carries `_MASTER`: promoting it to
   a master is an approval step that registers the file in
   `references/manifest.yaml`, done by `scripts/approve-asset.js`.
+  A revision of a full character sheet (`--sheet model --revise <version>
+  --changes "..."`) is written to the same file with `mode: repair`: its
+  `edit_target` is the image of the version it edits, `repair.changes`
+  lists the changes (with an optional region as fractions of the image),
+  and `repair.locked` everything else. It has no `repair.of_render` or
+  `repair.findings`. Generation saves it as the next free `_MODEL_V##`.
+  A full sheet's `lettering_text` holds its name, the line under it, and
+  its labels.
 
 ## generations/<scope>/GEN_*.yaml (`generation-record`)
 

@@ -1,7 +1,8 @@
 'use strict';
 /**
- * Sheet vocabulary: the model-facing text of reference sheets (character
- * turnarounds, expression and wardrobe sheets, location plates, prop
+ * Sheet vocabulary: the model-facing text of reference sheets (full character
+ * sheets, character turnarounds, expression and wardrobe sheets, location
+ * plates, prop
  * sheets, look pages, detail studies). The briefs follow the
  * character-sheet-generation, location-design, and visual-style-development
  * skills: sheet conditions and nothing else, scene lighting only where the
@@ -20,6 +21,7 @@ const NO_SIGNATURE = '- No watermark or signature.';
 
 /** Preferred aspect ratios per kind, best first; the page ratio stands in for null. */
 const RATIO_PREFERENCE = {
+  model: ['3:2', '16:9', '4:3', '1:1'],
   turnaround: ['1:1', '4:3', '3:2'],
   expressions: ['1:1', '4:3', '3:2'],
   wardrobe: ['1:1', '4:3', '3:4'],
@@ -30,6 +32,7 @@ const RATIO_PREFERENCE = {
 };
 
 const NEGATIVE = {
+  model: 'watermark, signature, arrows, color swatches, scenery, dramatic lighting, photograph, extra characters',
   sheet: 'watermark, signature, text, labels, arrows, color swatches, scenery, dramatic lighting, photograph',
   plate: 'watermark, signature, text, labels, people, figures, silhouettes',
   look: 'watermark, signature, page number, photograph',
@@ -50,6 +53,7 @@ function pickRatio(kind, supported, pageRatio) {
 
 function negativePrompt(kind, letteringMode) {
   if (kind === 'plate') return NEGATIVE.plate;
+  if (kind === 'model') return NEGATIVE.model;
   if (kind === 'look') {
     return letteringMode === 'overlay'
       ? `${NEGATIVE.look}, text, lettering, speech balloons, caption boxes`
@@ -63,6 +67,127 @@ function expressionList(input) {
   const raw = Array.isArray(input) ? input : String(input || '').split(',');
   const list = [...new Set(raw.map((x) => String(x).trim().toLowerCase()).filter(Boolean))];
   return list.length ? list : DEFAULT_EXPRESSIONS.slice();
+}
+
+/** Expressions and poses of a full character sheet when neither the person nor the file names any. */
+const DEFAULT_POSES = ['neutral', 'angry', 'afraid', 'sitting'];
+const MODEL_LIST_MAX = 8;
+const DEFAULT_CLOSEUP_MAX = 4;
+
+/** "Character sheet" in the project's language, for the line under the name. English when the language is not listed. */
+const SHEET_WORDS = {
+  en: 'Character sheet',
+  es: 'Hoja de personaje',
+  ca: 'Full de personatge',
+  gl: 'Folla de personaxe',
+  pt: 'Folha de personagem',
+  fr: 'Fiche de personnage',
+  it: 'Scheda del personaggio',
+  de: 'Figurenblatt',
+  nl: 'Karakterblad',
+};
+
+/**
+ * One labelled item of a full character sheet (a close-up, an expression or
+ * a pose): "left forearm: a long scar" -> { label: 'left forearm', subject:
+ * 'a long scar' }; "tired" -> { label: 'tired', subject: 'tired' }. Objects
+ * with `label` and `subject` (or `detail`) pass through.
+ */
+function sheetItem(value) {
+  if (value && typeof value === 'object') {
+    const label = String(value.label || value.subject || value.detail || '').trim();
+    const subject = String(value.subject || value.detail || value.label || '').trim();
+    return label ? { label, subject: subject || label } : null;
+  }
+  const text = String(value || '').trim();
+  if (!text) return null;
+  const cut = text.indexOf(':');
+  if (cut > 0 && cut < text.length - 1) {
+    return { label: text.slice(0, cut).trim(), subject: text.slice(cut + 1).trim() };
+  }
+  return { label: text, subject: text };
+}
+
+/**
+ * A list of sheet items from an array, or from text separated by semicolons
+ * or new lines. Cleaned, de-duplicated by label, at most eight. Null when
+ * nothing was given, so a caller can tell "not given" from "empty".
+ */
+function sheetItems(input) {
+  if (input === undefined || input === null || input === true) return null;
+  const raw = Array.isArray(input) ? input : String(input).split(/[;\n]/);
+  const out = [];
+  for (const value of raw) {
+    const item = sheetItem(value);
+    if (item && !out.some((x) => x.label.toLowerCase() === item.label.toLowerCase())) out.push(item);
+  }
+  return out.slice(0, MODEL_LIST_MAX);
+}
+
+/**
+ * What a full character sheet shows besides the turnaround: the labelled
+ * close-ups and the labelled expressions and poses. Each list comes from the
+ * options (what the person chose for this drawing), else from the
+ * character file's `sheet` block, else from defaults: the distinguishing
+ * features as close-ups, and four expressions or poses plus the physical
+ * states the pages give the character.
+ * @param {object} character character.yaml
+ * @param {{closeups?: *, poses?: *}} options
+ * @param {string[]} [states] physical states the story gives the character, in plain words
+ * @returns {{closeups: {label: string, subject: string}[], poses: {label: string, subject: string}[]}}
+ */
+function modelLists(character, options = {}, states = []) {
+  const plan = character && character.sheet && typeof character.sheet === 'object' ? character.sheet : {};
+  let closeups = sheetItems(options.closeups);
+  if (closeups === null) closeups = sheetItems(plan.closeups);
+  if (closeups === null) {
+    const features = character && character.description && Array.isArray(character.description.distinguishing_features)
+      ? character.description.distinguishing_features : [];
+    closeups = sheetItems(features.slice(0, DEFAULT_CLOSEUP_MAX)) || [];
+  }
+  let poses = sheetItems(options.poses);
+  if (poses === null) poses = sheetItems(plan.poses);
+  if (poses === null) poses = sheetItems([...DEFAULT_POSES, ...states]) || [];
+  return { closeups, poses };
+}
+
+/** The line under the name: "<series title> · Character sheet 02", in the project's language. */
+function sheetLine({ title, language, number }) {
+  const code = String(language || 'en').slice(0, 2).toLowerCase();
+  const word = SHEET_WORDS[code] || SHEET_WORDS.en;
+  const n = String(Number.isInteger(number) && number > 0 ? number : 1).padStart(2, '0');
+  const series = String(title || '').trim();
+  return series ? `${series} · ${word} ${n}` : `${word} ${n}`;
+}
+
+function itemList(items) {
+  return items.map((item, i) => (item.subject && item.subject !== item.label
+    ? `${i + 1}. "${item.label}": ${lang.sentence(item.subject).replace(/\.$/, '')}`
+    : `${i + 1}. "${item.label}"`)).join('; ');
+}
+
+function plural(n, one, many) {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+/** The lines that describe the layout of a full character sheet (shared by the first drawing and a revision). */
+function modelLayout(ctx) {
+  const name = ctx.name;
+  const closeups = ctx.closeups || [];
+  const poses = ctx.poses || [];
+  return [
+    `Header, top left: the name "${name}" lettered large, and under it a smaller line: "${ctx.line}".`,
+    'Top band, the turnaround: four full-figure views of the same person, left to right: front, three-quarter, profile, back. ' +
+      'All four at the same scale, heads level, feet on one baseline, neutral standing pose, arms a little away from the body. ' +
+      'The face is fully readable in the front, three-quarter, and profile views.',
+    closeups.length
+      ? `Beside the turnaround, close-ups: ${plural(closeups.length, 'framed close-up', 'framed close-ups')} drawn large, each with its label lettered under it: ${itemList(closeups)}.`
+      : 'No close-ups on this sheet.',
+    poses.length
+      ? `Bottom band, expressions and poses: ${plural(poses.length, 'drawing', 'drawings')} of the same person in one row, each with its label lettered under it: ${itemList(poses)}.`
+      : 'No expression or pose row on this sheet.',
+    'Lettering on the sheet: only the name, the line under it, and the labels listed here, copied exactly, in a plain hand-lettered style. No other text.',
+  ];
 }
 
 function gridOf(count) {
@@ -80,6 +205,14 @@ function gridOf(count) {
 function sheetBrief(kind, ctx) {
   const name = ctx.name;
   switch (kind) {
+    case 'model':
+      return [
+        `Full character sheet of one character: ${name}. One image laid out as a comic studio model sheet that defines the character completely.`,
+        ...modelLayout(ctx),
+        'Every drawing on the sheet is the same person, at one consistent scale within each band.',
+        SHEET_CONDITIONS,
+        IN_STYLE,
+      ];
     case 'turnaround':
       return [
         `Character turnaround sheet of one character: ${name}.`,
@@ -158,6 +291,19 @@ function sheetBrief(kind, ctx) {
 function sheetConstraints(kind, ctx) {
   const name = ctx.name;
   switch (kind) {
+    case 'model': {
+      const c = (ctx.closeups || []).length;
+      const p = (ctx.poses || []).length;
+      return [
+        `- One character only, ${name}. Every figure, head, and close-up is that person: same face, hair, build, and clothing. No other figure.`,
+        '- The turnaround shows exactly four full figures: front, three-quarter, profile, back.',
+        `- Exactly ${plural(c, 'close-up', 'close-ups')} and exactly ${plural(p, 'expression or pose drawing', 'expression or pose drawings')}, each with its own label.`,
+        '- Sided marks stay on the same side of the body in every view and close-up.',
+        '- Plain background, flat even light, no cast shadow on the face.',
+        '- No text other than the name, the line under it, and the listed labels. No arrows, numbers, or color swatches.',
+        NO_SIGNATURE,
+      ];
+    }
     case 'turnaround':
       return [
         `- One character only, ${name}, shown exactly four times: front, three-quarter, profile, back. No other figure.`,
@@ -337,7 +483,13 @@ function propSubject(prop, name) {
 
 module.exports = {
   DEFAULT_EXPRESSIONS,
+  DEFAULT_POSES,
   RATIO_PREFERENCE,
+  sheetItem,
+  sheetItems,
+  modelLists,
+  modelLayout,
+  sheetLine,
   pickRatio,
   negativePrompt,
   expressionList,

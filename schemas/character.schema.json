@@ -74,6 +74,25 @@
       "description": "Asset IDs registered in references/manifest.yaml.",
       "items": { "type": "string", "pattern": "^(CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*_V\\d{2}$" }
     },
+    "sheet": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What the full character sheet (sheet kind model) shows besides the turnaround. Each item is a label lettered on the sheet, optionally followed by a colon and what the drawing shows (\"left forearm: a long scar\"). Labels are in the project's language.",
+      "properties": {
+        "closeups": {
+          "type": "array",
+          "maxItems": 8,
+          "description": "Labelled close-ups of what identifies the character: a scar, a tattoo, glasses, a ring. Default: the distinguishing features.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "poses": {
+          "type": "array",
+          "maxItems": 8,
+          "description": "Labelled expressions and key poses or states the story needs: tired, sitting, fallen. Default: four expressions and poses plus the physical states the pages give the character.",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
     "status": {
       "enum": ["draft", "review", "approved"],
       "description": "Approval status of the bible entry."

@@ -48,8 +48,9 @@ with one default role, and from then on outranks any prompt.
 
 1. Collect the planned sheets from the bibles and order them. The look page
    comes first, because every other sheet is drawn in that style. Then each
-   character's turnaround, then the expression and wardrobe sheets that
-   condition on the approved turnaround, then location plates and props. A
+   character's turnaround or full character sheet, then the expression and
+   wardrobe sheets that condition on the approved one, then location plates
+   and props. A
    sheet whose parent is not `approved` is blocked. On a "next" from the
    user with a parent still in review, state the blocker and ask for the
    verdict.
@@ -63,8 +64,9 @@ with one default role, and from then on outranks any prompt.
    `distinguishing_features`.
 3. Compile one prompt package per sheet:
    `node scripts/compile-prompts.js --asset <ENTITY_ID> --sheet <kind> --root production [--provider <id>] [--model <id>]`.
-   The kinds are `turnaround`, `expressions`, and `wardrobe` for a
-   character, `plate` for a location, `prop` for a prop, `look` for a look,
+   The kinds are `turnaround`, `model` (the full character sheet: name,
+   turnaround, labelled close-ups, labelled expressions and poses, in one
+   landscape image), `expressions`, and `wardrobe` for a character, `plate` for a location, `prop` for a prop, `look` for a look,
    and `detail` with `--subject "<text>"` for a close study of any entity.
    `--outfit <WARD_ID>` picks the outfit of a wardrobe sheet,
    `--expressions a,b,c` the list of an expression sheet, and
@@ -78,8 +80,13 @@ with one default role, and from then on outranks any prompt.
    slug of its subject (`<provider>.detail.<slug>.yaml`), and a plate for
    a non-default time that state (`<provider>.plate.<state>.yaml`); the
    package ID and the candidate name carry the same variant. It attaches the
-   approved look master as a `style` reference and, for expression and
-   wardrobe sheets, the character's approved identity master. It refuses a
+   approved look master as a `style` reference. A character's first
+   turnaround or full sheet also attaches the approved photos the person
+   supplied, for likeness only; expression and wardrobe sheets attach the
+   approved identity master and are refused without one. A full sheet is
+   refined with `--revise <version> --changes "..."`, which edits that
+   version into the next with everything else locked
+   (`skills/character-sheet-generation`). It refuses a
    sheet while no look master is approved; the first look page is the one
    request compiled without an image. Nothing is written freehand. Each
    outfit and each detail subject has its own package file, so several
@@ -120,7 +127,7 @@ with one default role, and from then on outranks any prompt.
    registers it in `production/references/manifest.yaml` as `approved`:
    `id`, `entity`, `kind`, `path`, `sha256`, `approved_by`, `approved_at`,
    the candidate and generation record it came from, and a single
-   `default_role` (`identity` for a turnaround or an expression sheet,
+   `default_role` (`identity` for a turnaround, a full sheet, or an expression sheet,
    `style` for a look page, `spatial_continuity` for a plate,
    `prop_consistency` for a prop, `wardrobe` for a wardrobe sheet). It adds
    the asset ID to the entity file's `references`, and for a look master it

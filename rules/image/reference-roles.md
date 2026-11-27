@@ -32,7 +32,7 @@ Every entry of a reference plan carries one `role`:
 | Role | The image fixes | Typical asset |
 |---|---|---|
 | `style` | Line, tone, texture, rendering | The approved look master (`LOOK_*_MASTER_V##`) |
-| `identity` | A character's face, hair, and build | Turnaround or expression sheet |
+| `identity` | A character's face, hair, and build | Full character sheet, turnaround, or expression sheet; a photo only on the character's first sheet |
 | `wardrobe` | A specific outfit | Wardrobe sheet for the `WARD_*` state on the page |
 | `spatial_continuity` | Where things are in a place | Location plate, or the previous reviewed page |
 | `prop_consistency` | The design of an object | Prop sheet |
@@ -63,6 +63,14 @@ Every entry of a reference plan carries one `role`:
 - A grayscale photograph or a painting used as inspiration is `style`
   material for the art-director. It goes through `/ingest-references` and
   never onto a page request as an identity input.
+- A photo of the person a character is based on is attached with role
+  `identity` only to that character's first turnaround or full character
+  sheet, as a likeness source. Its legend line says to translate the person
+  into the comic style and to take nothing from the photo's rendering, light,
+  clothes, or background.
+- A character sheet attached to a page carries labels and a name. The
+  identity line of the legend says to take the identity only, ignore the
+  sheet's layout and labels, and letter none of its text.
 
 ## The look master on every request
 

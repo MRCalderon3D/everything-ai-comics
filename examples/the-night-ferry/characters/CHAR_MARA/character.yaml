@@ -29,5 +29,11 @@ wardrobe_file: wardrobe.yaml
 references:
   - CHAR_MARA_TURN_MASTER_V01
 
+sheet:                                 # what a full character sheet would show besides the turnaround
+  closeups:
+    - "broken nose: the bridge bent to her left"
+    - "left cuff: the tear in the oilskin, three fingers long"
+  poses: [neutral, wary, steering, soaked]
+
 status: approved
 notes: Against Oskar she is the tall one with the long face, the bare grey head, and no hood.

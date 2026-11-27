@@ -50,6 +50,15 @@ prompt compilation, and every render that depicts a `CHAR_*` entity.
 - Every request that depicts a character attaches that character's current
   identity master in the `identity` role. A style reference never stands in
   for it (`image/reference-roles.md`).
+- One identity chain per character. Photos and drawings the person supplied
+  are likeness sources: they go to the first turnaround or full character
+  sheet, and its redraws, while no drawn master is approved, and nowhere
+  else. The approved turnaround or full character sheet (sheet kind
+  `model`, which outranks a turnaround) is the identity master. Expression
+  and wardrobe sheets, later rounds of the full sheet, pages, and the cover
+  are drawn from it and never from a photo. Expression and wardrobe sheets
+  are not drawn before a master is approved: an unapproved candidate is a
+  face nobody has said is right.
 - When the provider's reference limit forces a choice, the look master and
   the identity masters of the cast on the page come first. Wardrobe comes
   next, environment after that. If the cast of a page does not fit the
@@ -78,6 +87,10 @@ prompt compilation, and every render that depicts a `CHAR_*` entity.
 
 ## Identity checks
 
+- A sheet drawn from the master is compared with it before it is offered
+  for approval. If the face, hair, build, or a sided mark differs, it is
+  drawn once more with what the comparison found and shown with a warning
+  if it still differs.
 - After each generation, compare every drawn character with the identity
   master: facial structure, hair, facial hair, distinguishing marks, apparent
   age, build, costume. A mismatch on any of these is a finding, however good
@@ -108,6 +121,10 @@ prompt compilation, and every render that depicts a `CHAR_*` entity.
   `first_appearance` page that its issue does not have.
   `scripts/check-continuity.js` reports a ledger row that names a character
   or wardrobe state the workspace does not define.
+- `scripts/build-reference-plan.js` and `scripts/compile-prompts.js` follow
+  the identity chain: a page or cover whose character has only photos is
+  refused, and expression and wardrobe sheets refuse to compile without an
+  approved master (`master_required`).
 - `hooks/protect-approved-assets.js` blocks writes to approved masters.
 - No script can judge whether two designs are far enough apart, or whether a
   character who recurs has a reference that is good enough. The

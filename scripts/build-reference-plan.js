@@ -9,7 +9,11 @@
  * The plan is derived from the page, in this order:
  *   1. The look master: role style, priority critical, required, always first.
  *   2. The identity master of every character drawn on the page (cast rows
- *      that are not off_panel): role identity, critical, required.
+ *      that are not off_panel): role identity, critical, required. The
+ *      master is an approved drawn sheet (full character sheet, then
+ *      turnaround, then an expression sheet); a photo or drawing the person
+ *      supplied is a likeness source for the first sheet and is never
+ *      attached to a page. A character with only such sources is refused.
  *   3. Wardrobe sheets registered for the outfits worn on the page: required
  *      (high) when the outfit is not the character's default, otherwise
  *      optional (medium), because the identity master shows the default.
@@ -59,6 +63,7 @@ reference is missing, unapproved, or does not fit the provider's budget.
 const ROLES = ['style', 'identity', 'wardrobe', 'spatial_continuity', 'prop_consistency', 'composition'];
 const PRIORITY_RANK = { critical: 0, high: 1, medium: 2, low: 3 };
 const KIND_ROLE = {
+  model: 'identity',
   turnaround: 'identity',
   expressions: 'identity',
   wardrobe: 'wardrobe',
@@ -73,7 +78,15 @@ const PREFIX_ROLE = {
   PROP: 'prop_consistency',
   LOOK: 'style',
 };
-const IDENTITY_KIND_RANK = { turnaround: 0, expressions: 1 };
+/**
+ * Drawn identity sheets, best first. The full character sheet and the
+ * turnaround are the kinds that can be a character's identity master; an
+ * expression sheet is drawn from the master and only stands in for it on a
+ * page when nothing better is approved.
+ */
+const IDENTITY_KIND_RANK = { model: 0, turnaround: 1, expressions: 2 };
+const MASTER_KINDS = ['model', 'turnaround'];
+const IDENTITY_KIND_BY_TAG = { MODEL: 'model', TURN: 'turnaround', EXPR: 'expressions' };
 
 function versionOf(id) {
   const m = /_V(\d{2})$/.exec(String(id || ''));
@@ -138,15 +151,97 @@ function findLookMaster(project, assets) {
 }
 
 /**
- * A character's identity master: the best approved turnaround or
- * expression sheet, preferring the ones character.yaml lists.
- * @returns {{identity: object|null, pool: object[]}}
+ * The drawn identity kind of an asset (model, turnaround, expressions), or
+ * null when it is not a drawn identity sheet. A recorded kind decides; an
+ * entry with no kind is read from the tag of its ID (CHAR_MARA_TURN_...).
+ */
+function identityKindOf(asset) {
+  if (!asset) return null;
+  if (asset.kind) return IDENTITY_KIND_RANK[asset.kind] === undefined ? null : asset.kind;
+  const entity = String(asset.entity || '');
+  const id = String(asset.id || '');
+  if (!entity || !id.startsWith(`${entity}_`)) return null;
+  return IDENTITY_KIND_BY_TAG[id.slice(entity.length + 1).split('_')[0]] || null;
+}
+
+/**
+ * A likeness source: a photo or drawing a person supplied for a character
+ * (registered by ingestion with role identity and a kind that is not a
+ * drawn sheet, usually `detail`, ID <CHAR>_REF_V##). It is attached only to
+ * the character's first identity sheet, never to a page or a cover.
+ */
+function isLikenessSource(asset) {
+  return Boolean(asset) && roleOfAsset(asset) === 'identity' && identityKindOf(asset) === null;
+}
+
+/**
+ * The identity chain of a character, from the registry:
+ *   master    the approved identity master: the best approved full
+ *             character sheet or turnaround (a full sheet outranks a
+ *             turnaround; then the sheets character.yaml lists, masters,
+ *             the highest version)
+ *   identity  what a page or a cover attaches: the master, else an
+ *             approved expression sheet; never a likeness source
+ *   pool      every drawn identity sheet of the character, any status
+ *   likeness  approved likeness sources (photos and drawings a person
+ *             supplied), in the order character.yaml lists them
+ * Existing registries where ingestion filed photos as approved identity
+ * assets work as they are: the photos are told apart by kind, not rewritten.
+ * @returns {{master: object|null, identity: object|null, pool: object[], likeness: object[]}}
+ */
+function findIdentityChain(assets, charId, character) {
+  const listed = character && Array.isArray(character.references) ? character.references : [];
+  const own = entityAssets(assets, charId);
+  const pool = own.filter((a) => identityKindOf(a) !== null && (!a.default_role || a.default_role === 'identity'));
+  const rank = (a) => {
+    const at = listed.indexOf(a.id);
+    return [IDENTITY_KIND_RANK[identityKindOf(a)], at === -1 ? listed.length : at, /_MASTER_/.test(a.id) ? 0 : 1, -versionOf(a.id)];
+  };
+  const sorted = pool.filter((a) => a.status === 'approved').sort((a, b) => {
+    const ra = rank(a);
+    const rb = rank(b);
+    for (let i = 0; i < ra.length; i++) if (ra[i] !== rb[i]) return ra[i] - rb[i];
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+  const master = sorted.find((a) => MASTER_KINDS.includes(identityKindOf(a))) || null;
+  const likeness = own.filter((a) => a.status === 'approved' && isLikenessSource(a)).sort((a, b) => {
+    const ia = listed.indexOf(a.id);
+    const ib = listed.indexOf(b.id);
+    if (ia !== ib) return (ia === -1 ? listed.length : ia) - (ib === -1 ? listed.length : ib);
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+  return { master, identity: master || sorted[0] || null, pool, likeness };
+}
+
+/**
+ * A character's identity reference for a page or a cover: the identity
+ * master (full character sheet or turnaround), else an approved expression
+ * sheet. A photo or drawing the person supplied is never returned here.
+ * @returns {{identity: object|null, master: object|null, pool: object[], likeness: object[]}}
  */
 function findIdentityMaster(assets, charId, character) {
-  const listed = character && Array.isArray(character.references) ? character.references : [];
-  const pool = entityAssets(assets, charId).filter((a) =>
-    a.default_role === 'identity' || (!a.default_role && IDENTITY_KIND_RANK[a.kind] !== undefined));
-  return { identity: bestApproved(pool, listed, IDENTITY_KIND_RANK), pool };
+  return findIdentityChain(assets, charId, character);
+}
+
+/** The refusal for a character drawn with no approved drawn sheet. */
+function identityRefusal(scope, charId, chain) {
+  if (chain.pool.length) {
+    return pipelineError('identity_unapproved',
+      `${scope}: ${charId} is drawn on this page but has no approved identity master ` +
+      `(${chain.pool.map((a) => `${a.id} is ${a.status}`).join(', ')}). ` +
+      'Approve the sheet in references/manifest.yaml, or generate and approve a new version, before planning references.');
+  }
+  if (chain.likeness.length) {
+    const ids = chain.likeness.map((a) => a.id).join(', ');
+    return pipelineError('identity_missing',
+      `${scope}: ${charId} is drawn here but has no approved drawn sheet, only ${ids}: ` +
+      `${chain.likeness.length === 1 ? 'a photo or drawing' : 'photos or drawings'} the person supplied. ` +
+      'Those are likeness sources for the first character sheet and are never attached to a page or a cover. ' +
+      'Draw the turnaround or the full character sheet from them and approve it first.');
+  }
+  return pipelineError('identity_missing',
+    `${scope}: ${charId} is drawn on this page but references/manifest.yaml registers no identity master for it. ` +
+    'Create a character sheet with /visual-development and approve it first.');
 }
 
 /**
@@ -289,18 +384,9 @@ function buildReferencePlan(root, page, options = {}) {
   // 2. Identity master per on-panel character.
   for (const charId of demand.characters) {
     const character = ws.loadCharacter(root, charId) || {};
-    const { identity, pool } = findIdentityMaster(assets, charId, character);
-    if (!identity) {
-      if (pool.length) {
-        throw pipelineError('identity_unapproved',
-          `${page.id}: ${charId} is drawn on this page but has no approved identity master ` +
-          `(${pool.map((a) => `${a.id} is ${a.status}`).join(', ')}). ` +
-          'Approve the sheet in references/manifest.yaml, or generate and approve a new version, before planning references.');
-      }
-      throw pipelineError('identity_missing',
-        `${page.id}: ${charId} is drawn on this page but references/manifest.yaml registers no identity master for it. ` +
-        'Create a character sheet with /visual-development and approve it first.');
-    }
+    const chain = findIdentityMaster(assets, charId, character);
+    const { identity } = chain;
+    if (!identity) throw identityRefusal(page.id, charId, chain);
     add({
       asset_id: identity.id,
       entity: charId,
@@ -580,7 +666,13 @@ module.exports = {
   entityAssets,
   findLookMaster,
   findIdentityMaster,
+  findIdentityChain,
+  identityKindOf,
+  isLikenessSource,
+  identityRefusal,
   roomierProviders,
+  IDENTITY_KIND_RANK,
+  MASTER_KINDS,
 };
 
 if (require.main === module) main();

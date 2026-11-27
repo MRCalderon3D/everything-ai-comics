@@ -25,7 +25,7 @@ hook check each YAML file against its schema.
 | `project` | Format, page geometry, color mode, lettering mode, style anchors, default provider, repair policy | `production/project.yaml` |
 | `story-bible` | Premise, world rules, facts tagged by provenance, arcs, timeline, open questions | `production/story/story-bible.yaml` |
 | `series-plan` | Issues with source span, page budget, and status | `production/story/series-plan.yaml` |
-| `character` | Identity, description, distinguishing features, adjacent characters, references | `production/characters/<CHAR_ID>/character.yaml` |
+| `character` | Identity, description, distinguishing features, adjacent characters, references, what the full character sheet shows (`sheet`) | `production/characters/<CHAR_ID>/character.yaml` |
 | `wardrobe` | Wardrobe states of one character | `production/characters/<CHAR_ID>/wardrobe.yaml` |
 | `location` | Description, time-of-day states, references | `production/locations/<LOC_ID>/location.yaml` |
 | `location-map` | Levels, side convention, landmarks, exits, connections | `production/locations/<LOC_ID>/map.yaml` |

@@ -655,12 +655,13 @@ function testSheets() {
     assert.ok(four.prompt.includes('4 head-and-shoulders drawings of the same head in a grid of 2 columns and 2 rows, read left to right, top to bottom: ' +
       '1. neutral; 2. listening; 3. angry; 4. spent.'));
     assert.ok(four.prompt.includes('exactly 4 times'));
-    // No approved identity master yet: compiled from the description, with a note.
+    // No approved identity master yet: refused, the face is not settled.
     const oskarExpr = fx.withWorkspace((other) => {
       fx.editYaml(other, 'references/manifest.yaml', (doc) => {
         doc.assets.find((a) => a.id === 'CHAR_OSKAR_TURN_MASTER_V01').status = 'review';
       });
-      return compileAsset(other, 'CHAR_OSKAR', { sheet: 'expressions' });
+      return expectError(() => compileAsset(other, 'CHAR_OSKAR', { sheet: 'expressions' }), 'master_required',
+        /expressions sheet is drawn from the approved identity master of Oskar .*CHAR_OSKAR_TURN_MASTER_V01 is review/);
     });
 
     // --- character: wardrobe ------------------------------------------------
@@ -836,10 +837,193 @@ function testSheets() {
 
     return oskarExpr;
   }).then((oskarExpr) => {
-    assert.deepStrictEqual(oskarExpr.pkg.references, [LOOK], 'no approved identity master: the style reference only');
-    assert.deepStrictEqual(oskarExpr.notes,
-      ['CHAR_OSKAR has no approved identity master yet: the expressions sheet is drawn from the written description only.']);
+    assert.ok(/Draw the turnaround or the full character sheet, approve it, then draw this sheet\./.test(oskarExpr.message));
   });
+}
+
+/** Register a photo the person supplied, the way ingestion files it (kind detail, role identity, approved). */
+function addPhoto(root, charId, n = 1, { listFirst = false } = {}) {
+  const id = `${charId}_REF_V${String(n).padStart(2, '0')}`;
+  const rel = `characters/${charId}/refs/${id}.jpg`;
+  fx.writePng(root, rel);
+  fx.editYaml(root, 'references/manifest.yaml', (doc) => {
+    doc.assets.push({ id, entity: charId, kind: 'detail', path: rel, status: 'approved', default_role: 'identity', approved_by: 'person' });
+  });
+  if (listFirst) {
+    fx.editYaml(root, `characters/${charId}/character.yaml`, (doc) => { doc.references = [id, ...(doc.references || [])]; });
+  }
+  return { asset_id: id, role: 'identity', image_path: rel };
+}
+
+/** Take every drawn sheet of a character out of the registry: only what the person supplied is left. */
+function dropSheets(root, charId) {
+  fx.editYaml(root, 'references/manifest.yaml', (doc) => {
+    doc.assets = doc.assets.filter((a) => a.entity !== charId || a.kind === 'detail');
+  });
+  fx.editYaml(root, `characters/${charId}/character.yaml`, (doc) => { doc.references = []; });
+}
+
+const LIKENESS_LINE = /Image 2: a photo or drawing of the person Oskar is based on, for likeness only\. Translate this person into the comic style above: match the face, hair, and build\. Do not copy the photo's rendering, light, clothes, or background\./;
+
+function testIdentityChain() {
+  return fx.withWorkspace((root) => {
+    // --- the first sheet of a character made from a photo ---------------------
+    const photo = addPhoto(root, 'CHAR_OSKAR');
+    dropSheets(root, 'CHAR_OSKAR');
+    const turn = compileAsset(root, 'CHAR_OSKAR', { sheet: 'turnaround' });
+    assertSchemaValid(turn.pkg);
+    assert.deepStrictEqual(turn.pkg.references, [LOOK, photo], 'the turnaround attaches the photo as a likeness source');
+    assert.match(section(turn.pkg.prompt, 'REFERENCE IMAGES'), LIKENESS_LINE);
+    assert.ok(!turn.pkg.prompt.includes('Match the face, hair, build, and proportions exactly'), 'a photo is not a drawn identity sheet');
+    assert.ok(turn.notes.some((n) => /CHAR_OSKAR_REF_V01 as likeness source/.test(n)), turn.notes.join(' | '));
+
+    // Expressions and wardrobe wait for an approved drawn master.
+    const refused = expectError(() => compileAsset(root, 'CHAR_OSKAR', { sheet: 'expressions' }), 'master_required');
+    assert.ok(/CHAR_OSKAR_REF_V01\) are likeness sources for that first sheet only/.test(refused.message), refused.message);
+    expectError(() => compileAsset(root, 'CHAR_OSKAR', { sheet: 'wardrobe' }), 'master_required');
+
+    // A page with only a photo is refused: a photo is never a page reference.
+    const pageErr = expectError(() => buildReferencePlan(root, ws.loadPage(root, fx.PAGE_2), { now: NOW }), 'identity_missing',
+      /CHAR_OSKAR is drawn here but has no approved drawn sheet, only CHAR_OSKAR_REF_V01/);
+    assert.ok(/never attached to a page or a cover/.test(pageErr.message));
+
+    // --- once a drawn master is approved, the photo leaves the chain ----------
+    const mara = addPhoto(root, 'CHAR_MARA', 1, { listFirst: true });
+    const expr = compileAsset(root, 'CHAR_MARA', { sheet: 'expressions' });
+    assert.deepStrictEqual(expr.pkg.references, [LOOK, MARA_ID], 'expressions: the master, not the photo listed first');
+    assert.ok(!expr.pkg.references.some((r) => r.asset_id === mara.asset_id));
+    assert.deepStrictEqual(compileAsset(root, 'CHAR_MARA', { sheet: 'wardrobe' }).pkg.references, [LOOK, MARA_ID]);
+    // A new turnaround next to an approved one is a redesign: no photo, no old sheet.
+    const redesign = compileAsset(root, 'CHAR_MARA', { sheet: 'turnaround' });
+    assert.deepStrictEqual(redesign.pkg.references, [LOOK]);
+    assert.ok(redesign.notes.some((n) => /CHAR_MARA_TURN_MASTER_V01 is the approved turnaround/.test(n)));
+    // A page with the photo listed first still gets the turnaround.
+    const plan = buildReferencePlan(root, ws.loadPage(root, fx.PAGE_1), { now: NOW }).doc;
+    const identity = plan.required.filter((e) => e.role === 'identity').map((e) => e.asset_id);
+    assert.deepStrictEqual(identity, ['CHAR_MARA_TURN_MASTER_V01'], 'the page attaches the drawn master only');
+
+    // An entry with no kind is read from its tag (older registries).
+    fx.editYaml(root, 'references/manifest.yaml', (doc) => { delete doc.assets.find((a) => a.id === 'CHAR_MARA_TURN_MASTER_V01').kind; });
+    assert.deepStrictEqual(compileAsset(root, 'CHAR_MARA', { sheet: 'expressions' }).pkg.references, [LOOK, MARA_ID]);
+  }).then(() => fx.withWorkspace((root) => {
+    // A cover with only a photo of a character on it is refused too.
+    addPhoto(root, 'CHAR_MARA');
+    dropSheets(root, 'CHAR_MARA');
+    fx.writeYaml(root, 'issues/ISS_001/cover/cover.yaml', {
+      id: 'CV_001', issue: 'ISS_001', concept: 'Mara alone.', composition: 'Centred.', location: null, time_of_day: 'night',
+      cast: [{ character: 'CHAR_MARA', wardrobe: 'WARD_MARA_OILSKIN', action: 'Stands.', acting: 'Still.', state: [], holding: [] }],
+      props: [], lettering: { mode: 'overlay', title: 'The Night Ferry', issue_line: null, tagline: null, credits: null },
+      generation: { provider: 'harness-native' }, status: 'draft', approved_render: null,
+    });
+    expectError(() => require('../scripts/compile-prompts').compileCover({ root, issue: 'ISS_001' }), 'identity_missing',
+      /CV_001: CHAR_MARA is drawn here but has no approved drawn sheet, only CHAR_MARA_REF_V01/);
+  }));
+}
+
+function testFullSheet() {
+  return fx.withWorkspace((root) => {
+    // --- the first full sheet of a character with an approved turnaround -------
+    const result = compileAsset(root, 'CHAR_OSKAR', { sheet: 'model' });
+    const pkg = assertSheetPackageModel(root, result);
+    assert.deepStrictEqual(pkg.references, [LOOK,
+      { asset_id: 'CHAR_OSKAR_TURN_MASTER_V01', role: 'identity', image_path: 'characters/CHAR_OSKAR/refs/CHAR_OSKAR_TURN_MASTER_V01.png' }],
+    'the full sheet is drawn from the approved turnaround');
+    const brief = section(pkg.prompt, 'SHEET');
+    assert.ok(brief.includes('Full character sheet of one character: Oskar.'));
+    assert.ok(brief.includes('Header, top left: the name "Oskar" lettered large, and under it a smaller line: "The Night Ferry · Character sheet 01".'));
+    assert.ok(brief.includes('Top band, the turnaround: four full-figure views of the same person, left to right: front, three-quarter, profile, back.'));
+    // Close-ups default to the distinguishing features; poses to four defaults plus the states the pages give.
+    const oskar = ws.loadCharacter(root, 'CHAR_OSKAR');
+    const features = oskar.description.distinguishing_features;
+    assert.ok(brief.includes(`each with its label lettered under it: 1. "${features[0]}"`), brief);
+    assert.ok(brief.includes('Bottom band, expressions and poses: 5 drawings of the same person in one row, each with its label lettered under it: 1. "neutral"; 2. "angry"; 3. "afraid"; 4. "sitting"; 5. "cut left hand".'), brief);
+    assert.ok(brief.includes('Lettering on the sheet: only the name, the line under it, and the labels listed here, copied exactly'));
+    assert.ok(section(pkg.prompt, 'HARD CONSTRAINTS').includes(`- Exactly ${features.length} close-up${features.length === 1 ? '' : 's'} and exactly 5 expression or pose drawings, each with its own label.`));
+    assert.deepStrictEqual(pkg.lettering_text, ['Oskar', 'The Night Ferry · Character sheet 01', ...features, 'neutral', 'angry', 'afraid', 'sitting', 'cut left hand']);
+    assert.ok(!/labels/.test(pkg.negative_prompt), 'the full sheet is lettered on purpose');
+
+    // The person's lists win, then the character file's sheet block. The line follows the project language.
+    const chosen = compileAsset(root, 'CHAR_OSKAR', { sheet: 'model', closeups: 'left hand: the cut across the palm; hood', poses: 'tired;crouching;tired' }).pkg;
+    assert.ok(chosen.prompt.includes('2 framed close-ups drawn large, each with its label lettered under it: 1. "left hand": the cut across the palm; 2. "hood".'), chosen.prompt);
+    assert.ok(chosen.prompt.includes('2 drawings of the same person in one row, each with its label lettered under it: 1. "tired"; 2. "crouching".'));
+    fx.editYaml(root, 'characters/CHAR_OSKAR/character.yaml', (doc) => { doc.sheet = { closeups: ['mano izquierda: el corte'], poses: ['agotado'] }; });
+    fx.editYaml(root, 'project.yaml', (doc) => { doc.language = 'es'; });
+    const fromFile = compileAsset(root, 'CHAR_OSKAR', { sheet: 'model' }).pkg;
+    assert.ok(fromFile.prompt.includes('"The Night Ferry · Hoja de personaje 01"'));
+    assert.ok(fromFile.prompt.includes('1. "mano izquierda": el corte.'), fromFile.prompt);
+    assert.ok(fromFile.prompt.includes('1 drawing of the same person in one row, each with its label lettered under it: 1. "agotado".'));
+
+    // --- revision rounds ------------------------------------------------------
+    fx.writePng(root, 'characters/CHAR_OSKAR/refs/CHAR_OSKAR_MODEL_V01.png');
+    const revision = compileAsset(root, 'CHAR_OSKAR', {
+      sheet: 'model',
+      revise: 'CHAR_OSKAR_MODEL_V01',
+      changes: [{ text: 'shorter hair' }, { text: 'the cut on the other hand', region: { x: 0.5, y: 0.25, w: 0.25, h: 0.25 } }],
+    });
+    const rev = revision.pkg;
+    assertSchemaValid(rev);
+    assert.strictEqual(rev.mode, 'repair');
+    assert.strictEqual(rev.edit_target, 'characters/CHAR_OSKAR/refs/CHAR_OSKAR_MODEL_V01.png');
+    assert.strictEqual(rev.id, 'PP_CHAR_OSKAR_HARNESS-NATIVE-MODEL', 'the next version of the same sheet');
+    assert.deepStrictEqual(rev.references, [LOOK], 'the previous version carries the identity');
+    assert.deepStrictEqual(rev.repair.changes, ['Shorter hair.',
+      'In the area from 50% to 75% of the width (left to right) and from 25% to 50% of the height (top to bottom): The cut on the other hand.']);
+    assert.ok(rev.repair.locked[0].startsWith('Everything CHANGES does not name'));
+    assert.ok(rev.prompt.includes('\n\nREVISION\nEdit Image 1, the previous version of the full character sheet of Oskar.'));
+    assert.ok(section(rev.prompt, 'REFERENCE IMAGES').includes('Image 1: the previous version of this character sheet, to edit.'));
+    assert.ok(section(rev.prompt, 'CHANGES').includes('1. Shorter hair.'));
+    assert.ok(section(rev.prompt, 'LOCKED, DO NOT CHANGE').includes('- The name header and the line under it, except for the sheet number.'));
+    assert.ok(rev.prompt.includes('"The Night Ferry · Hoja de personaje 02"'), 'the next version number');
+    assert.deepStrictEqual(revision.spec.body.images.map((i) => [i.position, i.role]), [[1, 'edit_target'], [2, 'style']]);
+    // A photo attached to this round, for likeness only.
+    const photo = addPhoto(root, 'CHAR_OSKAR');
+    const withPhoto = compileAsset(root, 'CHAR_OSKAR', { sheet: 'model', revise: 'CHAR_OSKAR_MODEL_V01', changes: 'closer to the photo', likeness: photo.asset_id }).pkg;
+    assert.deepStrictEqual(withPhoto.references, [LOOK, photo]);
+    assert.match(withPhoto.prompt, /Image 3: a photo or drawing of the person Oskar is based on, for likeness only\./);
+    // Refusals.
+    expectError(() => compileAsset(root, 'CHAR_OSKAR', { sheet: 'model', revise: 'CHAR_OSKAR_MODEL_V01' }), 'bad_arguments', /--revise needs --changes/);
+    expectError(() => compileAsset(root, 'CHAR_OSKAR', { sheet: 'model', changes: 'x' }), 'bad_arguments', /need --revise/);
+    expectError(() => compileAsset(root, 'CHAR_OSKAR', { sheet: 'turnaround', revise: 'CHAR_OSKAR_TURN_V02', changes: 'x' }), 'bad_arguments', /apply to --sheet model only/);
+    expectError(() => compileAsset(root, 'CHAR_OSKAR', { sheet: 'model', revise: 'CHAR_OSKAR_MODEL_V07', changes: 'x' }), 'revise_target_missing');
+    expectError(() => compileAsset(root, 'CHAR_OSKAR', { sheet: 'model', revise: 'CHAR_OSKAR_MODEL_V01', changes: 'x', likeness: 'CHAR_OSKAR_TURN_MASTER_V01' }),
+      'bad_arguments', /not an approved photo or drawing/);
+    expectError(() => compileAsset(root, 'CHAR_OSKAR', { sheet: 'model', revise: 'CHAR_OSKAR_MODEL_V01', changes: 'x', providerId: 'comfyui' }), 'provider_rejected');
+
+    // --- an approved full sheet is the identity master ------------------------
+    fx.writePng(root, 'characters/CHAR_OSKAR/refs/CHAR_OSKAR_MODEL_MASTER_V01.png');
+    fx.editYaml(root, 'references/manifest.yaml', (doc) => {
+      doc.assets.push({ id: 'CHAR_OSKAR_MODEL_MASTER_V01', entity: 'CHAR_OSKAR', kind: 'model', path: 'characters/CHAR_OSKAR/refs/CHAR_OSKAR_MODEL_MASTER_V01.png', status: 'approved', default_role: 'identity' });
+    });
+    const MODEL = { asset_id: 'CHAR_OSKAR_MODEL_MASTER_V01', role: 'identity', image_path: 'characters/CHAR_OSKAR/refs/CHAR_OSKAR_MODEL_MASTER_V01.png' };
+    assert.deepStrictEqual(compileAsset(root, 'CHAR_OSKAR', { sheet: 'expressions' }).pkg.references, [LOOK, MODEL]);
+    assert.deepStrictEqual(compileAsset(root, 'CHAR_OSKAR', { sheet: 'turnaround' }).pkg.references, [LOOK, MODEL],
+      'a turnaround drawn after the full sheet is drawn from it');
+    // (The fixture page names the old turnaround itself; a page that names nothing gets the master.)
+    fx.editYaml(root, `issues/ISS_001/pages/${fx.PAGE_2}/page.yaml`, (page) => { page.references.required = []; });
+    const plan = buildReferencePlan(root, ws.loadPage(root, fx.PAGE_2), { now: NOW }).doc;
+    assert.ok(plan.required.some((e) => e.asset_id === 'CHAR_OSKAR_MODEL_MASTER_V01' && e.role === 'identity'));
+    assert.ok(!plan.required.some((e) => e.asset_id === 'CHAR_OSKAR_TURN_MASTER_V01'), 'one identity image per character');
+    // The page legend keeps the sheet's labels out of the drawing.
+    writePlan(root, fx.PAGE_2);
+    const page = compile(root, fx.PAGE_2).pkg;
+    assert.ok(/identity of Oskar\. Match the face, hair, build, and proportions exactly\. Do not copy the sheet's poses, layout, background, or labels, and letter none of its text\./.test(page.prompt));
+    // A new full sheet next to the approved one is a redesign.
+    const again = compileAsset(root, 'CHAR_OSKAR', { sheet: 'model' });
+    assert.deepStrictEqual(again.pkg.references, [LOOK]);
+    assert.ok(again.notes.some((n) => /revise it \(--revise\)/.test(n)));
+  });
+}
+
+function assertSheetPackageModel(root, result) {
+  const { pkg, fileRel } = result;
+  assertSchemaValid(pkg);
+  assert.strictEqual(pkg.id, 'PP_CHAR_OSKAR_HARNESS-NATIVE-MODEL');
+  assert.strictEqual(fileRel, 'characters/CHAR_OSKAR/refs/prompts/harness-native.model.yaml');
+  assert.strictEqual(pkg.mode, 'generate');
+  assert.strictEqual(pkg.parameters.aspect_ratio, '3:2', 'a full sheet is landscape');
+  assert.ok(pkg.prompt.startsWith(`${ws.loadStyleBlock(root)}\n\nSHEET\n`));
+  assert.ok(!/\b(CHAR|PROP|LOC|LOOK|WARD)_[A-Z0-9_]+/.test(pkg.prompt), 'IDs stay out of the model-facing text');
+  return pkg;
 }
 
 function testSheetRefusalsAndDeterminism() {
@@ -1057,6 +1241,8 @@ async function main() {
   await testSheetCli();
   await testSafeMarginAndPanelNotes();
   await testPlateTime();
+  await testIdentityChain();
+  await testFullSheet();
   console.log('compile-prompts: OK');
 }
 
