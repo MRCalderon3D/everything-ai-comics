@@ -119,7 +119,7 @@
       "label": "Codex CLI (codex exec with its image tool)",
       "env": [],
       "capabilities": {
-        "referenceImages": 6,
+        "referenceImages": 5,
         "aspectRatios": [
           "2:3",
           "3:4",
