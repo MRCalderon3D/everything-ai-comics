@@ -13,7 +13,7 @@ import { jobsFor } from '/js/components/jobs.js';
 import { openViewer } from '/js/components/viewer.js';
 import { openDialog } from '/js/components/dialog.js';
 import { toast } from '/js/components/toast.js';
-import { pageName, versionName } from '/js/labels.js';
+import { pageName, versionName, plainIds } from '/js/labels.js';
 import { currentIssue, issueBar } from '/js/components/issues.js';
 import { newsBar } from '/js/components/news.js';
 import { deleteButton, cleanupButton } from '/js/components/deleting.js';
@@ -113,11 +113,18 @@ function readerTabLink(exp, { small = true } = {}) {
     icon('open'), h('span', null, t('publish.reader_tab')));
 }
 
+/** An edition's name: "Title - Title" (a comic whose issue has its name) once. */
+function editionName(ed) {
+  const name = ed.title || ed.id;
+  const m = /^(.+?) - (.+)$/.exec(name);
+  return m && m[1].trim() === m[2].trim() ? m[1].trim() : name;
+}
+
 function editionCard(ctx, ed, formatLabel) {
   const draft = ed.status === 'draft';
   return h('li', { class: 'edition', dataset: { status: ed.status } },
     h('div', { class: 'row spread' },
-      h('h3', null, ed.title || ed.id),
+      h('h3', null, editionName(ed)),
       h('span', { class: `edition-state ${ed.status}` }, tv('edition_status', ed.status, ed.status))),
     h('p', { class: 'small faint', title: ed.id }, `${formatDate(ed.created_at)}. ${tn('publish.edition_pages', ed.pages)}${ed.cover ? `. ${t('publish.with_cover')}` : ''}`),
     draft ? h('p', { class: 'small' }, t('publish.draft_note')) : null,
@@ -131,7 +138,7 @@ function editionCard(ctx, ed, formatLabel) {
             exp.draft ? h('span', { class: 'draft-mark' }, ` ${t('publish.draft_mark')}`) : null,
             h('span', { class: 'faint small' }, exp.exists ? ` ${formatBytes(exp.bytes)}` : ` ${t('publish.file_missing')}`)),
           exp.exists && exp.browsable
-            ? button(t('publish.open_reader'), { small: true, onclick: () => readEdition(exp, ed.title || ed.id) })
+            ? button(t('publish.open_reader'), { small: true, onclick: () => readEdition(exp, editionName(ed)) })
             : null,
           exp.exists && exp.browsable ? readerTabLink(exp) : null,
           exp.exists && exp.download_url
@@ -192,7 +199,7 @@ export function view(ctx, data) {
     data.lettering.mode === 'overlay' ? letteringPanel(ctx, data) : null,
     panel(t('publish.build_title'),
       formatBoxes,
-      next && next.reuses ? notice('info', t('publish.reuses', { edition: next.reuses })) : null,
+      next && next.reuses ? notice('info', t('publish.reuses', { edition: plainIds(next.reuses) })) : null,
       h('div', { class: 'row' },
         ready.final_possible
           ? [actionButton(t('publish.build_final'), build('final'), { kind: 'primary' }),

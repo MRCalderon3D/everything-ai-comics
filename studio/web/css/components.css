@@ -26,7 +26,7 @@
 .btn.accent:hover { filter: brightness(1.08); }
 .btn.quiet { border-color: transparent; background: transparent; color: var(--accent); }
 .btn.quiet:hover { background: var(--accent-wash); }
-.btn.danger { background: var(--bad); color: #fff; border-color: var(--bad); }
+.btn.danger { background: var(--bad); color: var(--bad-ink); border-color: var(--bad); }
 .btn.danger:hover { filter: brightness(1.08); }
 .btn.small { min-height: 32px; padding: 4px 12px; font-size: var(--step--1); }
 .btn.large { min-height: 48px; padding: 10px 22px; font-size: var(--step-1); }
@@ -117,6 +117,10 @@ input[type="checkbox"], input[type="radio"] { width: 18px; height: 18px; margin:
 .notice.ok { border-color: color-mix(in srgb, var(--ok) 40%, transparent); background: var(--ok-wash); }
 .notice.next { border: 2px solid var(--marker-ink); background: var(--marker); color: var(--marker-ink); }
 .notice.next a { color: var(--marker-ink); font-weight: 650; }
+/* Inside a panel a plain note is a line of the panel, not a box in a box. */
+.panel .notice:not(.warn):not(.bad):not(.ok):not(.next) {
+  border: 0; background: none; padding: 0; color: var(--ink-2);
+}
 .stale-banner { margin-bottom: var(--gutter); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .stale-banner > * + * { margin-top: 0; }
 
@@ -141,7 +145,8 @@ input[type="checkbox"], input[type="radio"] { width: 18px; height: 18px; margin:
 .caption-box .btn.quiet { color: var(--marker-ink); text-decoration: underline; }
 .caption-box .btn.quiet:hover { background: rgba(0, 0, 0, 0.08); }
 
-.empty, .art-empty {
+/* An empty state. A frame without its image also carries "empty", and keeps its own look. */
+.empty:not(.frame), .art-empty {
   border: 1.5px dashed var(--line-2); border-radius: var(--r-box);
   padding: var(--s6); display: flex; flex-direction: column; gap: 10px; align-items: flex-start;
   background: var(--sheet);
@@ -191,7 +196,7 @@ details.details-box[open] { padding-bottom: 12px; }
 /* --- documents and forms --------------------------------------------------- */
 .doc { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
 .doc-head { display: flex; gap: var(--gap); align-items: flex-start; }
-.doc-head h3 { font-size: var(--step-1); }
+.doc-head .doc-title { font-size: var(--step-1); }
 .doc-path { overflow-wrap: anywhere; }
 .doc-actions { padding: 12px 0 0; border-top: 1px solid var(--line); }
 .doc-text, .file-text { tab-size: 2; white-space: pre; overflow: auto; line-height: 1.5; }
@@ -227,18 +232,21 @@ details.details-box[open] { padding-bottom: 12px; }
 
 /* --- toasts ---------------------------------------------------------------- */
 .toasts { position: fixed; left: 16px; bottom: 16px; z-index: 80; display: flex; flex-direction: column; gap: 8px; width: min(460px, calc(100vw - 32px)); }
+/* A toast is a caption on ink. Its kind is a small inked panel at the start
+   of the line, in the colour of the kind; the words say the rest. */
 .toast {
-  display: flex; align-items: center; gap: 10px; padding: 10px 8px 10px 14px; border-radius: var(--r-ctl);
+  --mark: var(--toast-info);
+  display: flex; align-items: center; gap: 10px; padding: 10px 8px 10px 12px; border-radius: var(--r-ctl);
   background: var(--ink); color: var(--board); box-shadow: 0 12px 30px -12px var(--shade);
-  border-left: 6px solid var(--accent);
   animation: toast-in var(--slow) var(--ease) both;
 }
+.toast::before { content: ""; flex: none; width: 10px; height: 12px; border-radius: 2px; background: var(--mark); }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .toast a { color: inherit; font-weight: 650; white-space: nowrap; }
 .toast .btn.quiet { color: inherit; }
-.toast.ok { border-left-color: var(--marker); }
-.toast.bad { border-left-color: #ff6b5e; }
-.toast.warn { border-left-color: #f2a13a; }
+.toast.ok { --mark: var(--toast-ok); }
+.toast.bad { --mark: var(--toast-bad); }
+.toast.warn { --mark: var(--toast-warn); }
 
 /* --- the queue ------------------------------------------------------------- */
 .jobs-indicator { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -262,9 +270,12 @@ details.details-box[open] { padding-bottom: 12px; }
   font-weight: 700; text-decoration: none; border-radius: var(--r-pill); white-space: nowrap;
 }
 .fake-chip { font-size: 0.75rem; border: 1px dashed var(--ink-3); padding: 1px 9px; border-radius: var(--r-pill); color: var(--ink-2); white-space: nowrap; }
+/* Work that is running: a turning arc of ink in the colour of the work,
+   the same mark as loading. With reduced motion it stands still. */
 .pulse {
-  width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex: none; display: inline-block;
-  animation: pulse 1.4s ease-in-out infinite;
+  width: 11px; height: 11px; border-radius: 50%; flex: none; display: inline-block;
+  border: 2px solid currentColor; border-right-color: transparent;
+  animation: spin 0.9s linear infinite;
 }
 @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.7); } }
 
@@ -280,10 +291,14 @@ details.details-box[open] { padding-bottom: 12px; }
 .drawer-body h3 { font-size: var(--step-1); margin-bottom: 10px; }
 
 .job { background: var(--sheet); border: 1px solid var(--line); border-radius: var(--r-box); overflow: hidden; }
-.job[data-status="running"] { border-color: color-mix(in srgb, var(--live) 45%, var(--line)); box-shadow: inset 4px 0 0 var(--live); }
-.job[data-status="needs_decision"] { box-shadow: inset 4px 0 0 var(--marker); border-color: var(--marker-ink); }
-.job[data-status="failed"] { box-shadow: inset 4px 0 0 var(--bad); }
-.job[data-status="done"] { box-shadow: inset 4px 0 0 var(--ok); }
+/* A job's state is its whole outline plus the words of .job-state: magenta
+   while it runs, an inked edge on yellow when it waits for the person. */
+.job[data-status="running"] { border: 2px solid var(--live); }
+.job[data-status="needs_decision"] { border: 2px solid var(--marker-ink); }
+.job[data-status="needs_decision"] .job-head { background: var(--marker); color: var(--marker-ink); }
+.job[data-status="needs_decision"] .job-head .job-state, .job[data-status="needs_decision"] .job-head .job-time { color: var(--marker-ink); }
+.job[data-status="failed"] { border-color: color-mix(in srgb, var(--bad) 60%, var(--line)); }
+.job[data-status="done"] { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
 .job-head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; padding: 11px 14px; }
 .job-title { font-weight: 700; flex: 1 1 auto; }
 .job-state { font-size: var(--step--1); color: var(--ink-2); }
@@ -331,7 +346,7 @@ details.details-box[open] { padding-bottom: 12px; }
   background: var(--sheet-3); color: var(--ink-2); font-weight: 600; text-decoration: none;
 }
 a.msg-from:hover { background: var(--accent-wash); color: var(--accent); }
-.msg-text { white-space: pre-wrap; padding: 10px 13px; border-radius: 14px; line-height: 1.5; }
+.msg-text { white-space: pre-wrap; padding: 10px 13px; border-radius: 14px; line-height: 1.5; text-wrap: pretty; }
 .msg.user { align-items: flex-end; }
 .msg.user .msg-text { background: var(--accent); color: var(--accent-ink); border-bottom-right-radius: 4px; margin-left: 28px; }
 .msg.assistant .msg-text { background: var(--sheet-2); border: 1px solid var(--line); border-bottom-left-radius: 4px; margin-right: 20px; }
@@ -339,7 +354,7 @@ a.msg-from:hover { background: var(--accent-wash); color: var(--accent); }
 .msg.event { align-items: center; text-align: center; }
 .msg.event .msg-text { background: none; padding: 0 12px; font-size: var(--step--1); color: var(--ink-2); border-radius: 0; }
 .msg-extra { font-size: var(--step--1); display: flex; flex-direction: column; gap: 6px; margin-right: 20px; }
-.msg-extra.changed { border-left: 3px solid var(--ok); padding-left: 10px; }
+.msg-extra.changed { border: 1px solid color-mix(in srgb, var(--ok) 45%, var(--line)); background: var(--ok-wash); border-radius: var(--r-ctl); padding: 8px 10px; }
 .msg-links { display: flex; flex-wrap: wrap; gap: 6px; }
 .msg-links a {
   display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: var(--r-pill);
@@ -398,23 +413,26 @@ a.msg-from:hover { background: var(--accent-wash); color: var(--accent); }
 .action-meta { color: var(--ink-2); }
 .action-warn { color: var(--ink); background: var(--warn-wash); border-radius: 6px; padding: 4px 8px; display: flex; gap: 6px; align-items: flex-start; }
 .msg.result { align-items: stretch; }
-.result-body { border-left: 3px solid var(--live); padding: 6px 10px; background: var(--sheet-2); border-radius: 0 var(--r-ctl) var(--r-ctl) 0; display: flex; flex-direction: column; gap: 6px; font-size: var(--step--1); align-items: flex-start; }
-.result-body p { margin: 0; }
-.msg.result[data-status="done"] .result-body { border-left-color: var(--ok); }
-.msg.result[data-status="failed"] .result-body { border-left-color: var(--bad); }
-.msg.result[data-status="needs_decision"] .result-body { border-left-color: var(--warn); }
+/* What a job brought back: an outlined box in the colour of how it ended. */
+.result-body { border: 1px solid color-mix(in srgb, var(--live) 50%, var(--line)); padding: 8px 10px; background: var(--sheet-2); border-radius: var(--r-ctl); display: flex; flex-direction: column; gap: 6px; font-size: var(--step--1); align-items: flex-start; }
+.result-body p { margin: 0; text-wrap: pretty; }
+.msg.result[data-status="done"] .result-body { border-color: color-mix(in srgb, var(--ok) 50%, var(--line)); }
+.msg.result[data-status="failed"] .result-body { border-color: var(--bad); background: var(--bad-wash); }
+.msg.result[data-status="needs_decision"] .result-body { border-color: var(--warn); background: var(--warn-wash); }
 .result-questions { width: 100%; }
-.msg.result[data-status="paused"] .result-body { border-left-color: var(--warn); }
+.msg.result[data-status="paused"] .result-body { border-color: var(--warn); background: var(--warn-wash); }
 .result-quota { width: 100%; }
 .action-images { color: var(--ink-2); margin: 0; }
 
 /* --- guide mode ------------------------------------------------------------ */
 .guide-toggle[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--panel-ink); }
 .msg.guide { align-items: stretch; }
-.msg.guide .guide-lines { border-left: 3px solid var(--accent); background: var(--accent-wash); color: var(--ink); padding: 8px 12px; border-radius: 0 var(--r-ctl) var(--r-ctl) 0; display: flex; flex-direction: column; gap: 6px; }
-.msg.guide .guide-lines p { margin: 0; }
+/* The guide speaks in a caption: non-photo blue while it is the current
+   step, plain paper once the comic has moved on. */
+.msg.guide .guide-lines { border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-wash); color: var(--ink); padding: 9px 12px; border-radius: var(--r-ctl); display: flex; flex-direction: column; gap: 6px; }
+.msg.guide .guide-lines p { margin: 0; text-wrap: pretty; }
 .msg.guide .guide-decide { font-weight: 600; }
-.msg.guide:not(.live) .guide-lines { border-left-color: var(--line); background: var(--sheet-2); }
+.msg.guide:not(.live) .guide-lines { border-color: var(--line); background: var(--sheet-2); }
 .guide-choices { flex-wrap: wrap; gap: 6px; }
 .guide-images .attach-thumb.large, .attach-thumb.large { width: 132px; height: 180px; }
 .attach-thumb.large img { object-fit: contain; background: var(--sheet-2); }
@@ -549,10 +567,11 @@ button.frame-art:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0
 .review-human { border: 1px solid var(--line); border-radius: var(--r-ctl); padding: 10px 14px; }
 .review-human.approved { border: 2px solid var(--panel-ink); }
 .finding-list, .check-list { display: flex; flex-direction: column; gap: 8px; }
-.finding { border: 1px solid var(--line); border-radius: var(--r-ctl); box-shadow: inset 4px 0 0 var(--bad); padding: 10px 12px 10px 16px; display: flex; flex-direction: column; gap: 6px; background: var(--sheet); }
-.finding[data-status="fixed"] { box-shadow: inset 4px 0 0 var(--ok); }
-.finding.note { box-shadow: inset 4px 0 0 var(--accent); }
-.finding[data-status="accepted"] { box-shadow: inset 4px 0 0 var(--ink-3); }
+/* A finding is outlined in the colour of its state; .finding-status says it in words. */
+.finding { border: 1px solid color-mix(in srgb, var(--bad) 55%, var(--line)); border-radius: var(--r-ctl); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; background: var(--sheet); }
+.finding[data-status="fixed"] { border-color: color-mix(in srgb, var(--ok) 55%, var(--line)); }
+.finding.note { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.finding[data-status="accepted"] { border-color: var(--line-2); border-style: dashed; }
 .finding-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
 .finding-tags { display: flex; flex-wrap: wrap; gap: 6px; font-size: var(--step--1); color: var(--ink-2); }
 .finding-status { font-weight: 700; color: var(--ink); }
@@ -566,8 +585,8 @@ button.frame-art:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0
 
 /* --- tools ----------------------------------------------------------------- */
 .tool-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--s3); }
-.tool-row { border: 1px solid var(--line); border-radius: var(--r-box); padding: 14px 16px; background: var(--sheet); box-shadow: inset 0 4px 0 var(--ok); }
-.tool-row[data-found="false"] { box-shadow: inset 0 4px 0 var(--bad); }
+.tool-row { border: 1px solid color-mix(in srgb, var(--ok) 45%, var(--line)); border-radius: var(--r-box); padding: 14px 16px; background: var(--sheet); }
+.tool-row[data-found="false"] { border-color: color-mix(in srgb, var(--bad) 55%, var(--line)); background: var(--bad-wash); }
 .tool-name { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; margin-bottom: 4px; }
 .tool-state { font-size: var(--step--1); font-weight: 700; }
 .tool-state.no { color: var(--bad); }
@@ -620,7 +639,7 @@ button.frame-art:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0
 
 /* --- the web reader ---------------------------------------------------------- */
 .reader-frame { width: 100%; height: min(78vh, 900px); border: 2px solid var(--panel-ink); border-radius: var(--r-art); background: var(--art-bg); display: block; }
-.overrule-note { border-left: 3px solid var(--warn); padding-left: 10px; margin: 6px 0; }
+.overrule-note { border: 1px dashed var(--warn); background: var(--warn-wash); border-radius: var(--r-ctl); padding: 8px 10px; margin: 6px 0; }
 .overrule-note p { margin: 0; }
 .result-questions .question { padding: 0; border: 0; margin: 0; }
 .result-questions .question > legend { font-size: var(--step--1); font-weight: 600; line-height: 1.4; }
@@ -666,3 +685,13 @@ button.frame-art:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0
 .action-after { color: var(--ink-2); }
 .news-mark .news-dot { margin-top: 0.4em; }
 .action-details.plain dt { font-family: inherit; font-size: var(--step--1); color: var(--ink-2); }
+
+/* Standalone small controls of the conversation: at least 24 px tall. */
+.msg-from { min-height: 24px; }
+.action-raw > summary, .disclosure > summary { min-height: 24px; }
+/* Inside a panel the verdict is a band of colour, not a second box. */
+.panel .review-verdict { border: 0; }
+.action-details dd { text-wrap: pretty; }
+/* Inside a panel, the person's decision is a line under the verdict, not a box. */
+.panel .review-human, .panel .review-human.approved { border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: 10px 0 0; }
+.file-list .link { padding-block: 2px; }

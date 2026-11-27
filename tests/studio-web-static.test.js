@@ -401,8 +401,32 @@ function checkLayout() {
   assert.ok(/data-rail="collapsed"/.test(css) && /data-dock="collapsed"/.test(css) && /data-focus="true"/.test(css), 'the layout states have no styles');
 }
 
+/**
+ * The design record and the rules of studio/design/DESIGN.md that a stylesheet
+ * can break: state is never a bar down one side of a box (an inset stripe or
+ * a thick one-sided border), and text on a filled colour comes from a token,
+ * so it follows the theme (white on the dark theme's light red failed contrast).
+ */
+function checkDesign() {
+  for (const name of ['PRODUCT.md', 'DESIGN.md']) {
+    assert.ok(fs.existsSync(path.join(ROOT, 'studio', 'design', name)), `studio/design/${name} is missing`);
+  }
+  for (const file of cssFiles) {
+    const css = code(read(file));
+    assert.ok(!/box-shadow:\s*inset\s+(?:\d+px\s+0|0\s+\d+px)\s+0\s+(?!0)/.test(css), `${rel(file)}: an inset stripe on one side of a box; use the whole outline, a wash or words`);
+    // A quotation keeps its rule: it marks quoted text, not the state of a box.
+    for (const rule of css.split('}')) {
+      const [selector, body = ''] = rule.split('{');
+      if (/blockquote/.test(selector)) continue;
+      assert.ok(!/border-(?:left|right):\s*[3-9]px\s+solid/.test(body), `${rel(file)}: ${selector.trim()}: a thick border on one side of a box; use the whole outline, a wash or words`);
+    }
+    assert.ok(!/(?:^|[;{\s])color:\s*(?:#fff\b|#ffffff\b|white\b)/i.test(css), `${rel(file)}: white text hard-coded; use an ink token (--accent-ink, --bad-ink, --marker-ink)`);
+  }
+}
+
 function main() {
   checkHtml();
+  checkDesign();
   checkLayout();
   checkPolicy();
   checkThree();

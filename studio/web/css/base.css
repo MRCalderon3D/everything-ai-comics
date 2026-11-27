@@ -31,9 +31,15 @@
   --ok: #17734c;
   --ok-wash: #e0f2e9;
   --bad: #b3261e;
+  --bad-ink: #ffffff;
   --bad-wash: #fbe7e5;
   --warn: #855600;
   --warn-wash: #fff1cc;
+  /* the queue's toasts sit on ink, so their marks need the bright versions */
+  --toast-ok: #ffd23d;
+  --toast-bad: #ff8a7f;
+  --toast-warn: #f2a13a;
+  --toast-info: #8fb2ff;
   --shade: rgba(27, 26, 34, 0.5);
   --art-bg: #dfe2e8;
   --dot: rgba(27, 26, 34, 0.16);
@@ -105,6 +111,11 @@
     --ok: #7fd6ae;
     --ok-wash: #15301f;
     --bad: #ff978d;
+    --bad-ink: #2a0d0a;
+    --toast-ok: #17734c;
+    --toast-bad: #b3261e;
+    --toast-warn: #855600;
+    --toast-info: #2357c4;
     --bad-wash: #3d1d1a;
     --warn: #f3c44f;
     --warn-wash: #3a2f10;
@@ -137,6 +148,11 @@
   --ok: #7fd6ae;
   --ok-wash: #15301f;
   --bad: #ff978d;
+  --bad-ink: #2a0d0a;
+  --toast-ok: #17734c;
+  --toast-bad: #b3261e;
+  --toast-warn: #855600;
+  --toast-info: #2357c4;
   --bad-wash: #3d1d1a;
   --warn: #f3c44f;
   --warn-wash: #3a2f10;
@@ -148,7 +164,7 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
-html { color-scheme: light dark; }
+html { color-scheme: light dark; scrollbar-gutter: stable; }
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] { color-scheme: dark; }
 
@@ -159,7 +175,13 @@ body {
   font: var(--step-0)/1.55 var(--font-body);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  caret-color: var(--accent);
+  scrollbar-color: var(--line-2) transparent;
 }
+
+/* The parts the browser draws carry the palette too: a selection in
+   non-photo blue, the caret in the colour of things you can use. */
+::selection { background: color-mix(in srgb, var(--accent) 32%, transparent); color: var(--ink); }
 
 h1, h2, h3, h4 {
   font-family: var(--font-display);
@@ -177,6 +199,7 @@ h3 { font-size: var(--step-2); }
 h4 { font-size: var(--step-1); }
 
 p { margin: 0 0 0.75em; max-width: 72ch; text-wrap: pretty; }
+li, dd, figcaption { text-wrap: pretty; }
 p:last-child { margin-bottom: 0; }
 ul, ol { margin: 0; padding: 0; list-style: none; }
 img { max-width: 100%; display: block; }

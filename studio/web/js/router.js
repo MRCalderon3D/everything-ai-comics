@@ -160,6 +160,11 @@ function screenFor(ctx, data) {
     case 'corrections':
       if (page) return { key: `page:${page}`, label: t('page.n', { n: Number(String(page).slice(-3)) }), route: `${base}/pages/${page}` };
       return { key: `pages:${state.issue || 'ISS_001'}`, label: t('screen.pages'), route: `${base}/pages` };
+    // The overview and the history have no files of their own: the message
+    // goes with the story's, and the label says it is about the whole comic
+    // (on History, "Story" read like the screen itself).
+    case 'home':
+    case 'history': return { key: 'story', label: t('home.about_comic'), route: `${base}/story` };
     default: return { key: 'story', label: t('screen.story'), route: `${base}/story` };
   }
 }

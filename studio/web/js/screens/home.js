@@ -33,6 +33,11 @@ function nextAction(overview) {
     return { text: t('home.next_decision'), href: `${base}/decisions`, label: t('home.next_decision_action') };
   }
   if (!overview.next) {
+    // Published: the next thing is to read it (or start the next issue, offered just below).
+    const publish = overview.screens.find((s) => s.key === 'publish');
+    if (publish && publish.status === 'done') {
+      return { text: t('home.published'), href: `${base}/publish`, label: t('home.read_comic') };
+    }
     return { text: t('home.all_done'), href: `${base}/publish`, label: t('home.go_publish') };
   }
   const key = overview.next.screen;

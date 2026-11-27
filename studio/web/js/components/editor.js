@@ -218,7 +218,7 @@ export function docEditor(ctx, doc, { key, title, form = true, readonly, onSaved
   return h('div', { class: 'doc' },
     h('div', { class: 'doc-head' },
       h('div', { class: 'grow' },
-        title ? h('h3', null, title) : null,
+        title ? h('h2', { class: 'doc-title' }, title) : null,
         pathEl),
       toggle),
     readonly ? notice('info', readonly) : null,

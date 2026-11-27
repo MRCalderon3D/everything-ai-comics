@@ -109,7 +109,7 @@ function planEditor(ctx, data) {
     const target = byId.get(p.id);
     if (!target) return null;
     return h('li', { class: 'plan-panel' },
-      h('h4', null, t('page.panel_n', { n: p.number }),
+      h('h3', null, t('page.panel_n', { n: p.number }),
         h('span', { class: 'faint small' }, ` ${t('page.panel_meta', { size: tv('value', p.size, p.size), shot: tv('shot', p.shot, String(p.shot || '').replace(/_/g, ' ')) })}`,
           p.slot ? ` · ${slotWords(p.slot)}` : '')),
       area(t('page.moment'), target.moment, (v) => { target.moment = v; }),
@@ -196,7 +196,7 @@ function letteringBlock(target, shown, { limits, pageCast, onChange }) {
   const paint = (focusIndex) => {
     const items = target.lettering.map((el, i) => elementRow(el, i));
     box.replaceChildren(
-      h('div', { class: 'row spread' }, h('h5', { class: 'letter-title' }, t('letter.title')), meter),
+      h('div', { class: 'row spread' }, h('h4', { class: 'letter-title' }, t('letter.title')), meter),
       items.length ? h('ol', { class: 'letter-list' }, items) : h('p', { class: 'small faint' }, t('letter.none')),
       h('div', { class: 'row' },
         button(t('letter.add'), { kind: 'quiet', small: true, icon: 'plus', onclick: () => {

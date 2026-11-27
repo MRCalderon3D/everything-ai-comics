@@ -23,7 +23,7 @@ import { h, icon, mount, nextId } from '/js/dom.js';
 import { t, tn, tv, formatTime, formatDateTime, formatDuration } from '/js/i18n.js';
 import { api, errorText } from '/js/api.js';
 import { state, bus, rememberJob, ACTIVE } from '/js/store.js';
-import { toolName, jobStatus, jobOutcome, pageName } from '/js/labels.js';
+import { toolName, jobStatus, jobOutcome, pageName, plainIds } from '/js/labels.js';
 import { button } from '/js/components/ui.js';
 import { openDialog, confirmDialog } from '/js/components/dialog.js';
 import { showFile } from '/js/components/editor.js';
@@ -207,6 +207,16 @@ function paramLabel(name) {
   return label === `param.${name}` ? String(name).replace(/_/g, ' ') : label;
 }
 
+/** A parameter's value in words: kinds by their names, formats in capitals, IDs as numbers. */
+function plainParam(d) {
+  if (d.name === 'sheet') return tv('sheet', d.value, d.value);
+  if (d.name === 'mode') return tv('correct_mode', d.value, d.value);
+  if (d.name === 'formats' && typeof d.value === 'string') {
+    return d.value.split(/,\s*/).map((f) => (/^(pdf|cbz|epub)$/i.test(f) ? f.toUpperCase() : f)).join(', ');
+  }
+  return typeof d.value === 'string' ? plainIds(d.value) : d.value;
+}
+
 /**
  * The parameters of a card: plain labels and values; the raw names and the
  * values as sent stay under a "Details" toggle.
@@ -215,7 +225,7 @@ function cardDetails(card) {
   const details = card.details || [];
   if (!details.length) return null;
   return h('div', { class: 'action-params' },
-    h('dl', { class: 'action-details plain' }, details.map((d) => [h('dt', null, paramLabel(d.name)), h('dd', null, d.name === 'sheet' ? tv('sheet', d.value, d.value) : d.name === 'mode' ? tv('correct_mode', d.value, d.value) : d.value)])),
+    h('dl', { class: 'action-details plain' }, details.map((d) => [h('dt', null, paramLabel(d.name)), h('dd', null, plainParam(d))])),
     h('details', { class: 'action-raw' },
       h('summary', { class: 'small muted' }, t('card.raw_details')),
       h('dl', { class: 'action-details' }, Object.entries(card.params || {}).map(([name, value]) => [h('dt', null, h('code', null, name)),

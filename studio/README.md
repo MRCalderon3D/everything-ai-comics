@@ -545,6 +545,17 @@ content underneath. Without WebGL the flat version stays and three.js is not
 fetched. With reduced motion the scenes draw still frames when something
 changes, and no transition runs.
 
+### Design
+
+`design/PRODUCT.md` says who the studio is for and what it must keep (the
+artwork as the largest thing on screen, one next action per screen, plain
+words in front of the person). `design/DESIGN.md` records the visual system
+as it is in `web/css/base.css`: the print palette and the one job of each
+colour, the type scale, corners by role, how state is shown, and the rules
+a new screen follows. Read both before changing how a screen looks. The
+tokens live in `base.css`; when a value changes there, change it in
+`DESIGN.md` too.
+
 ## What a page goes through
 
 1. The plan: `pages.plan` runs the scaffold's issue breakdown and

@@ -21,6 +21,21 @@ export function pageName(id) {
   return String(id || '');
 }
 
+/**
+ * The scaffold's IDs inside a sentence, in words: "page PG_001_002" -> "page 2",
+ * "PG_001_002" -> "Page 2", "ISS_001" -> "1", "ED_001_02" -> "2". The raw IDs
+ * stay under "Details" where a screen shows them.
+ */
+export function plainIds(text) {
+  return String(text == null ? '' : text)
+    .replace(/\b(page|página)\s+PG_\d{3}_(\d{3})\b/gi, (m, word, n) => `${word} ${Number(n)}`)
+    .replace(/\bPG_\d{3}_(\d{3})(?:_V(\d{2}))?\b/g, (m, n, v) => (v
+      ? `${t('page.n', { n: Number(n) })}, ${t('version.n', { n: Number(v) }).toLowerCase()}`
+      : t('page.n', { n: Number(n) })))
+    .replace(/\bISS_(\d{3})\b/g, (m, n) => String(Number(n)))
+    .replace(/\bED_\d{3}_(\d{2})\b/g, (m, n) => String(Number(n)));
+}
+
 /** "PG_001_002_V03" -> "Version 3". */
 export function versionName(renderId) {
   const m = /_V(\d{2})$/.exec(String(renderId || ''));
@@ -140,7 +155,7 @@ export function jobOutcome(job) {
     case 'page.review':
       return withStop(r.passes ? (hasNotes(r) ? t('outcome.review.notes') : t('outcome.review.passes')) : t('outcome.review.flagged'), r);
     case 'publish.build':
-      return r.draft ? t('outcome.publish.draft', { edition: r.edition }) : t('outcome.publish.final', { edition: r.edition });
+      return r.draft ? t('outcome.publish.draft', { edition: plainIds(r.edition) }) : t('outcome.publish.final', { edition: plainIds(r.edition) });
     case 'story.draft':
     case 'story.complete':
     case 'story.suggest':

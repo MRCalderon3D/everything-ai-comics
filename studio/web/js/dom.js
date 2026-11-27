@@ -57,6 +57,8 @@ const ICONS = {
   down: 'M2.5 5.5L8 11l5.5-5.5',
   chat: 'M2 3h12v8H7l-3.5 3v-3H2z',
   queue: 'M2 4h12M2 8h12M2 12h8',
+  // The path of the comic: a column of numbered panels with their names.
+  steps: 'M2.5 2h4v3.5h-4zM2.5 6.25h4v3.5h-4zM2.5 10.5h4V14h-4zM9 3.75h4.5M9 8h4.5M9 12.25h4.5',
   gear: 'M2 4.5h6M11 4.5h3M9.5 3v3M2 11.5h3M8 11.5h6M6.5 10v3',
   sun: 'M8 5a3 3 0 100 6 3 3 0 000-6zM8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M3 13l1.5-1.5M11.5 4.5L13 3',
   moon: 'M13 9.5A5.5 5.5 0 016.5 3 5.5 5.5 0 1013 9.5z',

@@ -47,7 +47,7 @@ function paintTopbar() {
       type: 'button', class: 'btn icon-only quiet steps-toggle', 'aria-expanded': String(!!transient.railDrawer),
       'aria-label': t('layout.steps'), title: t('layout.steps'),
       onclick: () => setTransient({ railDrawer: !transient.railDrawer }),
-    }, icon('queue')) : null,
+    }, icon('steps')) : null,
     h('a', { class: 'brand', href: '/' }, h('span', { class: 'mark', 'aria-hidden': 'true' }), t('app.name')),
     project ? h('a', { class: 'crumb', href: `/p/${encodeURIComponent(project.id)}` }, project.title) : null,
     state.health && state.health.fake ? h('span', { class: 'fake-chip', title: t('fake.explain') }, t('fake.chip')) : null,

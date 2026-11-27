@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+- Web studio, design pass: `studio/design/PRODUCT.md` and
+  `studio/design/DESIGN.md` record who the studio is for and its visual
+  system. Fixes from an audit of every screen in both themes and languages:
+  - A danger button and a red count on the path were white on light red in
+    the dark theme (2.1:1); they now use a `--bad-ink` token (8.7:1).
+  - State is shown by a whole outline, a wash or words, never a bar down
+    one side of a box: jobs in the queue, findings, accepted proposal
+    parts, approved plans, readiness, the guide's captions, job results,
+    tool rows, the check strip and toasts. Running work turns an arc
+    instead of pulsing a dot.
+  - Headings no longer skip levels (Style, a place, a page's plan and its
+    lettering, History). History's restore buttons name the step they
+    restore.
+  - Names instead of IDs in front of the person: History titles, the
+    conversation's cards and results, and Publish say "page 2", "issue 1"
+    and "edition 1"; an edition titled like its comic shows the title once;
+    "Another ID…" reads "Change its internal name…".
+  - After publishing, the project home offers to read the comic instead of
+    sending the person to publish again. The conversation on the overview
+    and on History says it is about the whole comic.
+  - Tablet and phone: the queue no longer slides under the focus button,
+    the collapsed path hides its "collapse" label, the path never scrolls
+    sideways, the phone's top bar drops focus mode and (under 560 px) the
+    language, which stays in Settings, and the path's drawer button has its
+    own icon.
+  - On a check, the verdict sits beside the drawing down to 720 px of
+    screen. Notes and verdicts inside a panel are no longer boxes in a box.
+  - Smaller things: themed text selection, caret and scrollbars, a stable
+    scrollbar gutter, 24 px targets for standalone small links, no lone
+    last word on a line in the conversation.
+
 - Web studio, "Guide me": a mode of the project conversation that leads
   from an empty project to a published comic, one decision at a time. It is
   offered on the new-comic form and switched from the conversation header.

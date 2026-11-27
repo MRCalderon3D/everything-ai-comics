@@ -12,7 +12,7 @@ import { showFile } from '/js/components/editor.js';
 import { openViewer } from '/js/components/viewer.js';
 import { toast } from '/js/components/toast.js';
 import { changesView } from '/js/components/diff.js';
-import { actorName } from '/js/labels.js';
+import { actorName, plainIds } from '/js/labels.js';
 
 const PAGE = 60;
 
@@ -21,9 +21,12 @@ export async function load(ctx) {
   return api.history(ctx.projectId, `?limit=${limit}`);
 }
 
-/** What happened, in the server's words and in the language of the request. */
+/**
+ * What happened, in the server's words and in the language of the request,
+ * with page and issue IDs said as names ("Approved page 2").
+ */
 function entryTitle(entry) {
-  return entry.title || entry.op || entry.kind;
+  return plainIds(entry.title || entry.op || entry.kind);
 }
 
 async function restore(ctx, entry) {
@@ -72,12 +75,13 @@ function entryRow(ctx, entry, canRestore) {
   const gone = (entry.images || []).filter((i) => i && i.missing).length;
   const items = images.map((i, n) => ({ id: String(n), label: i.path.split('/').pop(), image: i }));
   const files = entry.files || [];
+  const titleId = `history-${String(entry.id).replace(/[^\w-]/g, '')}`;
   return h('li', { class: 'history-entry', dataset: { kind: entry.kind, actor: entry.actor } },
     h('div', { class: 'history-when' },
       h('time', { dateTime: entry.at }, formatDateTime(entry.at)),
       h('span', { class: `actor ${entry.actor}` }, actorName(entry.actor))),
     h('div', { class: 'history-what' },
-      h('h3', null, entryTitle(entry)),
+      h('h2', { id: titleId }, entryTitle(entry)),
       images.length ? h('ul', { class: 'history-images' }, items.slice(0, 8).map((it) => h('li', null,
         h('button', { type: 'button', class: 'thumb', 'aria-label': t('image.open_large', { name: it.label }), onclick: () => openViewer(items, it.id, { title: entryTitle(entry) }) },
           h('img', { src: it.image.url, alt: '', loading: 'lazy' })))),
@@ -94,7 +98,7 @@ function entryRow(ctx, entry, canRestore) {
       entry.commit && files.length ? changesToggle(ctx, entry) : null),
     h('div', { class: 'history-actions' },
       entry.restorable && canRestore
-        ? button(t('history.restore'), { kind: 'quiet', small: true, onclick: () => restore(ctx, entry) })
+        ? button(t('history.restore'), { kind: 'quiet', small: true, describedBy: titleId, onclick: () => restore(ctx, entry) })
         : null));
 }
 
