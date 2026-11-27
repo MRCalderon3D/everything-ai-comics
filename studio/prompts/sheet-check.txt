@@ -1,0 +1,27 @@
+TASK
+Look at a newly drawn {{sheet}} of the character {{name}} ({{character_id}}) and say whether it shows the same person as the character's approved identity master.
+
+COMMAND FILES TO FOLLOW
+- commands/visual-review.md, for how to look and what counts as evidence. This run makes one check only, identity, on a reference sheet instead of a page.
+- rules/visual/character-consistency.md, the section "Identity checks", for what to compare.
+Do not write a review file: return the result in "data".
+
+WHAT TO OPEN
+- The new sheet: {{candidate_file}}
+- The approved identity master ({{master_id}}), the face this character has: {{master_file}}
+{{#if features}}- What identifies the character, from the character file:
+{{features}}
+{{/if}}
+WHAT TO COMPARE
+- The face: shape, eyes, nose, mouth, apparent age.
+- The hair and facial hair: colour, length, cut.
+- The build and the proportions.
+- Every mark, scar, tattoo, and accessory that identifies the character, and the side of the body it is on.
+- The drawing style only as far as it changes who the person seems to be.
+The new sheet may show other views, expressions, poses, or another outfit than the master. That is what it is for, and it is not a finding. A difference is a finding only when it makes the person look like someone else, or moves or loses a mark.
+
+INSTRUCTIONS FOR THIS RUN
+- Read-only run: write no file.
+- Judge pixels, not the prompt. Open both images before you answer.
+- data.check has: same_identity (true when every drawing on the new sheet is clearly the same person as the master), and findings: one entry per difference, each with aspect (face, hair, build, mark, or style), expected (what the master shows), visible (what the new sheet shows, and where), and repair (one sentence that says what to draw differently, so a new drawing can fix it). Write findings and evidence in the interface language.
+- same_identity false needs at least one finding. same_identity true has no findings.

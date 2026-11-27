@@ -3,8 +3,20 @@
  * chat.turn: one message of the project conversation. The context is the
  * files of the screen the message was sent from; the model may edit them,
  * except the story bible: story text comes back as a proposal the person
- * decides on (studio/server/story.js). The reply can suggest screens to go
- * to (`data.links`), checked against the project's real screens.
+ * decides on (studio/server/story.js), and a direct write to it is undone
+ * by the guard every AI call runs in (studio/server/bible-guard.js). The
+ * reply can suggest screens to go to (`data.links`), checked against the
+ * project's real screens.
+ *
+ * The prompt carries a short state of the project (what the screens and the
+ * chat did so far), the files the person attached, and the catalog of
+ * actions (studio/server/actions.js). The reply may propose actions
+ * (`data.actions`), which become cards the person runs or dismisses, and
+ * may run cards the person confirmed in words (`data.run_actions`). The turn
+ * itself never starts a job or approves anything on its own.
+ *
+ * When another job runs, the turn runs in the read-only lane of the queue
+ * (studio/server/jobs.js): it answers and proposes, and changes no file.
  *
  * The conversation continues through the tool's own session while the same
  * tool answers. When the answering tool changes, the new one starts a
@@ -12,7 +24,6 @@
  * says so.
  */
 
-const fs = require('fs');
 const chats = require('../chats');
 const conversation = require('../conversation');
 const screens = require('../screens');
@@ -22,8 +33,8 @@ const prompts = require('../prompts');
 const S = require('../scaffold');
 const { runAi, TOOL_LABELS } = require('../ai');
 const { isCancel, NeedsDecision } = require('../jobs');
-const { str } = require('./shared');
-const { errorText } = require('../util');
+const { str, uploadIds } = require('./shared');
+const { errorText, newId } = require('../util');
 
 /** The keys the model may link to, for the prompt. */
 function linkableKeys(project) {
@@ -43,32 +54,38 @@ function linkableKeys(project) {
   return keys.filter((k) => screens.exists(project, k));
 }
 
-function readText(file) {
-  try {
-    return fs.readFileSync(file, 'utf8');
-  } catch (err) {
-    return null;
-  }
+/** The attachments of a message as the transcript keeps them. */
+function attachmentViews(project, ids) {
+  return (ids || []).map((id) => project.upload(id)).filter(Boolean).map((u) => ({
+    id: u.id, name: u.name, kind: u.kind, bytes: u.bytes, width: u.width || null, height: u.height || null,
+    url: `/api/projects/${project.id}/uploads/${u.id}`,
+  }));
 }
 
 module.exports = {
   name: 'chat.turn',
+  readOnlyLane: true,
   params: [
     { name: 'screen', type: 'object', required: true, description: 'The screen the message was sent from: { key, label, route }. key is a screen key: story, style, options, characters, places, character:<ID>, location:<ID>, prop:<ID>, pages:<ISS_ID>, page:<PAGE_ID>, cover:<ISS_ID>, publish:<ISS_ID>.' },
     { name: 'text', type: 'string', required: true, description: 'The person\'s message.' },
     { name: 'conversation', type: 'string', required: false, description: 'Conversation id. Default: the current conversation of the project.' },
+    { name: 'attachments', type: 'string[]', required: false, description: 'Ids of uploaded files (images or text) sent with the message. The prompt lists them by path, and images also go to the tool.' },
     { name: 'key', type: 'string', required: false, description: 'Deprecated: the screen key alone, as the per-screen chat sent it.' },
   ],
+
+  attachmentViews,
 
   validate(params, { project }) {
     const screen = screens.checkScreen(project, params.screen !== undefined ? params.screen : String(params.key || ''));
     const conv = params.conversation ? conversation.get(project, String(params.conversation)) : conversation.current(project);
+    const attachments = uploadIds(params, 'attachments', project, null);
     return {
       key: screen.key,
       screen,
       conversation: conv.id,
       text: str(params, 'text', { required: true, max: 8000 }),
       message: params.message ? String(params.message) : null,
+      attachments,
     };
   },
 
@@ -77,12 +94,14 @@ module.exports = {
   },
 
   async run(ctx) {
-    const { project, params } = ctx;
+    // Required here: actions.js reads the operations registry, which loads this file.
+    const actions = require('../actions');
+    const { project, params, services } = ctx;
     const root = project.root;
     const convId = params.conversation;
     const screen = params.screen || screens.checkScreen(project, params.key);
     const context = chats.contextOf(project, screen.key);
-    const emit = (message) => ctx.services.events.emit(project.id, 'chat', { conversation: convId, key: message.key || screen.key, message });
+    const emit = (message) => services.events.emit(project.id, 'chat', { conversation: convId, key: message.key || screen.key, message });
     const record = (message) => {
       const stored = conversation.append(project, convId, message);
       emit(stored);
@@ -90,7 +109,10 @@ module.exports = {
     };
     const entry = conversation.get(project, convId);
     const session = entry.session || null;
-    const bibleFile = S.ws.abs(root, story.BIBLE);
+    const readOnly = !!ctx.readOnly;
+    const attached = (params.attachments || []).map((id) => project.upload(id)).filter(Boolean)
+      .map((u) => ({ id: u.id, name: u.name, kind: u.kind, file: project.uploadFile(u) }));
+    const pendingCards = Object.values(conversation.cards(project, convId)).filter((c) => c.status === 'pending').map((c) => c.id);
     const call = (sessionId, history) => ({
       verb: 'plan',
       kind: 'chat',
@@ -103,45 +125,24 @@ module.exports = {
         message: params.text,
         history,
         screens: linkableKeys(project).join(', '),
-        bible: bibleFile,
+        bible: S.ws.abs(root, story.BIBLE),
+        state: actions.stateBlock(project, services, convId),
+        actions: actions.promptText(),
+        attachments: attached.map((a) => `- ${a.file} (upload id ${a.id}, ${a.kind === 'image' ? 'an image: open it and look at it' : 'a text file: read it'}, sent as "${a.name}")`).join('\n'),
+        attachment_ids: attached.map((a) => a.id),
+        pending_cards: pendingCards,
+        busy: readOnly,
       },
+      images: attached.filter((a) => a.kind === 'image').map((a) => a.file),
+      allowWrite: !readOnly,
       sessionId,
       fakeText: params.text,
     });
 
-    const bibleBefore = readText(bibleFile);
-    let bibleStat = null;
-    try {
-      bibleStat = fs.statSync(bibleFile);
-    } catch (err) {
-      bibleStat = null;
-    }
-    // The story bible changes only through a proposal the person accepts. A
-    // reply that wrote it anyway is undone inside the step, so the step's
-    // commit never carries it.
-    const guardBible = async (h, fn) => {
-      const reverted = [];
-      let result;
-      try {
-        result = await fn();
-      } finally {
-        if (readText(bibleFile) !== bibleBefore) {
-          if (bibleBefore === null) fs.rmSync(bibleFile, { force: true });
-          else {
-            fs.writeFileSync(bibleFile, bibleBefore);
-            // Back to its old time too, so the step's diff sees no change.
-            if (bibleStat) fs.utimesSync(bibleFile, bibleStat.atime, bibleStat.mtime);
-          }
-          reverted.push(story.BIBLE);
-          h.log('the reply changed the story bible directly: the change was undone; story text goes through a proposal');
-        }
-      }
-      return Object.assign(result, { reverted });
-    };
     let reply;
     try {
-      reply = await ctx.step('reply', (h) => guardBible(h, async () => {
-        const wanted = ctx.services.drivers.pick('plan', project.settings());
+      reply = await ctx.step('reply', async (h) => {
+        const wanted = services.drivers.pick('plan', project.settings());
         const sameTool = session && wanted.available && session.tool === wanted.name;
         const summary = () => conversation.summaryFor(project, convId, { exceptId: params.message });
         if (sameTool) {
@@ -162,14 +163,14 @@ module.exports = {
           });
         }
         return runAi(ctx, h, call(null, summary()));
-      }), { verb: 'plan' });
+      }, { verb: 'plan' });
     } catch (err) {
       if (!isCancel(err) && !(err instanceof NeedsDecision)) {
-        record({ role: 'assistant', text: '', error: errorText(err), job: ctx.job.id, reply_to: params.message, screen, key: screen.key });
+        record({ role: 'assistant', text: '', error: errorText(err), job: ctx.job.id, reply_to: params.message, screen, key: screen.key, read_only: readOnly });
       }
       throw err;
     }
-    const reverted = reply.reverted || [];
+    const reverted = reply.bible && reply.bible.reverted ? [story.BIBLE] : [];
 
     if (reply.sessionId) conversation.setSession(project, convId, { tool: reply.tool, id: reply.sessionId });
     let proposal = null;
@@ -182,9 +183,19 @@ module.exports = {
     }
     const { links, dropped } = screens.checkLinks(project, reply.data && reply.data.links);
     if (dropped) ctx.log(`${dropped} suggested link(s) named no screen of this project and were left out`);
-    // The step diff knows what changed; a reverted bible is not among the reply's changes.
+
+    // The actions the reply proposes become cards; the ones that do not check out are left out, with the reason.
+    const messageId = newId('msg');
+    const proposed = actions.propose(project, services, reply.data && reply.data.actions, {
+      conversation: convId, message: messageId, job: ctx.job.id, attachments: params.attachments || [],
+    });
+    for (const d of proposed.dropped) {
+      ctx.log(`the proposed action ${d.action} was left out: ${require('../i18n').render('en', d.reason)}`);
+    }
     const step = ctx.job.steps.find((s) => s.id === 'reply') || {};
-    const message = record({
+    // The transcript keeps the card ids; the event and the job carry the cards themselves.
+    const stored = conversation.append(project, convId, {
+      id: messageId,
       role: 'assistant',
       text: String(reply.summary || ''),
       tool: reply.tool,
@@ -198,7 +209,42 @@ module.exports = {
       links,
       proposal,
       reverted,
+      story_proposal: reply.bible && reply.bible.proposal ? reply.bible.proposal : null,
+      actions: proposed.cards.map((c) => c.id),
+      dropped: proposed.dropped,
+      read_only: readOnly,
     });
-    return { conversation: convId, key: screen.key, message };
+    const message = Object.assign({}, stored, { actions: proposed.cards });
+    emit(message);
+
+    // Cards the person confirmed in words, then text-only cards when the setting allows it.
+    const ran = [];
+    const asked = Array.isArray(reply.data && reply.data.run_actions) ? reply.data.run_actions.map(String).slice(0, 6) : [];
+    for (const id of asked) {
+      if (!pendingCards.includes(id)) {
+        ctx.log(`the reply asked to run ${id.slice(0, 60)}, which is not a waiting card of this conversation`);
+        continue;
+      }
+      try {
+        const out = await actions.runCard(services, project, convId, id, { by: 'text' });
+        ran.push({ card: id, status: out.card.status, job: out.job ? out.job.id : null });
+        ctx.log(`ran card ${id} (${out.card.action}) as the person confirmed: ${out.card.status}`);
+      } catch (err) {
+        ctx.log(`card ${id} could not run: ${err.message}`);
+      }
+    }
+    if (project.settings().chat_auto_run) {
+      for (const card of proposed.cards.filter((c) => c.auto)) {
+        try {
+          const out = await actions.runCard(services, project, convId, card.id, { by: 'auto' });
+          ran.push({ card: card.id, status: out.card.status, job: out.job ? out.job.id : null });
+          ctx.log(`ran card ${card.id} (${card.action}) at once: text only, and the setting allows it`);
+        } catch (err) {
+          ctx.log(`card ${card.id} could not run: ${err.message}`);
+        }
+      }
+    }
+    return { conversation: convId, key: screen.key, message, ran, read_only: readOnly };
   },
 };
+

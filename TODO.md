@@ -149,6 +149,197 @@ them and to hide the two side columns, to focus on what they are doing.
 - The layout is remembered per person in the browser (not per project) and
   survives a reload.
 
+### 8. A chat that can do everything the screens do
+
+The person wants to run the whole comic from the chat, the way they would
+ask a coding assistant: "make a character from this photo in the comic's
+style", "add two pages where she opens the box", "draw the cover". The chat
+then does the work with the scaffold's resources, without the person
+having to go to each screen.
+
+What the chat does today: it answers in text, edits the files of the
+screen the message came from, turns story text into proposals, and
+suggests screens as links. It takes no attachments and cannot start a
+job. Making a character from a photo already works, but only from the
+Characters screen (name, description, photos, then a sheet in the
+project's look).
+
+- Attachments: images (and text files) can be dropped or pasted into the
+  chat. They go through the existing upload store, and the model receives
+  them as files it can look at (`--add-dir` for Claude, `-i` for Codex).
+- Actions: the chat can start the same jobs the screens start
+  (`character.create` with the attached photos, `pages.plan`,
+  `pages.generate`, `page.correct`, `cover.create`, `publish.build`, and
+  the rest of `studio/server/ops/`). The reply names the action and its
+  parameters in the structured output, and the server checks and queues
+  it through the normal job queue, so progress, the git commit per step,
+  reviews and cancel work as they do from a screen. The model does not run
+  scripts or write scaffold files on its own to get around the jobs.
+- Before it runs, each action shows as a card in the transcript saying
+  what it will do, which tool and model, and how long it usually takes.
+  Quick actions that only write text can run at once if the person allows
+  it in Settings; anything that draws asks first, because one page takes
+  minutes of the subscription.
+- When the job ends, the result comes back into the conversation (the
+  sheet, the planned pages, the drawn page) with a link to the screen
+  where it can be approved. Approval stays a person's decision, as on
+  the screens.
+- The story rule of item 5 still holds: story text the chat writes is a
+  proposal, and a page plan does not add events the person did not ask
+  for.
+- Photos of real people: keep the rights notice the Characters screen
+  shows today (use photos only of people who agree), and show it in the
+  chat when an attached photo is used for a character.
+
+### 9. A next issue that continues the comic
+
+A finished comic (say 12 pages and a cover) can have a continuation that
+keeps its look, its characters and its places. The data model already
+allows it: a project is a series, `story/series-plan.yaml` lists issues,
+each issue has its own pages, cover and editions, and `issue.yaml` has
+`opens_from` for the continuity state the previous issue ended in. The
+studio has no way to start one: today the person would have to add
+`ISS_002` to the series plan by hand.
+
+- A "New issue" action (on the Pages screen and on the project home)
+  asks for a title and a rough page count and creates the next issue:
+  the series-plan entry, `issues/ISS_00N/issue.yaml` with `opens_from`
+  pointing at the previous issue's last continuity state, and nothing
+  else. Look, characters, places, props and the story bible are the
+  project's, so the new issue uses them without copying anything.
+- The issue picker shows every issue, and the cover, publish and page
+  screens follow the chosen one.
+- Planning the first pages of the new issue starts from where the last
+  issue ended (who has what, who is where), not from a blank state.
+- The chat can create the next issue too (item 8).
+- Adding pages to an issue that already has a published edition keeps
+  working: the new pages go after the last one, and publishing again
+  makes the next edition.
+
+### 10. A full character sheet, refined round by round
+
+Creating a character draws a turnaround (front, three-quarter, profile,
+back), and expressions and wardrobe sheets can be drawn separately. The
+person wants what a comic team uses: one character sheet image that defines
+the character completely, and a way to keep changing it until it is right.
+
+What the sheet holds, in one image, in the look of the comic:
+
+- The character's name and a short line (series, sheet number), lettered
+  in the project's language.
+- The turnaround: front, three-quarter, profile and back, full figure, same
+  scale, neutral pose.
+- Close-ups of what identifies them: a scar, a wound, a tattoo, glasses, a
+  ring. Each with a label ("left forearm").
+- A row of expressions and key poses or states the story needs (tired,
+  sitting, fallen, after a change in their condition), each labelled. The
+  list comes from the character's description and the story bible, and
+  the person can edit it before drawing.
+
+How it is refined:
+
+- The first sheet is a candidate (V01). The person asks for changes from
+  the character screen or the chat ("shorter hair", "the wound on the
+  other arm", "add a sitting pose"). Each round draws the next version from
+  the previous image plus the list of changes, so what was right stays
+  right, and updates the written character file to match.
+- The versions sit side by side, the person can go back to an earlier
+  one, and approving one makes it the identity master that pages use.
+- Region marking, as page corrections have, works on the sheet too
+  ("this hand").
+- Scaffold side: add the full sheet as a sheet kind in
+  `character-sheet-generation` and the character schemas, keep the
+  separate turnaround, expressions and wardrobe sheets for those who want
+  them, and check that labels on the sheet do not leak lettering into
+  pages drawn from it as a reference.
+- Found in a real run: a character made from a photo before the look page
+  was approved got no sheet, and the only sign was a greyed-out checkbox.
+  The character screen must say plainly that the sheet is missing and
+  why, and once the look is approved, offer to draw the sheets of every
+  character still without one.
+
+### 11. Say what the page plan added, and keep the history clean
+
+Found in a real run. Planning pages from the person's text created three
+character files for people the text describes but who had no file yet (two
+unnamed attackers and a child). That is right: they are drawn in panels and
+need a file to stay the same from panel to panel. Two things are wrong.
+
+- The person is not told. The plan's result must list what it added
+  (characters, places, props), each with a link, and let the person rename
+  it, edit it, or merge it into a character that already exists before
+  approving the plan. Each one also shows as "needs a sheet" in the cast,
+  since pages cannot be drawn until its sheet is approved.
+- The git history put those files in the wrong commit: they were written
+  by the running plan job while the person approved a sheet, and the
+  approval's commit picked them up. A commit must hold only the files of
+  its own step or approval. Undoing the approval would otherwise remove the
+  three characters too.
+- The same person got two IDs. A story proposal named the two attackers
+  `CHAR_GREY_HAIRED_MAN` and `CHAR_BEARDED_MAN` in the story bible; the page
+  plan, running at about the same time, created their files as
+  `CHAR_ORANGE_GREY` and `CHAR_ORANGE_BEARD`. Before creating a character,
+  place or prop, every step must match it against the IDs already in the
+  story bible, the entity files and pending proposals, and reuse the
+  existing ID when it is the same person.
+- While a plan job is still writing pages, the plan's checks show dozens of
+  errors (pages listed by scenes that do not exist yet, a broken page
+  chain, a wrong page count). They are not errors yet. Do not run or show
+  those checks for an issue whose plan job is running; say "planning page
+  6 of 12" instead.
+
+### 12. Show what changed while the person was elsewhere
+
+Sheets, pages and plans run in the background for minutes while the person
+keeps working on other parts of the project. When one finishes, nothing
+points at it unless they happen to open that screen.
+
+- A small marker (a dot with a count) on each entry of the side navigation
+  whose screen has something new the person has not seen: Characters when
+  a sheet was drawn, Pages when a plan or a page finished, Cover, Publish,
+  Story when a proposal arrived, Corrections, and so on. The collapsed
+  navigation rail (item 7) keeps the dots.
+- Inside the screen, the same marker on each item that changed: the
+  character card whose sheet is new, the page thumbnail that was drawn or
+  repaired, the proposal waiting for a decision. A short line says what is
+  new ("new expressions sheet", "page 4 drawn, needs review").
+- Failures and questions count too, with a different colour: a job that
+  failed or is waiting for an answer is the first thing to see.
+- An item stops being new when the person opens it (or the screen shows it
+  to them), not when the job ends. "Mark all as seen" per screen.
+- Seen state is kept per project in the browser and survives a reload. It
+  is built from the job results and the events the server already sends;
+  the chat's own result messages (item 8) mark the same items.
+- Respect reduced motion: the marker appears without animation then.
+
+### 13. Delete what the person does not want to keep
+
+Every try leaves files behind: sheet candidates, look pages, page renders,
+cover versions, uploads. The person wants to remove the ones they do not
+want, starting with character sheet images.
+
+- A delete control on every generated image that is not in use: sheet
+  candidates and superseded versions, look pages, page renders and repair
+  attempts, cover versions, uploaded photos, drafts of editions. Also
+  delete for a whole character, place or prop, and for a page.
+- Refuse, with the reason, when the thing is in use: an approved master
+  that pages were drawn from, the render an edition ships, a reference a
+  planned page lists. Say what to do first (approve another version,
+  remove it from the page). Deleting an approved master asks twice and
+  says what depends on it.
+- Delete keeps the scaffold consistent: the file, its manifest entry
+  (`references/manifest.yaml`), the generation record, reviews of that
+  render, and references to it in character files and plans. Run the
+  workspace validation after and show nothing broken.
+- It goes into the git history as its own step, so it can be undone from
+  History. Say so in the confirmation ("you can bring it back from
+  History").
+- Select several and delete them at once (for example all rejected
+  candidates of a character), and a "clean up" action per screen that
+  offers every unused try.
+- The chat can delete too (item 8), always as an action card the person
+  confirms.
+
 ## Scaffold
 
 ### 6. More comic styles

@@ -29,10 +29,11 @@ function nameOf(load, root, id) {
   }
 }
 
-/** The route of the browser app for a screen key, or null. Pure. */
+/** The route of the browser app for a screen key, or null. Pure. An issue after the first goes in ?issue=. */
 function routeOf(projectId, key) {
   const base = `/p/${encodeURIComponent(projectId)}`;
   const [kind, id] = String(key).split(':');
+  const issue = id && id !== 'ISS_001' && /^ISS_\d{3}$/.test(id) ? `?issue=${id}` : '';
   switch (kind) {
     case 'home': return base;
     case 'story': return `${base}/story`;
@@ -44,10 +45,10 @@ function routeOf(projectId, key) {
     case 'places': return `${base}/places`;
     case 'location': return `${base}/places/location/${id}`;
     case 'prop': return `${base}/places/prop/${id}`;
-    case 'pages': return `${base}/pages`;
+    case 'pages': return `${base}/pages${issue}`;
     case 'page': return `${base}/pages/${id}`;
-    case 'cover': return `${base}/cover`;
-    case 'publish': return `${base}/publish`;
+    case 'cover': return `${base}/cover${issue}`;
+    case 'publish': return `${base}/publish${issue}`;
     case 'check': return `${base}/check`;
     case 'corrections': return `${base}/corrections`;
     case 'history': return `${base}/history`;
@@ -114,11 +115,13 @@ function checkScreen(project, given) {
 /** The screen key a route of this project points at, or null. */
 function keyOfRoute(project, route) {
   const text = String(route || '').split(/[?#]/)[0].replace(/\/+$/, '');
+  const asked = (/[?&]issue=(ISS_\d{3})/.exec(String(route || '')) || [])[1] || null;
   const base = `/p/${encodeURIComponent(project.id)}`;
   if (text === base) return 'home';
   if (!text.startsWith(`${base}/`)) return null;
   const rest = text.slice(base.length + 1).split('/');
   const issue = () => {
+    if (asked) return asked;
     const list = S.ws.listIssues(project.root);
     return list[0] || 'ISS_001';
   };

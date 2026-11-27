@@ -16,6 +16,14 @@ const { HttpError, appendJsonl, readJsonl, newId, nowIso } = require('./util');
 
 const KEY_RE = /^(story|style|options|characters|places|(character|location|prop|pages|page|cover|publish):[A-Z][A-Z0-9_]{2,60})$/;
 
+/** An issue of the project: a directory under issues/, or an entry of the series plan not planned yet. */
+function knownIssue(root, id) {
+  if (!S.ws.ID.issue.test(String(id))) return false;
+  if (S.ws.listIssues(root).includes(id)) return true;
+  const plan = S.ws.loadYaml(S.ws.abs(root, 'story/series-plan.yaml'));
+  return !!(plan && Array.isArray(plan.issues) && plan.issues.some((i) => i && i.id === id));
+}
+
 function existing(root, rels) {
   return rels.filter((rel) => fs.existsSync(S.ws.abs(root, rel)));
 }
@@ -87,8 +95,8 @@ function contextOf(project, key) {
       if (!S.ws.loadProp(root, id)) throw missing(id);
       return { key, screen: `prop ${id}`, files: existing(root, [`props/${id}/prop.yaml`]), commands: ['commands/prop-bible.md'] };
     case 'pages': {
-      if (!S.ws.ID.issue.test(id) || !S.ws.listIssues(root).includes(id)) throw missing(id);
-      const files = [`issues/${id}/issue.yaml`, ...S.ws.listScenes(root, id).map((s) => S.ws.rel(root, s.file))];
+      if (!knownIssue(root, id)) throw missing(id);
+      const files = [`issues/${id}/issue.yaml`, 'story/series-plan.yaml', ...S.ws.listScenes(root, id).map((s) => S.ws.rel(root, s.file))];
       for (const pageId of S.ws.listPageIds(root, id).slice(0, 40)) files.push(`issues/${id}/pages/${pageId}/page.yaml`);
       return {
         key, screen: `pages of ${id}`, files: existing(root, files),
@@ -109,14 +117,14 @@ function contextOf(project, key) {
       };
     }
     case 'cover':
-      if (!S.ws.ID.issue.test(id) || !S.ws.listIssues(root).includes(id)) throw missing(id);
+      if (!knownIssue(root, id)) throw missing(id);
       return {
         key, screen: `cover of ${id}`,
         files: existing(root, [`issues/${id}/cover/cover.yaml`, `issues/${id}/issue.yaml`, 'story/story-bible.yaml']),
         commands: ['commands/cover.md'],
       };
     case 'publish': {
-      if (!S.ws.ID.issue.test(id) || !S.ws.listIssues(root).includes(id)) throw missing(id);
+      if (!knownIssue(root, id)) throw missing(id);
       const editions = S.ws.listEditions(root).filter((e) => e.startsWith(`ED_${id.slice(4)}_`));
       const files = [`issues/${id}/issue.yaml`];
       if (editions.length) files.push(`editions/${editions[editions.length - 1]}/edition.yaml`);

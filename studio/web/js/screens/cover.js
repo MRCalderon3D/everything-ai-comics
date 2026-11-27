@@ -16,13 +16,14 @@ import { correction, lastCorrection } from '/js/components/correction.js';
 import { handoff, noDrawTool } from '/js/components/handoff.js';
 import { versionName } from '/js/labels.js';
 import { toast } from '/js/components/toast.js';
+import { currentIssue, issueBar } from '/js/components/issues.js';
 
 const mine = (j) => j.op === 'cover.create' || j.op === 'cover.correct'
   || (j.op === 'page.manual' && j.params && j.params.cover)
   || (j.op === 'page.review' && j.params && String(j.params.render || '').startsWith('CV_'));
 
 export async function load(ctx) {
-  const issue = state.issue || 'ISS_001';
+  const issue = currentIssue(ctx);
   const [cover, repairLimit] = await Promise.all([api.cover(ctx.projectId, issue), Promise.resolve(state.overview.repair_limit)]);
   return { issue, cover, repairLimit };
 }
@@ -90,6 +91,7 @@ export function view(ctx, { issue, cover, repairLimit }) {
   if (!cover.exists) {
     return h('div', { class: 'screen narrow' },
       screenHead({ title: t('screen.cover'), lede: t('cover.lede_none') }),
+      issueBar(ctx, issue),
       jobsFor(mine),
       why,
       panel(t('cover.new_title'), createForm(ctx, issue, canDraw)));
@@ -177,5 +179,6 @@ export function view(ctx, { issue, cover, repairLimit }) {
       title: t('screen.cover'),
       lede: approved ? t('cover.lede_approved') : (current ? t('cover.lede_drawn') : t('cover.lede_written')),
     }),
+    issueBar(ctx, issue),
     bench(ctx, { text, images, chat: { key: cover.chat_key, examples: [t('cover.example_1')] } }));
 }

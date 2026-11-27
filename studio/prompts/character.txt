@@ -8,6 +8,7 @@ COMMAND FILES TO FOLLOW, IN THIS ORDER
 INPUT FROM THE PERSON
 Character ID: {{character_id}}
 {{#if name}}Name: {{name}}
+{{/if}}{{#if sheet_change}}These are changes the person asked for on the drawn full character sheet. The sheet is redrawn from them in the next step; this step makes the written file say the same thing.
 {{/if}}{{#if description}}{{#if update}}What to change:{{/if}}{{#if create}}Who they are:{{/if}}
 <<<
 {{description}}
@@ -19,5 +20,7 @@ The studio has already filed and registered them in references/manifest.yaml as 
 INSTRUCTIONS FOR THIS RUN
 - Write characters/{{character_id}}/character.yaml and characters/{{character_id}}/wardrobe.yaml with one default outfit. Give at least three distinguishing features that separate this character from every other one in the cast, and fill visually_adjacent_to in both directions where two characters could be confused.
 - Add the character to the "characters" list of story/story-bible.yaml when it is not there.
-- Leave "references" as it is and status as draft: the turnaround sheet is drawn and approved in later steps.
+- Fill the "sheet" block (see docs/data-model.md): "closeups", the marks that identify the character (a scar, a tattoo, glasses, a ring), each as "label: what it shows" with the side of the body in the label; and "poses", the expressions and the key poses or states the description and the story bible give the character (tired, sitting, after a change in their condition). Labels are lettered on the sheet, so write them short and in the project language. At most eight of each. Keep the lines that are already there unless the person's words change them.
+{{#if sheet_change}}- Change in the file only what the listed changes touch: the description, the distinguishing features, the outfit, and the "sheet" block when a change adds, removes or moves a close-up or a pose. Everything else stays as it is. A change that is a story fact (what happened to them, not how they look) is not written into story/story-bible.yaml: name it under "decisions" so the person can add it to the story.
+{{/if}}- Leave "references" as it is and status as draft: the sheets are drawn and approved in later steps.
 - Return the character ID in data.character_id.

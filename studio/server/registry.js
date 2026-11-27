@@ -28,6 +28,8 @@ const DEFAULT_SETTINGS = {
     codex: { plan: null, look: null, draw: null },
   },
   repair_limit: null,
+  // Text-only actions the chat proposes run at once (never drawings, approvals or answers).
+  chat_auto_run: false,
 };
 
 const DRIVER_CHOICES = {
@@ -61,6 +63,7 @@ function mergeSettings(saved) {
   if (s.repair_limit === null || (Number.isInteger(s.repair_limit) && s.repair_limit >= 0 && s.repair_limit <= 10)) {
     out.repair_limit = s.repair_limit === undefined ? null : s.repair_limit;
   }
+  if (typeof s.chat_auto_run === 'boolean') out.chat_auto_run = s.chat_auto_run;
   return out;
 }
 
@@ -93,6 +96,7 @@ function checkSettingsPatch(patch) {
       !(Number.isInteger(patch.repair_limit) && patch.repair_limit >= 0 && patch.repair_limit <= 10)) {
     bad('repair_limit must be null or a whole number from 0 to 10.');
   }
+  if (patch.chat_auto_run !== undefined && typeof patch.chat_auto_run !== 'boolean') bad('chat_auto_run must be true or false.');
 }
 
 /** One project on disk. Cheap to create; holds no open handles. */
@@ -134,6 +138,7 @@ class Project {
         codex: Object.assign({}, current.models.codex, (patch.models && patch.models.codex) || {}),
       },
       repair_limit: patch.repair_limit !== undefined ? patch.repair_limit : current.repair_limit,
+      chat_auto_run: patch.chat_auto_run !== undefined ? patch.chat_auto_run : current.chat_auto_run,
     });
     writeJsonAtomic(path.join(this.studioDir, 'settings.json'), next);
     return next;

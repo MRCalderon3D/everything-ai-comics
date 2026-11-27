@@ -17,9 +17,9 @@ const story = require('./story');
 const looks = require('./looks');
 const timings = require('./timings');
 const history = require('./history');
-const approvals = require('./approvals');
 const aggregates = require('./aggregates');
 const projectOptions = require('./project-options');
+const actions = require('./actions');
 const { lookState } = require('./ops/shared');
 const { Router, readBody, readJsonBody, sendFile, contentTypeOf } = require('./http');
 const { resolveInside, safeName } = require('./security');
@@ -131,6 +131,8 @@ function createApi(services) {
   });
 
   get('/api/ops', () => ({ operations: ops.catalog() }));
+
+  get('/api/actions', () => ({ actions: actions.catalog() }));
 
   get('/api/schemas', () => ({ schemas: S.schemaNames() }));
 
@@ -264,17 +266,7 @@ function createApi(services) {
   put(`${P}/options`, async (req, res, ctx) => {
     const proj = project(ctx);
     const body = await readJsonBody(req, JSON_LIMIT);
-    const partial = projectOptions.checkOptions(body);
-    const hasPages = S.ws.listIssues(proj.root).some((issue) => S.ws.listPageIds(proj.root, issue).length > 0);
-    const current = projectOptions.readOptions(proj.root);
-    if (partial.comic_format && partial.comic_format !== current.comic_format && hasPages) {
-      throw new HttpError(409, 'format_locked', 'The format cannot change once pages are planned: their layout depends on it.');
-    }
-    const saved = await history.record(services, proj, { kind: 'save', title: msg('activity.options') }, () => {
-      projectOptions.applyToProject(proj.root, partial);
-    });
-    const doc = files.readDoc(proj, 'project.yaml');
-    return { options: projectOptions.readOptions(proj.root), findings: doc.findings, commit: saved.commit };
+    return actions.DIRECT['options.update'].run(services, proj, { options: body });
   });
 
   // --- screens ----------------------------------------------------------------------
@@ -302,6 +294,16 @@ function createApi(services) {
   screenRoute(`${P}/locations/:loc`, (proj, ctx) => aggregates.entity(proj, 'locations', ctx.params.loc));
   screenRoute(`${P}/props/:prop`, (proj, ctx) => aggregates.entity(proj, 'props', ctx.params.prop));
   screenRoute(`${P}/issues`, (proj) => aggregates.issues(proj));
+
+  // The next issue of the series: a series-plan entry and issue.yaml, opening from where the last one ended.
+  post(`${P}/issues`, async (req, res, ctx) => {
+    const proj = project(ctx);
+    const body = await readJsonBody(req, JSON_LIMIT);
+    const def = actions.DIRECT['issue.create'];
+    const result = await def.run(services, proj, def.validate(body));
+    res.statusCode = 201;
+    return result;
+  });
   screenRoute(`${P}/issues/:issue`, (proj, ctx) => aggregates.issue(proj, ctx.params.issue, drivers));
   screenRoute(`${P}/issues/:issue/cover`, (proj, ctx) => aggregates.cover(proj, ctx.params.issue));
   screenRoute(`${P}/issues/:issue/publish`, (proj, ctx) => aggregates.publishScreen(proj, ctx.params.issue));
@@ -553,13 +555,13 @@ function createApi(services) {
   post(`${P}/jobs/:job/cancel`, async (req, res, ctx) => {
     const proj = project(ctx);
     await readJsonBody(req, JSON_LIMIT);
-    return { job: jobs.cancel(proj, ctx.params.job) };
+    return actions.DIRECT['job.cancel'].run(services, proj, { job: ctx.params.job });
   });
 
   post(`${P}/jobs/:job/answer`, async (req, res, ctx) => {
     const proj = project(ctx);
     const body = await readJsonBody(req, JSON_LIMIT);
-    return { job: jobs.answer(proj, ctx.params.job, body.answers) };
+    return actions.DIRECT['job.answer'].run(services, proj, { job: ctx.params.job, answers: body.answers });
   });
 
   // --- events ------------------------------------------------------------------------------
@@ -588,11 +590,17 @@ function createApi(services) {
   };
 
   /** Store the person's message and queue the reply. */
-  const sendMessage = (proj, screen, text) => {
+  const sendMessage = (proj, screen, text, attachments = []) => {
     proj.ensureStudioDirs();
     const entry = conversation.current(proj);
-    const message = conversation.append(proj, entry.id, { role: 'user', text, screen, key: screen.key });
-    const job = jobs.enqueue(proj, 'chat.turn', { screen, text, message: message.id, conversation: entry.id });
+    // Checked before the message is stored, so a bad attachment id stores nothing.
+    const turn = ops.get('chat.turn');
+    const clean = turn.validate({ screen, text, conversation: entry.id, attachments }, { project: proj, services });
+    const message = conversation.append(proj, entry.id, {
+      role: 'user', text, screen, key: screen.key,
+      attachments: clean.attachments.length ? turn.attachmentViews(proj, clean.attachments) : undefined,
+    });
+    const job = jobs.enqueue(proj, 'chat.turn', { screen, text, message: message.id, conversation: entry.id, attachments: clean.attachments });
     events.emit(proj.id, 'chat', { conversation: entry.id, key: screen.key, message });
     return { message, job };
   };
@@ -613,9 +621,24 @@ function createApi(services) {
     const body = await readJsonBody(req, JSON_LIMIT);
     const text = messageText(body);
     const screen = screens.checkScreen(proj, body.screen);
-    const sent = sendMessage(proj, screen, text);
+    const sent = sendMessage(proj, screen, text, body.attachments === undefined ? [] : body.attachments);
     res.statusCode = 202;
     return Object.assign({ conversation: sent.message.conversation }, sent);
+  });
+
+  // An action card of a reply: run it (queue its job, or make its decision now), or dismiss it.
+  post(`${P}/conversation/:conversation/actions/:card/run`, async (req, res, ctx) => {
+    const proj = project(ctx);
+    await readJsonBody(req, JSON_LIMIT);
+    const entry = conversation.get(proj, ctx.params.conversation);
+    return actions.runCard(services, proj, entry.id, ctx.params.card, { by: 'click' });
+  });
+
+  post(`${P}/conversation/:conversation/actions/:card/dismiss`, async (req, res, ctx) => {
+    const proj = project(ctx);
+    await readJsonBody(req, JSON_LIMIT);
+    const entry = conversation.get(proj, ctx.params.conversation);
+    return { card: actions.dismissCard(services, proj, entry.id, ctx.params.card) };
   });
 
   post(`${P}/conversation/new`, async (req, res, ctx) => {
@@ -675,33 +698,11 @@ function createApi(services) {
   post(`${P}/proposals/:proposal/decide`, async (req, res, ctx) => {
     const proj = project(ctx);
     const body = await readJsonBody(req, JSON_LIMIT);
-    const proposal = story.read(proj, ctx.params.proposal);
-    const clean = story.checkDecisions(proposal, body.decisions);
-    const accepting = clean.filter((d) => d.decision !== 'reject').length;
-    let outcome;
-    const saved = await history.record(services, proj, {
-      kind: 'proposal',
-      title: msg('activity.proposal_decided', { accepted: accepting, rejected: clean.length - accepting }),
-    }, () => {
-      outcome = story.decide(proj, proposal, clean);
-    });
-    if (saved.commit) proposal.commits.push(saved.commit);
-    story.save(proj, proposal);
-    const bible = files.readDoc(proj, story.BIBLE);
-    return {
-      proposal: story.view(proposal),
-      accepted: outcome.accepted,
-      rejected: outcome.rejected,
-      comments_kept: outcome.preserved,
-      findings: bible.findings,
-      commit: saved.commit,
-    };
+    return actions.DIRECT['proposal.decide'].run(services, proj, { proposal: ctx.params.proposal, decisions: body.decisions });
   });
 
   del(`${P}/proposals/:proposal`, (req, res, ctx) => {
-    const proj = project(ctx);
-    const proposal = story.discard(proj, story.read(proj, ctx.params.proposal));
-    return { proposal: story.view(proposal) };
+    return actions.DIRECT['proposal.discard'].run(services, project(ctx), { proposal: ctx.params.proposal });
   });
 
   // --- history -----------------------------------------------------------------------------------
@@ -752,49 +753,25 @@ function createApi(services) {
   post(`${P}/approve/asset`, async (req, res, ctx) => {
     const proj = project(ctx);
     const body = await readJsonBody(req, JSON_LIMIT);
-    let result;
-    const saved = await history.record(services, proj, { kind: 'approval', title: msg('activity.approved_asset', { candidate: String(body.candidate || '').split('/').pop() }) }, () => {
-      result = approvals.approveAsset(proj, body);
-    });
-    return Object.assign({}, result, {
-      image: files.image(proj, result.file),
-      style_frozen: result.kind === 'look',
-      commit: saved.commit,
-    });
+    return actions.DIRECT['approve.asset'].run(services, proj, body);
   });
 
   post(`${P}/approve/plan`, async (req, res, ctx) => {
     const proj = project(ctx);
     const body = await readJsonBody(req, JSON_LIMIT);
-    proj.ensureStudioDirs();
-    const result = approvals.approvePlans(proj, body);
-    const activity = proj.addActivity({
-      kind: 'approval',
-      title: msg(body.approved === false ? 'activity.plan_unapproved' : 'activity.plan_approved', { pages: result.pages.map((p) => p.page) }),
-      actor: 'person',
-    });
-    events.emit(proj.id, 'activity', { entry: activity });
-    return result;
+    return actions.DIRECT['approve.plan'].run(services, proj, body);
   });
 
   post(`${P}/approve/page`, async (req, res, ctx) => {
     const proj = project(ctx);
     const body = await readJsonBody(req, JSON_LIMIT);
-    let result;
-    const saved = await history.record(services, proj, { kind: 'approval', title: msg('activity.approved_page', { page: String(body.page || '') }) }, () => {
-      result = approvals.approvePage(proj, body);
-    });
-    return Object.assign({}, result, { commit: saved.commit });
+    return actions.DIRECT['approve.page'].run(services, proj, body);
   });
 
   post(`${P}/approve/cover`, async (req, res, ctx) => {
     const proj = project(ctx);
     const body = await readJsonBody(req, JSON_LIMIT);
-    let result;
-    const saved = await history.record(services, proj, { kind: 'approval', title: msg('activity.approved_cover', { issue: String(body.issue || 'ISS_001') }) }, () => {
-      result = approvals.approveCover(proj, body);
-    });
-    return Object.assign({}, result, { commit: saved.commit });
+    return actions.DIRECT['approve.cover'].run(services, proj, body);
   });
 
   // --- overlay lettering ---------------------------------------------------------------------------

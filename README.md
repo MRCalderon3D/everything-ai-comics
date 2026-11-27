@@ -155,7 +155,7 @@ review is marked as not independent.
 |---|---|
 | Story | Describe what the comic is about. The studio writes the story bible and the series plan, and you edit them. |
 | Style | Pick a preset, describe a style, or upload reference images. Approve a look page, which freezes the style. |
-| Characters | Add each character from a description, a photo, or both. Approve the drawn sheet. |
+| Characters | Add each character from a description, a photo, or both. Approve the drawn sheet: it becomes the face everything else is drawn from. Refine the full character sheet round by round. |
 | Pages | Write what happens, on one page or several. Read the plan per page, then start the drawing queue. |
 | Check | Read the verdict of each page with its evidence: what was expected and what is on the page. |
 | Corrections | Mark a region or pick a panel, write the change, and compare the new version with the old one. |
@@ -163,9 +163,24 @@ review is marked as not independent.
 | Publish | Build PDF, CBZ, EPUB, a web reader, or one image per page. |
 
 Every step shows the text and the images of what is being made. You change
-anything by editing it or by asking the chat on that screen. Each finished
-step is a commit in a local git repository inside the project, so the History
-screen can take the project back to an earlier point.
+anything by editing it or by asking in the conversation docked beside every
+screen. Each finished step is a commit in a local git repository inside the
+project, so the History screen can take the project back to an earlier point.
+
+The conversation can also do the work itself. Drop a photo into it and ask
+for a character in the comic's style, ask for two more pages where she opens
+the box, or for the cover. The reply proposes each step as a card that says
+what it will do, which tool and model will do it, and how long it usually
+takes, and nothing runs until you click Run or say yes. Approvals and
+answers to a job's questions work the same way. When a job ends, the sheet,
+the plan or the drawn page comes back into the conversation with a link to
+the screen where you approve it. A question asked while a drawing runs is
+answered at once, without waiting for it. A whole comic can be made from the
+conversation alone, from the screens alone, or mixing both.
+
+When an issue is finished, "New issue" on the Pages screen or the project
+home starts the next one. It keeps the look, the characters, the places and
+the story, and its first pages start from where the last issue ended.
 
 ![The check of a page: the verdict, the evidence, and the page beside it](docs/images/studio-check.png)
 
@@ -399,8 +414,9 @@ node scripts/compile-prompts.js --asset CHAR_OSKAR --sheet expressions --root pr
 node scripts/generate-assets.js --asset CHAR_OSKAR --root production
 ```
 
-`--sheet` takes `turnaround`, `expressions`, or `wardrobe` for a character,
-`plate` for a location, `prop` for a prop, `look` for a look, and `detail`
+`--sheet` takes `turnaround`, `model` (the full character sheet: name,
+turnaround, labelled close-ups, labelled expressions and poses),
+`expressions`, or `wardrobe` for a character, `plate` for a location, `prop` for a prop, `look` for a look, and `detail`
 (with `--subject`) for any entity. `--outfit` picks the outfit of a wardrobe
 sheet and `--time` the time of day of a plate. The package is written under
 the entity's `refs/prompts/` (look pages under `references/style/prompts/`);

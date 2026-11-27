@@ -82,10 +82,20 @@ export function view(ctx, data) {
   const have = new Set(cast.map((c) => c.id));
   const named = data.story ? (data.story.characters_named || []).filter((c) => !have.has(c.id)) : [];
 
+  // Characters with no drawn sheet at all: once the look is approved, offer to draw them.
+  const unsheeted = cast.filter((c) => !c.has_master && !c.candidates);
+  const offer = data.cast.look_approved && draw.available && unsheeted.length
+    ? notice('next', h('p', null, tn('characters.missing_sheets', unsheeted.length, { names: unsheeted.map((c) => c.name).join(', ') })),
+      h('div', { class: 'row' }, actionButton(t('characters.draw_missing'), async () => {
+        for (const c of unsheeted) await queueOp('character.sheet', { character: c.id, sheet: 'turnaround' });
+      }, { kind: 'primary' }), h('span', { class: 'small muted' }, t('characters.draw_missing_time'))))
+    : null;
+
   const text = h('div', { class: 'stack' },
-    jobsFor((j) => j.op === 'character.create'),
+    jobsFor((j) => j.op === 'character.create' || (j.op === 'character.sheet' && j.params && unsheeted.some((c) => c.id === j.params.character))),
     !data.cast.look_approved ? notice('info', t('characters.look_first'), ' ',
       h('a', { href: `/p/${encodeURIComponent(ctx.projectId)}/style` }, t('screen.style'))) : null,
+    offer,
     named.length ? notice('next', h('p', null, tn('characters.named_in_story', named.length)),
       h('ul', { class: 'bullets' }, named.map((c) => h('li', null,
         h('button', {
@@ -108,7 +118,8 @@ export function view(ctx, data) {
       h('p', { class: `small ${c.has_master ? 'state-ok' : 'state-wait'}` },
         c.has_master ? t('characters.has_master')
           : (c.candidates ? tn('characters.candidates_waiting', c.candidates)
-            : (c.has_identity ? t('characters.photo_only') : t('characters.no_sheet')))))))
+            : (!data.cast.look_approved ? t('characters.no_sheet_look')
+              : (c.identity && c.identity.photos && c.identity.photos.length ? t('characters.photo_only') : t('characters.no_sheet'))))))))
     : emptyState(t('characters.empty_title'), t('characters.empty_body'));
 
   return h('div', { class: 'screen' },

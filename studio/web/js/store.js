@@ -85,8 +85,10 @@ export function jobList() {
 export function activeJobs() {
   return jobList().filter((j) => ACTIVE.includes(j.status)).reverse();
 }
+/** The job running in the main lane; a chat turn answering beside it comes second. */
 export function runningJob() {
-  return jobList().find((j) => j.status === 'running') || null;
+  const running = jobList().filter((j) => j.status === 'running');
+  return running.find((j) => !j.read_only) || running[0] || null;
 }
 export function waitingJobs() {
   return jobList().filter((j) => j.status === 'needs_decision');
@@ -135,6 +137,10 @@ export async function refreshOverview() {
   const overview = await api.overview(id);
   if (state.projectId !== id) return null;
   state.overview = overview;
+  if (!state.issue) {
+    // The issue chosen before a reload of the tab (components/issues.js keeps it).
+    try { state.issue = sessionStorage.getItem(`studio.issue.${id}`) || null; } catch (err) { state.issue = null; }
+  }
   if (!state.issue || !overview.issues.some((i) => i.id === state.issue)) {
     state.issue = overview.first_issue || (overview.issues[0] && overview.issues[0].id) || 'ISS_001';
   }

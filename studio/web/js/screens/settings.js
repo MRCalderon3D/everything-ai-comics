@@ -8,7 +8,7 @@ import { t, tn, tv, getLang, LANGUAGES, formatDuration, formatDateTime } from '/
 import { api, errorText } from '/js/api.js';
 import { state, loadHealth, getTheme, setTheme, refreshOverview, changeLanguage, loadTimings } from '/js/store.js';
 import { screenHead } from '/js/components/bench.js';
-import { panel, selectField, textField, notice, radioField, actionButton } from '/js/components/ui.js';
+import { panel, selectField, textField, notice, radioField, actionButton, checkField } from '/js/components/ui.js';
 import { toolsPanel } from '/js/components/tools.js';
 import { toast } from '/js/components/toast.js';
 import { toolName } from '/js/labels.js';
@@ -162,6 +162,10 @@ function toolsForm(ctx, data) {
     hint: t('settings.repair_limit_hint', { limit: state.overview ? state.overview.repair_limit : '' }),
   });
   limit.input.addEventListener('change', () => save({ repair_limit: limit.value === '' ? null : Number(limit.value) }));
+  const autoRun = checkField({
+    label: t('settings.chat_auto_run'), checked: !!s.chat_auto_run, hint: t('settings.chat_auto_run_hint'),
+    onchange: (on) => save({ chat_auto_run: on }),
+  });
   return h('section', { class: 'panel' },
     h('div', { class: 'row spread' },
       h('h2', { class: 'panel-title' }, t('settings.tools_title')),
@@ -174,7 +178,8 @@ function toolsForm(ctx, data) {
     h('p', { class: 'muted' }, t('settings.tools_intro')),
     result,
     VERBS.map((v) => jobSetting(ctx, data, v, save)),
-    h('div', { class: 'job-setting' }, limit.el));
+    h('div', { class: 'job-setting' }, limit.el),
+    h('div', { class: 'job-setting' }, autoRun.el));
 }
 
 export function view(ctx, data) {

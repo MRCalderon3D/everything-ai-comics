@@ -34,6 +34,7 @@ const TEMPLATES = {
   'pages.fix': 'pages-fix.txt',
   'page.revise': 'page-revise.txt',
   review: 'review.txt',
+  'sheet.check': 'sheet-check.txt',
   'cover.write': 'cover.txt',
   'lettering.place': 'lettering.txt',
   chat: 'chat.txt',
@@ -166,6 +167,36 @@ function reviewDataSchema() {
   };
 }
 
+/** The shape of data.check the identity check of a drawn sheet returns. */
+function sheetCheckDataSchema() {
+  return {
+    type: 'object',
+    properties: {
+      check: {
+        type: 'object',
+        properties: {
+          same_identity: { type: 'boolean' },
+          findings: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                aspect: { type: 'string', enum: ['face', 'hair', 'build', 'mark', 'style'] },
+                expected: { type: 'string' },
+                visible: { type: 'string' },
+                repair: { type: 'string' },
+              },
+              required: ['aspect', 'expected', 'visible', 'repair'],
+            },
+          },
+        },
+        required: ['same_identity', 'findings'],
+      },
+    },
+    required: ['check'],
+  };
+}
+
 /**
  * Build the full prompt of one AI call.
  * @param {string} kind a key of TEMPLATES
@@ -205,4 +236,6 @@ function fileList(items) {
     : `- ${item.path}${item.note ? ` (${item.note})` : ''}`)).join('\n');
 }
 
-module.exports = { TEMPLATES, REVIEW_CHECKS, languageLabel, render, build, contractSchema, reviewDataSchema, fileList, PROMPTS_DIR };
+module.exports = {
+  TEMPLATES, REVIEW_CHECKS, languageLabel, render, build, contractSchema, reviewDataSchema, sheetCheckDataSchema, fileList, PROMPTS_DIR,
+};

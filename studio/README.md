@@ -207,6 +207,91 @@ writes the story bible: story text comes back as a proposal, and a reply
 that wrote the file anyway is undone. The person can start a fresh
 conversation; the earlier ones stay readable.
 
+Every prompt of the conversation carries a short state of the project, read
+from the workspace when the message is sent: the style and look, each
+character and whether its sheet is approved, each issue with its pages,
+cover and editions, the jobs running and the last ones finished, the
+questions waiting for an answer. The conversation knows what was done on the
+screens, and the screens show what the conversation did, because both write
+the same files. A message can carry images and text files, dropped, pasted
+or picked; they go through the upload store, the prompt names them by path,
+and images also go to the tool. A message sent while another job runs is
+answered at once in a read-only lane of the queue: the reply can answer and
+propose work, and changes no file.
+
+## The chat can do what the screens do
+
+The server keeps one catalog of actions (`server/actions.js`): every
+operation except `chat.turn`, with the operation's own parameters and
+checks, and the decisions the screens make without a job (approvals, story
+proposals, the project options, answering or cancelling a job, the next
+issue). The catalog goes into every chat prompt. A reply proposes work in
+its structured output, and the server checks each proposal the way the
+screen's request would be checked and shows it as a card in the transcript:
+what it will do, the tool and model, and how long it usually takes, measured
+in this project or taken from the run below. A proposal that does not check
+out is left out, with the reason in the reply and in the job log.
+
+The model proposes and the server runs. A card runs when the person clicks
+Run, or when they confirm in words and the next reply names the card. An
+operation goes through the normal queue, with its progress shown live on the
+card; a decision runs through the same code as the screen's button. Work
+that only writes text may start at once if the person turns that on in
+Settings. Drawing, approving and answering always wait for them. When a job
+started from a card ends or stops to ask, its result comes back into the
+conversation: the outcome, the images it drew, links to the screens where
+they are approved, and the questions, which can be answered right there. A
+photo used for a character shows the same rights notice as the Characters
+screen.
+
+No AI run writes the story bible, except `story.update`, which applies a
+change the person asked for. Any other run that changes it (a character run
+that adds an invented relative as a fact, for example) has the change undone
+inside its step, and what it wanted to add becomes a story proposal the
+person accepts or rejects (`server/bible-guard.js`).
+
+## One face per character
+
+Photos and drawings the person adds to a character are where its face comes
+from. The studio shows them to the drawing tool for the character's first
+turnaround or full character sheet only, with the instruction to translate
+the person into the comic's style. Once the person approves a drawn sheet,
+that sheet is the face: expressions, wardrobe sheets, pages and the cover
+are drawn from it and never from a photo, and they wait for it
+(`409 master_required` before then). A full sheet outranks a turnaround.
+
+A sheet drawn from the approved one is compared with it right after it is
+drawn (`sheet-check`, a read-only look by the checking tool). If the face,
+hair, build or a sided mark differs, the sheet is drawn once more with what
+the comparison found and compared again. Whatever comes out is shown, with
+a warning when it still differs, and the person decides.
+
+The full character sheet (sheet kind `model`) is one wide image (3:2) with
+the name, a line with the series and the sheet number in the project's
+language, the turnaround, labelled close-ups and a labelled row of
+expressions and poses. The lists live in the character file's `sheet`
+block. A round of changes (`character.sheet` with `revise`) first updates
+the character file to match (a story fact becomes a proposal, as for any
+run), then edits the chosen version into the next one with everything else
+locked. Approving a version makes it the face; approving another later
+replaces it, so the person can go back.
+
+## The next issue
+
+A project is a series. "New issue" on the Pages screen or the project home
+(or the `issue.create` action of the conversation) asks for a title and a
+rough page count, then writes the series-plan entry and the new
+`issue.yaml`, nothing else. Look, characters, places, props and the story
+bible stay the project's. `opens_from` points at the state the previous
+issue ended in: `continuity/<ISS_ID>.final-state.yaml` as
+`/continuity-review` wrote it, or, when that file is missing, one the
+studio derives from the last ledger rows of each character and prop. The
+first plan of the new issue reads it, and `check-continuity.js` checks the
+first page against it. The issue picker on the Pages, Check, Corrections,
+Cover and Publish screens follows the chosen issue, and pages added to an
+issue that already has an edition go after its last page, so the next
+publish makes the next edition.
+
 ## The browser app
 
 `web/` is plain ES modules, CSS and one HTML file, with no build step. It
@@ -245,6 +330,16 @@ What each screen asks of the person:
   `templates/looks/README.md`, a comparison of up to four side by side, and
   what tends to drift under "details". Words and reference images can be
   mixed in.
+- Characters: each character's drawn sheets and where its face comes from.
+  A sheet that is missing says why (the look is not approved yet, nothing
+  can draw, a candidate waits for approval). Expressions and wardrobe sheets
+  stay unavailable, with the reason, until a turnaround or a full character
+  sheet is approved. The full sheet has its own panel: the close-ups and
+  poses to draw, edited as lines, the versions side by side with a
+  comparison, approval of one of them, and a round of changes on any
+  version with text, a marked region and an optional photo. Once the look
+  is approved, the Characters screen offers to draw the sheets still
+  missing.
 - Pages: the plan of each page, what the planner filled in that the text did
   not say (each item can be changed through the conversation), the drawing,
   and while a page is drawn, a waiting state that says what is happening and
@@ -252,7 +347,8 @@ What each screen asks of the person:
 - Settings: per kind of work (planning, checking, drawing) the tool, then a
   model from the list the installed tool reports, the default marked, a name
   typed by hand when needed, and the time measured with each model. Without
-  Codex, drawing says the pages are uploaded by hand.
+  Codex, drawing says the pages are uploaded by hand. A switch lets the
+  conversation start text-only work without a click.
 
 Both languages (English and Spanish) have the same keys in
 `web/js/i18n/en.js` and `es.js`; the text the server writes arrives in the
@@ -389,23 +485,30 @@ whole pipeline from a project that holds only the person's description,
 story proposals decided part by part, the project conversation, the model
 lists (read from files in a temporary home), cancel, questions and answers,
 the event stream, the checks above, and the command lines built for both
-tools. No test starts a real CLI.
+tools. Two of them make a whole comic: one only through the conversation
+endpoints (messages, cards, answers), one mixing screens and conversation.
+No test starts a real CLI.
 `studio/test-support/record-api-examples.js` refreshes the examples in the
 API reference from such a run.
 
 ## Limits
 
-- One job runs at a time per project. Drawing one page with Codex took about
-  five minutes when it was measured, so an issue is a long queue.
+- One job that writes runs at a time per project. Drawing one page with
+  Codex took about five minutes when it was measured, so an issue is a long
+  queue. Chat turns are the exception: they answer beside it, read-only.
 - Codex returned pages at 1024 x 1536 pixels in that measurement, below the
   default page size of a project. The studio does not upscale.
-- A character sheet is drawn from the written description and the look
-  master. An uploaded photo informs the description and is attached to later
-  sheets and to pages as an identity reference, but the scaffold does not
-  attach it to the first turnaround sheet.
+- The check that compares a sheet with the approved one looks at identity
+  only (face, hair, build, sided marks). It does not judge the layout or
+  the labels of a full character sheet: the person does.
 - Pages are drawn whole. The scaffold's per-panel mode is not used.
 - Lettering is one mode per project. In overlay mode the browser flattens
-  each page; the server cannot.
+  each page; the server cannot. So the conversation can place overlay
+  lettering but not flatten it: that last step is on the Publish screen.
+- A real chat turn reads its attachments through the tool: Claude Code opens
+  them with its Read tool inside the project directory, Codex gets images
+  with `-i`. Whether `codex exec resume` accepts `-i` on a resumed session
+  was not measured.
 - The style of a project is fixed once its look is approved. A different
   style means a new project.
 - Publishing builds files. It does not upload them anywhere.

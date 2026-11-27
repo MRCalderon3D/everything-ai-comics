@@ -97,6 +97,7 @@ export const api = {
   location: (id, loc) => request('GET', `${project(id)}/locations/${enc(loc)}`),
   prop: (id, prop) => request('GET', `${project(id)}/props/${enc(prop)}`),
   issues: (id) => request('GET', `${project(id)}/issues`),
+  createIssue: (id, body) => request('POST', `${project(id)}/issues`, { body }),
   issue: (id, issue) => request('GET', `${project(id)}/issues/${enc(issue)}`),
   page: (id, page) => request('GET', `${project(id)}/pages/${enc(page)}`),
   cover: (id, issue) => request('GET', `${project(id)}/issues/${enc(issue)}/cover`),
@@ -118,7 +119,10 @@ export const api = {
 
   /** The project conversation: one per project, every message tagged with its screen. */
   conversation: (id) => request('GET', `${project(id)}/conversation`),
-  sendMessage: (id, text, screen) => request('POST', `${project(id)}/conversation`, { body: { text, screen } }),
+  sendMessage: (id, text, screen, attachments) => request('POST', `${project(id)}/conversation`, { body: { text, screen, attachments: attachments && attachments.length ? attachments : undefined } }),
+  /** An action card of a reply: run it, or dismiss it. */
+  runAction: (id, conv, card) => request('POST', `${project(id)}/conversation/${enc(conv)}/actions/${enc(card)}/run`, { body: {} }),
+  dismissAction: (id, conv, card) => request('POST', `${project(id)}/conversation/${enc(conv)}/actions/${enc(card)}/dismiss`, { body: {} }),
   newConversation: (id) => request('POST', `${project(id)}/conversation/new`, { body: {} }),
   conversations: (id) => request('GET', `${project(id)}/conversations`),
   conversationById: (id, conv) => request('GET', `${project(id)}/conversations/${enc(conv)}`),

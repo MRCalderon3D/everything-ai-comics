@@ -57,6 +57,8 @@ const S = {
   get pipeline() { return load('scripts/lib/page-pipeline.js'); },
   get coverLib() { return load('scripts/lib/cover.js'); },
   get yamlEdit() { return has('scripts/lib/yaml-edit.js') ? load('scripts/lib/yaml-edit.js') : null; },
+  get referencePlan() { return load('scripts/build-reference-plan.js'); },
+  get sheetLanguage() { return load('scripts/lib/sheet-language.js'); },
 
   version() {
     try {
@@ -73,6 +75,7 @@ const S = {
   buildReferencePlan: (...a) => fn('scripts/build-reference-plan.js', 'buildReferencePlan')(...a),
   compilePage: (...a) => fn('scripts/compile-prompts.js', 'compilePage')(...a),
   compileAsset: (...a) => fn('scripts/compile-prompts.js', 'compileAsset')(...a),
+  storyStates: (...a) => fn('scripts/compile-prompts.js', 'storyStates')(...a),
   compileCover: (...a) => fn('scripts/compile-prompts.js', 'compileCover')(...a),
   generateAssets: (...a) => fn('scripts/generate-assets.js', 'generateAssets')(...a),
   collectPackages: (...a) => fn('scripts/generate-assets.js', 'collectPackages')(...a),

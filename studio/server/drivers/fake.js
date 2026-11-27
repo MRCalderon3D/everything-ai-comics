@@ -22,6 +22,15 @@
  *   NOTE        the first review of it lists one minor finding: the page
  *               passes with a note and no repair is tried
  *   EDIT        (chat) the reply also changes the screen's first file
+ *   ACTION:<name> {params}
+ *               (chat) the reply proposes that action, with those params
+ *               (JSON); "@attachments" stands for the message's uploads
+ *   RUN         (chat) the reply runs every card waiting in the conversation
+ *   STATE       (chat) the reply repeats the project state it was given
+ *   WRITEBIBLE  (chat, character) the run writes the story bible directly,
+ *               which the studio undoes
+ *   SHEETFLAG   (character description) the identity check of a sheet drawn
+ *               from the master fails once; SHEETFLAGALWAYS fails every time
  */
 
 const fs = require('fs');
@@ -197,6 +206,7 @@ const handlers = {
   'character.write'(task, out) {
     const { root, vars } = task;
     const id = vars.character_id;
+    if (has(task.text, 'WRITEBIBLE')) addInventedFact(root, id, out);
     const rel = `characters/${id}/character.yaml`;
     const existing = ws.loadCharacter(root, id);
     const token = id.replace(/^CHAR_/, '');
@@ -338,6 +348,9 @@ const handlers = {
     const existingIds = ws.listPageIds(root, issue).filter((id) => !pageIds.includes(id)).sort();
     const lastExisting = existingIds[existingIds.length - 1] || null;
     let panelTotal = 0;
+    // The first pages of a later issue carry on from the state the previous issue ended in.
+    const opening = vars.opens_from_file ? (ws.loadYaml(vars.opens_from_file) || {}) : {};
+    const carried = opening.characters && typeof opening.characters === 'object' ? opening.characters : {};
 
     pageIds.forEach((pageId, index) => {
       const number = parseInt(pageId.slice(-3), 10);
@@ -345,6 +358,7 @@ const handlers = {
       const pn = (n) => `PN_${pageId.slice(3)}_${String(n).padStart(2, '0')}`;
       const row = (charId, i, action) => {
         const character = ws.loadCharacter(root, charId) || {};
+        const from = carried[charId] || {};
         return {
           character: charId,
           off_panel: false,
@@ -352,10 +366,10 @@ const handlers = {
           facing: i === 0 ? 'right' : 'left',
           action,
           acting: 'Shoulders loose, eyes on the other side of the room.',
-          wardrobe: character.default_wardrobe || `WARD_${charId.slice(5)}_DEFAULT`,
-          state: [],
+          wardrobe: from.wardrobe || character.default_wardrobe || `WARD_${charId.slice(5)}_DEFAULT`,
+          state: Array.isArray(from.state) ? from.state.slice() : [],
           state_changes: { adds: [], resolves: [] },
-          holding: [],
+          holding: Array.isArray(from.holding) ? from.holding.slice() : [],
           carrying: null,
           moved: null,
           wardrobe_change: null,
@@ -452,6 +466,25 @@ const handlers = {
 
   'pages.fix'(task, out) {
     out.summary = 'Looked at the reported errors. The fake planner has nothing to change.';
+  },
+
+  // The identity check of a drawn sheet: SHEETFLAG fails the first look,
+  // SHEETFLAGALWAYS every look.
+  'sheet.check'(task, out) {
+    const always = has(task.text, 'SHEETFLAGALWAYS');
+    const failing = always || (has(task.text, 'SHEETFLAG') && Number(task.vars.round) === 1);
+    out.data.check = failing
+      ? {
+        same_identity: false,
+        findings: [{
+          aspect: 'face',
+          expected: 'The long face of the approved sheet.',
+          visible: 'Placeholder finding forced by the word SHEETFLAG: the face on the new sheet is rounder.',
+          repair: 'Draw the face long and narrow, as on the approved sheet.',
+        }],
+      }
+      : { same_identity: true, findings: [] };
+    out.summary = failing ? 'The new sheet does not show the same person yet.' : 'The new sheet shows the same person as the approved one.';
   },
 
   review(task, out) {
@@ -631,6 +664,20 @@ const handlers = {
     if (vars.history) {
       out.summary += ` I joined with a summary of ${String(vars.history).split('\n').filter((l) => l.startsWith('- ')).length} earlier message(s).`;
     }
+    const attached = Array.isArray(vars.attachment_ids) ? vars.attachment_ids.length : 0;
+    if (attached) out.summary += ` I got ${attached} attachment(s), ${(task.images || []).length} of them image(s) I can look at.`;
+    if (vars.busy) out.summary += ' Another job is running, so I changed nothing.';
+    // ACTION:<name> {json params} proposes an action; RUN runs the waiting cards.
+    const proposed = parseActions(message);
+    if (proposed.length) {
+      out.data.actions = proposed.map((a) => ({ action: a.action, params: a.params, why: `The fake assistant was asked for ${a.action}.` }));
+      out.summary += ` I propose ${proposed.length} action(s): ${proposed.map((a) => a.action).join(', ')}. Each waits for your click.`;
+    }
+    if (has(message, 'RUN') && Array.isArray(vars.pending_cards) && vars.pending_cards.length) {
+      out.data.run_actions = vars.pending_cards.slice();
+      out.summary += ` Running ${vars.pending_cards.length} waiting card(s), as you confirmed.`;
+    }
+    if (has(message, 'STATE') && vars.state) out.summary += ` State: ${String(vars.state).replace(/\s+/g, ' ')}`;
     if (has(message, 'PROPOSE')) {
       // Story text comes back as a proposal, never as a write to the story bible.
       out.data.proposal = {
@@ -675,6 +722,73 @@ const handlers = {
     out.summary += ` I also added a note to ${target}.`;
   },
 };
+
+/**
+ * The actions a message asks the fake for: every "ACTION:<name>" followed,
+ * optionally, by a JSON object of params.
+ */
+function parseActions(text) {
+  const out = [];
+  const re = /ACTION:([a-z][a-z.]*[a-z])/g;
+  let m;
+  while ((m = re.exec(text))) {
+    let params = {};
+    let at = m.index + m[0].length;
+    while (text[at] === ' ') at += 1;
+    if (text[at] === '{') {
+      let depth = 0;
+      let inString = false;
+      for (let i = at; i < text.length; i++) {
+        const c = text[i];
+        if (inString) {
+          if (c === '\\') i += 1;
+          else if (c === '"') inString = false;
+        } else if (c === '"') inString = true;
+        else if (c === '{') depth += 1;
+        else if (c === '}') {
+          depth -= 1;
+          if (depth === 0) {
+            try {
+              params = JSON.parse(text.slice(at, i + 1));
+            } catch (err) {
+              params = { unreadable: text.slice(at, i + 1) };
+            }
+            re.lastIndex = i + 1;
+            break;
+          }
+        }
+      }
+    }
+    out.push({ action: m[1], params, from: m.index, to: re.lastIndex > m.index ? re.lastIndex : m.index + m[0].length });
+  }
+  return out;
+}
+
+/** The text without its ACTION:... parts, so the words inside an action's params do not steer the chat turn itself. */
+function withoutActions(text) {
+  let out = String(text || '');
+  for (const a of parseActions(out).reverse()) out = out.slice(0, a.from) + out.slice(a.to);
+  return out;
+}
+
+/**
+ * What a careless real run did once: write an invented fact straight into
+ * the story bible. The studio undoes it and turns it into a proposal.
+ */
+function addInventedFact(root, charId, out) {
+  const rel = 'story/story-bible.yaml';
+  const doc = ws.loadYaml(ws.abs(root, rel));
+  if (!doc) return;
+  if (!Array.isArray(doc.facts)) doc.facts = [];
+  const n = doc.facts.length + 1;
+  doc.facts.push({
+    id: `FACT_${String(n).padStart(3, '0')}`,
+    statement: `Placeholder invention: ${charId} has an older brother who runs the harbour.`,
+    provenance: 'addition',
+    affects: [charId],
+  });
+  writeYaml(root, rel, doc, out.files, 'Schema: schemas/story-bible.schema.json');
+}
 
 /** A location with a map, when the workspace has none. Returns the ID it made, or null. */
 function ensureLocation(root, out) {
@@ -738,7 +852,8 @@ async function run(options) {
     emit(`reading commands for ${task.kind || 'this step'}`);
     await sleep(3, options.signal);
     // A review reacts to FLAG words only: the other words are for steps that plan.
-    const text = task.kind === 'review' ? '' : String(task.text || '');
+    // A chat turn reacts to the words outside the actions it is asked to propose.
+    const text = task.kind === 'review' ? '' : task.kind === 'chat' ? withoutActions(task.text) : String(task.text || '');
     if (has(text, 'SLOW')) {
       const ms = Number.parseInt(process.env.STUDIO_FAKE_SLOW_MS || '', 10);
       emit('working slowly, as asked');
@@ -758,7 +873,7 @@ async function run(options) {
     const handler = handlers[task.kind];
     const out = { summary: 'Done.', files: [], decisions: [], data: {} };
     if (handler) {
-      if (task.allowWrite === false && !['review', 'chat', 'story.propose'].includes(task.kind)) {
+      if (task.allowWrite === false && !['review', 'chat', 'story.propose', 'sheet.check'].includes(task.kind)) {
         return finish({ status: 'failed', summary: 'This step needs to write files and was run read-only.', files_written: [] });
       }
       handler(task, out);

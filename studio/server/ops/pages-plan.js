@@ -19,6 +19,7 @@ const S = require('../scaffold');
 const { msg } = require('../i18n');
 const pipeline = require('../pipeline');
 const assumptions = require('../assumptions');
+const issues = require('../issues');
 const { runAi } = require('../ai');
 const { OpError } = require('../jobs');
 const { HttpError } = require('../util');
@@ -67,6 +68,8 @@ module.exports = {
     const issue = params.issue;
     const provider = pipeline.compileProvider(project, ctx.services.drivers);
 
+    // The first pages of a later issue start from the state the previous issue ended in.
+    let opening = { opens_from: null, file: null, previous: null };
     const breakdown = await ctx.step('breakdown', async (h) => {
       const existing = S.ws.listPageIds(root, issue).sort();
       const last = existing[existing.length - 1] || null;
@@ -74,6 +77,8 @@ module.exports = {
       if (first + params.pages - 1 > 999) throw new OpError('too_many_pages', 'An issue holds at most 999 pages.');
       const pageIds = [];
       for (let n = first; n < first + params.pages; n++) pageIds.push(`PG_${issue.slice(4)}_${String(n).padStart(3, '0')}`);
+      opening = issues.openingState(project, issue);
+      if (opening.file && !last) h.log(`${issue} opens from ${opening.opens_from}: the first pages start from that state`);
       const result = await runAi(ctx, h, {
         verb: 'plan',
         kind: 'pages.breakdown',
@@ -86,13 +91,21 @@ module.exports = {
           append: !!last,
           last_page: last || '',
           first_number: first,
+          opens_from: opening.file ? opening.opens_from : '',
+          opens_from_file: opening.file && !last ? opening.file : '',
+          previous_issue: opening.previous || '',
         },
         fakeText: params.text,
         pages: params.pages,
       });
+      if (issues.keepOpensFrom(project, issue, opening.file ? opening.opens_from : null)) {
+        h.log(`issue.yaml lost its opens_from in the breakdown: it was put back to ${opening.opens_from}`);
+      }
       return {
         page_ids: pageIds, summary: result.summary, decisions: result.decisions, tool: result.tool, data: result.data,
         assumptions: assumptions.clean(result.data.assumptions, pageIds),
+        opens_from: opening.file && !last ? opening.opens_from : null,
+        opens_from_file: opening.file && !last ? opening.file : null,
       };
     }, { verb: 'plan' });
     const pageIds = breakdown.page_ids;
@@ -101,7 +114,10 @@ module.exports = {
       const result = await runAi(ctx, h, {
         verb: 'plan',
         kind: 'pages.plan',
-        vars: { issue, text: params.text, page_ids: pageIds.join(', '), page_list: pageIds, provider },
+        vars: {
+          issue, text: params.text, page_ids: pageIds.join(', '), page_list: pageIds, provider,
+          opens_from: breakdown.opens_from || '', opens_from_file: breakdown.opens_from_file || '',
+        },
         fakeText: params.text,
         pages: params.pages,
       });
@@ -169,6 +185,7 @@ module.exports = {
       tool: planned.tool,
       assumptions: planned.assumptions || [],
       fix_pass: fixed,
+      opens_from: breakdown.opens_from || null,
       continuity: gates.continuity,
       validation: gates.validation,
       mechanical_errors: gates.errors,

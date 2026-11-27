@@ -15,6 +15,12 @@
  * own and gets a short summary of the conversation so far; the transcript
  * records that as an event message.
  *
+ * Action cards (what a reply proposes to do, studio/server/actions.js) live
+ * beside the messages in <id>.cards.json, keyed by card id, because their
+ * state changes after the message was written (run, dismissed, done). An
+ * assistant message keeps the ids in `actions`; reading the messages puts
+ * each card's current state in their place.
+ *
  * The conversations per screen of earlier versions (.studio/chats/) are
  * folded into the first project conversation, in time order and tagged with
  * their screen, the first time the conversation is read. Their files stay
@@ -105,9 +111,39 @@ function entryOf(index, id) {
   return entry;
 }
 
-/** The messages of a conversation, oldest first. */
+function cardsFile(project, id) {
+  return path.join(dirOf(project), `${id}.cards.json`);
+}
+
+/** The action cards of a conversation: { <card id>: card }. */
+function cards(project, id) {
+  const doc = readJson(cardsFile(project, id), null);
+  return doc && doc.cards && typeof doc.cards === 'object' ? doc.cards : {};
+}
+
+function getCard(project, id, cardId) {
+  const card = cards(project, id)[String(cardId)];
+  if (!card) throw new HttpError(404, 'card_not_found', 'There is no action card with that id in this conversation.');
+  return card;
+}
+
+/** Store a card (new or changed) and return it. */
+function saveCard(project, id, card) {
+  const all = cards(project, id);
+  all[card.id] = card;
+  fs.mkdirSync(dirOf(project), { recursive: true });
+  writeJsonAtomic(cardsFile(project, id), { cards: all });
+  return card;
+}
+
+/** The messages of a conversation, oldest first, with each action card in its current state. */
 function messages(project, id) {
-  return readJsonl(fileOf(project, id));
+  const list = readJsonl(fileOf(project, id));
+  if (!list.some((m) => Array.isArray(m.actions) && m.actions.length)) return list;
+  const all = cards(project, id);
+  return list.map((m) => (Array.isArray(m.actions) && m.actions.length
+    ? Object.assign({}, m, { actions: m.actions.map((c) => all[typeof c === 'string' ? c : c && c.id]).filter(Boolean) })
+    : m));
 }
 
 /** The conversations, newest first: [{ id, started_at, current, messages, last_at }]. */
@@ -204,4 +240,5 @@ function screensUsed(project) {
 
 module.exports = {
   CONV_RE, ensure, list, current, get, start, append, messages, setSession, summaryFor, byScreen, screensUsed,
+  cards, getCard, saveCard,
 };

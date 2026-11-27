@@ -12,6 +12,19 @@
  *
  * After every step that changed files the project directory is committed
  * and an activity entry links to the commit.
+ *
+ * A chat turn must not wait half an hour behind a drawing. An operation that
+ * says `readOnlyLane: true` (chat.turn) goes to a second lane of the queue
+ * when the main lane is busy, and runs at once in read-only mode: the job
+ * has `read_only: true`, ctx.readOnly is true, and its steps never take a
+ * snapshot or commit, so the job running in the main lane keeps every change
+ * it makes. Jobs of that lane run one at a time, and never while a turn of
+ * the main lane runs, so two turns of one conversation never overlap. When
+ * the main lane is idle the turn runs there, as before, and may write.
+ *
+ * A job can carry an `origin` (the conversation card that started it). When
+ * such a job settles (done, failed, cancelled, needs_decision) the manager
+ * calls services.onJobSettled(project, job), which posts the result back.
  */
 
 const fs = require('fs');
@@ -62,7 +75,8 @@ function view(job) {
   if (!job) return null;
   const out = {};
   for (const key of ['id', 'project', 'op', 'title', 'params', 'status', 'created_at', 'started_at', 'ended_at',
-    'current_step', 'steps', 'questions', 'answers', 'result', 'error', 'tools', 'commits', 'position', 'cost_usd']) {
+    'current_step', 'steps', 'questions', 'answers', 'result', 'error', 'tools', 'commits', 'position', 'cost_usd',
+    'read_only', 'origin', 'story_proposals']) {
     out[key] = job[key] === undefined ? null : job[key];
   }
   return out;
@@ -170,12 +184,13 @@ class JobManager {
     return tail > 0 ? lines.slice(-tail) : lines;
   }
 
-  /** True while a job of the project is queued, running, or waiting for an answer. */
+  /** True while a job of the project is queued or running, in either lane. */
   busy(project) {
     const q = this.queues.get(project.id);
-    return !!(q && (q.running || q.queued.length));
+    return !!(q && (q.running || q.queued.length || q.lane.running || q.lane.queued.length));
   }
 
+  /** The job running in the main lane (the one that may write), or null. */
   running(project) {
     const q = this.queues.get(project.id);
     return q && q.running ? view(q.running) : null;
@@ -183,12 +198,19 @@ class JobManager {
 
   // --- commands --------------------------------------------------------------
 
-  /** Create a job and put it in the project's queue. Returns the job view. */
-  enqueue(project, opName, params = {}) {
+  /**
+   * Create a job and put it in the project's queue. Returns the job view.
+   * @param {object} [meta] { origin } stored on the job: what started it
+   *   (a conversation card), so its result can be posted back there.
+   */
+  enqueue(project, opName, params = {}, meta = {}) {
     const op = this.ops.get(opName);
     if (!op) throw new HttpError(400, 'unknown_operation', `"${opName}" is not an operation. See GET /api/ops.`);
     const clean = op.validate ? op.validate(params || {}, { project, services: this.services }) : (params || {});
     project.ensureStudioDirs();
+    const q = this.queue(project);
+    // A read-only lane job waits for nothing but other turns: it never sits behind a drawing.
+    const lane = !!op.readOnlyLane && !!(q.running || q.queued.length);
     const job = {
       id: newId('job'),
       project: project.id,
@@ -212,10 +234,11 @@ class JobManager {
       commits: [],
       position: null,
       stepResults: {},
+      read_only: lane,
+      origin: meta && meta.origin ? meta.origin : null,
     };
     this.jobs(project).set(job.id, job);
-    const q = this.queue(project);
-    q.queued.push(job.id);
+    (lane ? q.lane.queued : q.queued).push(job.id);
     this.positions(project);
     this.save(project, job);
     this.emit(project, job);
@@ -224,17 +247,21 @@ class JobManager {
   }
 
   queue(project) {
-    if (!this.queues.has(project.id)) this.queues.set(project.id, { running: null, queued: [] });
+    if (!this.queues.has(project.id)) {
+      this.queues.set(project.id, { running: null, queued: [], lane: { running: null, queued: [] } });
+    }
     return this.queues.get(project.id);
   }
 
   positions(project) {
     const q = this.queue(project);
     const jobs = this.jobs(project);
-    q.queued.forEach((id, index) => {
-      const job = jobs.get(id);
-      if (job) job.position = index + 1;
-    });
+    for (const list of [q.queued, q.lane.queued]) {
+      list.forEach((id, index) => {
+        const job = jobs.get(id);
+        if (job) job.position = index + 1;
+      });
+    }
   }
 
   cancel(project, id) {
@@ -251,6 +278,7 @@ class JobManager {
     }
     const q = this.queue(project);
     q.queued = q.queued.filter((x) => x !== job.id);
+    q.lane.queued = q.lane.queued.filter((x) => x !== job.id);
     job.status = 'cancelled';
     job.ended_at = nowIso();
     job.position = null;
@@ -258,7 +286,18 @@ class JobManager {
     this.positions(project);
     this.save(project, job);
     this.emit(project, job);
+    this.settledHook(project, job);
     return view(job);
+  }
+
+  /** Tell whoever started a job (a conversation card) that it settled. Never throws. */
+  settledHook(project, job) {
+    if (!job.origin || typeof this.services.onJobSettled !== 'function') return;
+    try {
+      this.services.onJobSettled(project, job);
+    } catch (err) {
+      if (process.env.STUDIO_DEBUG) console.error(err);
+    }
   }
 
   /** Answer the questions of a paused job and put it back at the front of the queue. */
@@ -285,7 +324,7 @@ class JobManager {
     job.error = null;
     for (const step of job.steps) if (step.status === 'waiting') step.status = 'pending';
     const q = this.queue(project);
-    q.queued.unshift(job.id);
+    (job.read_only ? q.lane.queued : q.queued).unshift(job.id);
     this.positions(project);
     this.save(project, job);
     this.emit(project, job);
@@ -308,15 +347,57 @@ class JobManager {
   }
 
   pump(project) {
+    this.pumpMain(project);
+    this.pumpLane(project);
+  }
+
+  /** The main lane: one job at a time, the only one that may write. */
+  pumpMain(project) {
     const q = this.queue(project);
     if (q.running || !q.queued.length) return;
-    const id = q.queued.shift();
-    const job = this.jobs(project).get(id);
+    const job = this.jobs(project).get(q.queued[0]);
     if (!job || job.status !== 'queued') {
-      this.pump(project);
+      q.queued.shift();
+      this.pumpMain(project);
       return;
     }
-    q.running = job;
+    // Two turns of one conversation never run side by side.
+    if (q.lane.running && this.isLaneOp(job)) return;
+    q.queued.shift();
+    this.start(project, job, q, 'main');
+  }
+
+  /** The read-only lane: chat turns that came while the main lane was busy. */
+  pumpLane(project) {
+    const q = this.queue(project);
+    if (q.lane.running || !q.lane.queued.length) return;
+    const job = this.jobs(project).get(q.lane.queued[0]);
+    if (!job || job.status !== 'queued') {
+      q.lane.queued.shift();
+      this.pumpLane(project);
+      return;
+    }
+    if (q.running && this.isLaneOp(q.running)) return;
+    q.lane.queued.shift();
+    if (!q.running && !q.queued.length) {
+      // The main lane went idle while this turn waited: it runs there and may write.
+      job.read_only = false;
+      q.queued.unshift(job.id);
+      this.positions(project);
+      this.pumpMain(project);
+      return;
+    }
+    job.read_only = true;
+    this.start(project, job, q.lane, 'lane');
+  }
+
+  isLaneOp(job) {
+    const op = job && this.ops.get(job.op);
+    return !!(op && op.readOnlyLane);
+  }
+
+  start(project, job, slot, laneName) {
+    slot.running = job;
     this.positions(project);
     const done = this.run(project, job)
       .catch((err) => {
@@ -327,12 +408,13 @@ class JobManager {
         try { this.save(project, job); } catch (e) { /* ignore */ }
       })
       .then(() => {
-        q.running = null;
+        slot.running = null;
         this.controllers.delete(job.id);
         this.settled.delete(done);
         setImmediate(() => this.pump(project));
       });
     this.settled.add(done);
+    return laneName;
   }
 
   async run(project, job) {
@@ -353,6 +435,8 @@ class JobManager {
       job,
       params: job.params,
       answers: job.answers,
+      // A turn of the read-only lane: no file of the workspace may change.
+      readOnly: !!job.read_only,
       signal: controller.signal,
       services: this.services,
       log: (line) => manager.log(project, job, line),
@@ -421,6 +505,7 @@ class JobManager {
       // project directory gone
     }
     this.emit(project, job);
+    this.settledHook(project, job);
   }
 
   /**
@@ -449,7 +534,9 @@ class JobManager {
     this.emit(project, job);
     this.log(project, job, `${i18n.render('en', step.label)}`, id);
 
-    const before = snapshot(project.root, []);
+    // A read-only turn runs beside a job that writes: what changes on disk now is that job's.
+    const readOnly = !!job.read_only;
+    const before = readOnly ? null : snapshot(project.root, []);
     const handle = {
       setTool: (name) => {
         step.tool = name;
@@ -471,12 +558,12 @@ class JobManager {
     // Whatever happened, what changed on disk goes into the history.
     let changes = [];
     try {
-      changes = diffSnapshots(before, snapshot(project.root, []));
+      changes = readOnly ? [] : diffSnapshots(before, snapshot(project.root, []));
     } catch (err) {
       changes = [];
     }
     // Files the person saved or approved while this step ran are theirs, not the step's.
-    const manual = this.services.touched ? this.services.touched.get(project.id) : null;
+    const manual = this.services.touched && !readOnly ? this.services.touched.get(project.id) : null;
     if (manual && manual.size) {
       changes = changes.filter((c) => !manual.has(c.path));
       manual.clear();
@@ -533,7 +620,7 @@ class JobManager {
   async idle() {
     for (;;) {
       const pending = [...this.settled];
-      const queued = [...this.queues.values()].some((q) => q.running || q.queued.length);
+      const queued = [...this.queues.values()].some((q) => q.running || q.queued.length || q.lane.running || q.lane.queued.length);
       if (!pending.length && !queued) return;
       await Promise.race([Promise.all(pending), new Promise((r) => setTimeout(r, 20))]);
       await new Promise((r) => setImmediate(r));
@@ -542,7 +629,10 @@ class JobManager {
 
   /** Abort every running job (server shutdown). */
   async shutdown() {
-    for (const q of this.queues.values()) q.queued = [];
+    for (const q of this.queues.values()) {
+      q.queued = [];
+      q.lane.queued = [];
+    }
     for (const controller of this.controllers.values()) controller.abort();
     await Promise.all([...this.settled]);
   }

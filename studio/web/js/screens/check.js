@@ -15,9 +15,11 @@ import { reviewPanel, verdictChip, verdictWords, verdictClass, outcomeOf, approv
 import { pageName, versionName } from '/js/labels.js';
 import { renderItems } from '/js/screens/page.js';
 import { queueLine } from '/js/screens/pages.js';
+import { currentIssue } from '/js/components/issues.js';
 
 export async function load(ctx) {
-  const issueId = state.issue || 'ISS_001';
+  // A page names its issue; otherwise the issue chosen on the Pages screen.
+  const issueId = ctx.params.page && /^PG_\d{3}_\d{3}$/.test(ctx.params.page) ? `ISS_${ctx.params.page.slice(3, 6)}` : currentIssue(ctx);
   const issue = await api.issue(ctx.projectId, issueId);
   const wanted = ctx.params.page
     || (issue.pages.find((p) => p.flagged) || issue.pages.find((p) => p.current_render) || issue.pages[0] || {}).id;

@@ -9,6 +9,8 @@ import { frame, openViewer } from '/js/components/viewer.js';
 import { jobsFor } from '/js/components/jobs.js';
 import { toolName } from '/js/labels.js';
 import { SCREENS } from '/js/shell.js';
+import { openNewIssue } from '/js/components/issues.js';
+import { button } from '/js/components/ui.js';
 
 export async function load() {
   return (await refreshOverview()) || state.overview;
@@ -55,6 +57,10 @@ export function view(ctx, overview) {
           h('p', { class: 'caption-text' }, next.text),
           h('a', { class: 'btn primary', href: next.href }, next.label)),
         jobsFor(() => true, { showLast: false }),
+        h('div', { class: 'home-issues' },
+          h('span', { class: 'muted' }, t('issues.pick')),
+          (overview.issues || []).map((i) => h('a', { class: 'chip-link', href: `${base}/pages${i.id === 'ISS_001' ? '' : `?issue=${encodeURIComponent(i.id)}`}` }, `${i.number}. ${i.title}`)),
+          button(t('issues.new'), { kind: 'quiet', small: true, icon: 'plus', onclick: () => openNewIssue(ctx) })),
         fallbacks.length ? notice('warn', h('ul', { class: 'bullets' }, fallbacks.map(([verb, v]) => h('li', null,
           !v.available
             ? t(`home.tool_missing.${verb}`)

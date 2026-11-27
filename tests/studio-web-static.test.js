@@ -198,9 +198,11 @@ function checkScreens() {
   const { routeOf } = require('../studio/server/screens.js');
   const patterns = routes.map(([, pattern]) => new RegExp(`^${pattern.replace(/:[a-z]+/g, '[^/]+')}/?$`));
   for (const key of ['home', 'story', 'style', 'options', 'settings', 'characters', 'character:CHAR_X', 'places', 'location:LOC_X', 'prop:PROP_X',
-    'pages:ISS_001', 'page:PG_001_001', 'cover:ISS_001', 'publish:ISS_001', 'check', 'corrections', 'history']) {
+    'pages:ISS_001', 'page:PG_001_001', 'cover:ISS_001', 'publish:ISS_001', 'pages:ISS_002', 'cover:ISS_002', 'publish:ISS_002',
+    'check', 'corrections', 'history']) {
     const url = routeOf('demo', key);
-    assert.ok(url && patterns.some((re) => re.test(url)), `the server links ${key} to ${url}, which the app does not route`);
+    // A later issue rides in ?issue=, which the screen reads.
+    assert.ok(url && patterns.some((re) => re.test(url.split('?')[0])), `the server links ${key} to ${url}, which the app does not route`);
   }
   // The screens of the brief each have a route.
   for (const screen of ['story', 'style', 'characters', 'places', 'pages', 'check', 'corrections', 'cover', 'publish', 'history', 'settings', 'decisions']) {

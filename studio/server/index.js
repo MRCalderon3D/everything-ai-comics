@@ -77,6 +77,8 @@ function createServer(options = {}) {
   const services = { registry, events, drivers, ops, fake, touched: new Map() };
   const jobs = new JobManager({ events, ops, services });
   services.jobs = jobs;
+  // A job started from a card of the conversation posts its result back there.
+  services.onJobSettled = (project, job) => require('./actions').jobSettled(services, project, job);
   const webDir = options.webDir || path.join(STUDIO_ROOT, 'web');
   let port = options.port === undefined ? DEFAULT_PORT : options.port;
 

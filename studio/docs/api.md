@@ -24,6 +24,7 @@ long string ends with `…`, and local paths are replaced by `<studio home>` and
 - [Operations and jobs](#operations-and-jobs)
 - [Events](#events)
 - [Conversation](#conversation)
+- [Actions of the conversation](#actions-of-the-conversation)
 - [Story proposals](#story-proposals)
 - [History](#history)
 - [Approvals](#approvals)
@@ -652,6 +653,17 @@ and `summary` are in the language of the request (`?lang=` or
 ```
 <!-- /example:ops -->
 
+### `GET /api/actions`
+
+What the conversation can propose: every operation except `chat.turn`, with
+the operation's own `params`, and the decisions the screens make without a
+job (approvals, a story proposal decided or discarded, the project options,
+answering or cancelling a job, the next issue). Each entry is
+`{ name, kind, title, summary, params, decision }`: `kind` is `op` (it runs
+as a job) or `direct` (it happens at once), and `decision` is `true` for
+what only the person decides. See
+[Actions of the conversation](#actions-of-the-conversation).
+
 ### `GET /api/schemas`
 
 Names of the JSON Schemas of the scaffold.
@@ -1132,6 +1144,7 @@ are fields of `production/project.yaml`.
 | `settings.drivers` | Which tool does each verb: `plan` and `look` take `claude` or `codex`; `draw` takes `codex` or `manual`. |
 | `settings.models` | Model per driver and verb, or `null` for the tool's default: `claude.plan`, `claude.look`, `codex.plan`, `codex.look`, `codex.draw`. A model `id` from `installed.<tool>.models`, or any name the person types (letters, digits, `.`, `_`, `:`, `-`, `[`, `]`, at most 80 characters). |
 | `settings.repair_limit` | `null`, or a number from 0 to 10 that stops the automatic repairs earlier than the project's own limit. It never raises that limit. |
+| `settings.chat_auto_run` | `false` by default. When `true`, an action card the conversation proposes runs at once when it only writes text (planning pages, a story suggestion, a style written without drawing). Drawings, approvals, decisions and answers always wait for the person. |
 | `tools` | The resulting assignment, as in the project home. |
 | `installed` | `{ claude, codex }` as in `GET /api/health`, with `jobs`, `models` and `models_source`. Show a tool only when `installed` is `true`, and per job only the tools whose `jobs` include it. |
 | `model_status` | Per tool and verb: `default` (the setting is `null`), `listed` (it names a model of the list, or the model an alias points at) or `custom` (a name typed by hand). |
@@ -1340,7 +1353,7 @@ After a few pages were drawn:
 
 ### `PUT /api/projects/:id/settings`
 
-Body: any subset of `language`, `drivers`, `models`, `repair_limit`. Fields
+Body: any subset of `language`, `drivers`, `models`, `repair_limit`, `chat_auto_run`. Fields
 left out keep their value. 400 `bad_settings` names the first invalid field.
 A model name that is not in the tool's list is accepted (the person may know
 one the tool does not report); the answer's `model_status` marks it
@@ -1886,9 +1899,15 @@ Asset fields, used for looks, characters, locations and props:
 ### `GET /api/projects/:id/characters`
 
 The cast. `image` is the approved master, else the newest candidate, else an
-uploaded reference. `has_master` means an approved sheet exists;
-`has_identity` also counts an uploaded photo. `candidates` counts sheets
-waiting for a decision.
+uploaded reference. `has_master` means an approved sheet exists.
+`has_identity` means pages can be drawn: the character has an approved
+drawn sheet. An uploaded photo does not count, since it is only a likeness
+source for the first sheet. `identity` says where the character stands in
+the identity chain: `master` (`{ id, kind, path }` of the approved
+turnaround or full sheet, or null), `identity` (the asset pages attach),
+`photos` (the approved likeness sources), `photos_only`, and `needs_master`
+(expressions and wardrobe sheets cannot be drawn yet). `candidates` counts
+sheets waiting for a decision.
 
 <!-- example:characters -->
 ```json
@@ -1933,9 +1952,14 @@ waiting for a decision.
 
 One character: the summary above plus `character` and `wardrobe` (text
 documents), `assets` (`masters`, `candidates`, `references`), `sheets` (per
-kind: `{ master, candidates }` for `turnaround`, `expressions`, `wardrobe`,
-`detail`), `packages` (compiled sheet prompts), `used_on` (page IDs where the
-character appears) and `look_approved`.
+kind: `{ master, candidates }` for `model`, `turnaround`, `expressions`,
+`wardrobe`, `detail`), `packages` (compiled sheet prompts), `used_on` (page
+IDs where the character appears), `look_approved`, `model_versions` (every
+version of the full character sheet, oldest first, a master standing for the
+candidate it was made from) and `sheet_plan` (`closeups` and `poses` as the
+full sheet would show them now, one line each, and `saved` when they come
+from the character file). A candidate drawn from the master carries `check`,
+the identity check it had (`verdict`, `master`, `findings`, `redrawn`).
 
 <!-- example:character -->
 ```json
@@ -2241,6 +2265,38 @@ The issues of the series plan and of the workspace.
 }
 ```
 <!-- /example:issues -->
+
+### `POST /api/projects/:id/issues`
+
+Starts the next issue of the series. Body: `title` (required, at most 120
+characters), `pages` (a rough page count, 1 to 200, default 4) and
+`summary` (optional). It writes two things and nothing else: the entry of
+the series plan (`story/series-plan.yaml`) and
+`issues/<ISS_ID>/issue.yaml`, with no scene and no page yet. The look, the
+characters, the places, the props and the story bible belong to the project,
+so the new issue uses them as they are.
+
+`opens_from` points at the continuity state the previous issue ended in,
+`continuity/<ISS_ID>.final-state.yaml`. When the scaffold's
+`/continuity-review` has written that file, it is used as it is. When it is
+not there, the studio derives it from the panel ledger of the previous
+issue: the last row of every character (place, position, outfit, state tags,
+props in hand) and the last known place of every prop. A derived file says
+so in its `notes` and has no open threads. It is derived again when the
+previous issue gains pages before the new one has any. An issue after an
+issue with no pages opens from nothing (`opens_from: null`).
+
+Answers 201 with `{ issue, number, title, page_budget, previous,
+opens_from, state_written, files, commit, screen }`: `state_written` is
+`true` when the end state was derived now, and `screen` is the Pages screen
+of the new issue. 400 `bad_params` for a missing title or a bad page count;
+409 `project_busy` while pages are being planned.
+
+The first `pages.plan` of the new issue reads that state: the prompt names
+the file, the plan keeps `opens_from` in `issue.yaml` (the studio puts it
+back if a run drops it), and `check-continuity.js` seeds the ledger of the
+issue from it, so the first page is checked against where the last issue
+ended.
 
 ### `GET /api/projects/:id/issues/:issue`
 
@@ -3382,6 +3438,9 @@ are not approved:
 | `tools` | Which tool did each verb in this job: `{ plan?, look?, draw? }`. |
 | `commits` | Every commit the job made. |
 | `cost_usd` | Sum of the costs Claude Code reported, or `null`. Codex reports none. |
+| `read_only` | `true` for a chat turn that ran in the read-only lane, beside another job, and could change no file. |
+| `origin` | What started the job when it was not a screen: `{ conversation, card, message }` for an action card of the conversation, else `null`. |
+| `story_proposals` | When a run of the job changed the story bible directly: the change was undone, and what it wanted to add waits as a proposal, `[{ id, parts }]`. Else `null`. |
 
 <!-- example:job -->
 ```json
@@ -3848,7 +3907,7 @@ the time of the event. Codes and params come with it as in any response.
 | `log` | A progress line of the running job. | `{ job, step, at, line }`. Tool use arrives as short lines such as `reading docs/data-model.md` or `writing story/story-bible.yaml`. |
 | `activity` | A history entry was added. | `{ entry }`, as in [History](#history) (image paths, not image objects). |
 | `files` | Files of the workspace changed. | `{ paths, job, commit }`. `job` is `null` for a save or an approval by the person. Reload the screens that show those paths. |
-| `chat` | A message was added to the project conversation. | `{ conversation, key, message }`: the conversation id, the screen key the message belongs to, and the message (see [Conversation](#conversation)). |
+| `chat` | A message was added to the project conversation, or an action card changed. | `{ conversation, key, message }`: the conversation id, the screen key the message belongs to, and the message (see [Conversation](#conversation)). A changed card comes as `{ conversation, card }` instead. |
 | `heartbeat` | Every 15 seconds. | `{ at }`. |
 
 <!-- example:event-hello -->
@@ -4022,8 +4081,30 @@ when the person moves between screens, and every message carries the screen
 it was sent from: `screen: { key, label, route }`. The AI is given the files
 of that screen, so "change this" means the thing in front of the person, and
 it may change them. Show the screen with each message ("from Style", "from
-Page 2"). A turn runs as a job (`chat.turn`), so it waits its turn behind a
-running job and can be cancelled like one.
+Page 2"). A turn runs as a job (`chat.turn`) and can be cancelled like one.
+When the queue is idle it runs as any job and may change files. When
+another job is running it does not wait: it runs at once in a read-only
+lane of the queue, answers and proposes, and changes no file (the job has
+`read_only: true`, and so does the reply). Two turns never run side by side.
+
+Every prompt carries a short state of the project, read from the workspace
+at that moment: the options, the story and its open proposals, the style
+and look, each character and whether its sheet is approved, the places, each
+issue with its pages (plan approved, drawn, passing, approved), its cover
+and editions, the jobs running and the last ones finished (from the screens
+or from the conversation), the questions waiting for an answer, the cards
+waiting for the person and the uploaded files. So the conversation knows
+what was done on the screens, and the screens show what the conversation
+did, because both write the same workspace.
+
+A message can carry attachments: images and text files sent through the
+[upload store](#uploads) first. The prompt lists each one with its absolute
+path and its upload id; images also go to the tool (Codex takes them with
+`-i`; Claude Code opens them with its Read tool, since the uploads live
+inside the project directory it is given with `--add-dir`).
+
+A reply can propose actions, which become cards the person runs or
+dismisses: see [Actions of the conversation](#actions-of-the-conversation).
 
 Conversations live in `.studio/conversations/` of the project: `index.json`
 and one `<conversation id>.jsonl` per conversation. The person can start a
@@ -4040,7 +4121,7 @@ Screen keys, and the files the AI gets for each:
 | `character:<CHAR_ID>` | That character's file and wardrobe. |
 | `places` | Every location, map and prop file. |
 | `location:<LOC_ID>`, `prop:<PROP_ID>` | That entity's files. |
-| `pages:<ISS_ID>` | The issue file, its scenes and its page files. |
+| `pages:<ISS_ID>` | The issue file, the series plan, its scenes and its page files. An issue of the series plan with no directory yet is a screen too. |
 | `page:<PAGE_ID>` | The page file, its lettering geometry, the review of its current render, its scene. |
 | `cover:<ISS_ID>` | The cover file, the issue file, the story bible. |
 | `publish:<ISS_ID>` | The issue file and the latest edition. |
@@ -4064,6 +4145,9 @@ The routes of the browser app the server uses for `route` (the ones
 | `pages:<ISS_ID>`, `page:<PAGE_ID>` | `/p/:id/pages`, `/p/:id/pages/<PAGE_ID>` |
 | `cover:<ISS_ID>`, `publish:<ISS_ID>` | `/p/:id/cover`, `/p/:id/publish` |
 
+For an issue after the first, the Pages, Cover and Publish routes carry it as
+`?issue=<ISS_ID>`, and the screens open on that issue.
+
 Message fields:
 
 | Field | Meaning |
@@ -4080,6 +4164,11 @@ Message fields:
 | `proposal` | When the person asked for story text: `{ id, parts }` of the [proposal](#story-proposals) the reply made, else `null`. The story bible itself is never written by a chat. |
 | `reverted` | Files the reply wrote that the studio undid: `["story/story-bible.yaml"]` when a reply wrote the story bible directly. Usually empty. |
 | `error` | When the turn failed: what went wrong, with an empty `text`. |
+| `attachments` | On a person's message: the files sent with it, `[{ id, name, kind, bytes, width, height, url }]`. |
+| `actions` | On a reply: the [action cards](#actions-of-the-conversation) it proposed, each in its current state. The transcript file keeps their ids. |
+| `dropped` | On a reply: actions it proposed that did not check out, `[{ action, reason }]`, with the reason in the language of the request. The job log says the same. |
+| `read_only` | On a reply: `true` when it was written beside another job and could change no file. |
+| `story_proposal` | On a reply that wrote the story bible directly: `{ id, parts }` of the proposal made from what it wanted to add, else `null`. |
 | `folded_from` | On a message brought in from the conversations per screen of earlier versions: the screen key it came from. |
 
 Event messages (`role: "event"`) say what happened between turns:
@@ -4089,6 +4178,7 @@ Event messages (`role: "event"`) say what happened between turns:
 | `folded` | The conversations per screen of an earlier version were brought into this one (`keys` lists them). |
 | `tool_changed` | Another tool answers from here on (`from_tool`, `tool`). It started a session of its own and was given a summary of the conversation so far. |
 | `session_restarted` | The same tool could not continue its earlier session, so it started a new one with the summary. |
+| `action_result` | A job started from a card ended or stopped to ask. Fields: `card`, `action`, `job`, `status` (`done`, `failed`, `cancelled`, `needs_decision`), `text` (a sentence of the studio), `summary` (the tool's own words), `error`, `images` (what it drew, as [image objects](#image-objects) with their `path`), `links` (the screens where the result is seen and approved), `proposals` (story proposals it left, `guard: true` on one made from a direct write to the story bible), `questions` (while it waits for an answer) and `reply_to`. |
 
 How the conversation continues: while the same tool answers, each turn
 resumes that tool's own session (`--resume <session id>` for Claude Code,
@@ -4209,12 +4299,14 @@ finished.
 ### `POST /api/projects/:id/conversation`
 
 Sends a message to the current conversation. Body: `text` (at most 8000
-characters) and `screen` (`{ key, label?, route? }`, or the key alone).
+characters), `screen` (`{ key, label?, route? }`, or the key alone) and
+`attachments` (optional: at most 12 upload ids, images or text files).
 Answers 202 with the stored message, the `chat.turn` job and the
 conversation id. The reply arrives as a `chat` event and in the
 transcript. 400 `bad_params` without text or screen, 400 `bad_chat_key` for a
 key that is malformed or has no files (`home`, `check`...), 404
-`chat_target_not_found` for a screen that is not there.
+`chat_target_not_found` for a screen that is not there, 400 `bad_params` for
+an attachment that is not an upload of the project.
 
 <!-- example:conversation-post-request -->
 ```json
@@ -4392,6 +4484,96 @@ One conversation, current or earlier, with the fields of
 }
 ```
 <!-- /example:conversation-old -->
+
+## Actions of the conversation
+
+The conversation can do what the screens do. The catalog
+(`GET /api/actions`) is written into every chat prompt with the parameters
+of each action. A reply proposes work in its structured output:
+`data.actions: [{ action, params, why }]`. The server checks each one with
+the action's own validation, the one the screens' requests go through, and
+stores it as a card on the reply. An action that does not check out is left
+out, with the reason in `dropped` and in the job log. A reply proposes at
+most six.
+
+The chat turn never runs anything by itself. A card runs when the person
+clicks Run (`POST .../actions/:card/run`), or when they confirm it in words
+("yes, draw it", "sí, apruébala") and the next reply returns
+`data.run_actions: [<card id>]` with the ids of cards that were waiting. An
+operation runs as a job through the normal queue, so progress, the commit of
+each step, reviews and cancel work as from a screen. A decision (an
+approval, a proposal decided, an answer) runs at once through the same code
+as the screen's route. Text-only work may run at once when
+`settings.chat_auto_run` is on; anything that draws, approves, decides or
+answers always waits for a click or a confirmation in words.
+
+The actions:
+
+| Action | Kind | What it does |
+|---|---|---|
+| `story.update`, `story.draft`, `story.complete`, `story.suggest` | op | The story operations. Text the AI writes is a proposal. |
+| `proposal.decide` | direct, decision | Accepts, edits or rejects the parts of a story proposal: `{ proposal, decisions }` as `POST .../proposals/:proposal/decide`, or `{ proposal, all: "accept" \| "reject" }` for every pending part. |
+| `proposal.discard` | direct, decision | Drops a proposal. |
+| `style.define`, `style.look` | op | The style, and its look page (draws). |
+| `approve.asset` | direct, decision | Approves a candidate sheet, plate or look page: `{ candidate, supersede?, note? }`. |
+| `options.update` | direct, decision | Changes project options: `{ options: { ... } }` with the body of `PUT .../options`. |
+| `character.create`, `character.update`, `character.sheet` | op | Characters, from words and attached photos; the sheet draws. |
+| `entities.derive` | op | Places and objects (plates draw). |
+| `pages.plan` | op | Plans pages from the person's words. |
+| `approve.plan` | direct, decision | Approves page plans: `{ pages, approved? }`. |
+| `pages.generate`, `page.review`, `page.correct`, `page.manual` | op | Drawing, checking, correcting (draws), a page made by hand. |
+| `approve.page` | direct, decision | `{ page, render?, overrule?, note? }` as `POST .../approve/page`. |
+| `cover.create`, `cover.correct` | op | The cover (draws). |
+| `approve.cover` | direct, decision | `{ issue?, render?, overrule?, note? }`. |
+| `lettering.apply`, `publish.build` | op | Lettering in overlay mode, and the edition. |
+| `issue.create` | direct, decision | The next issue: `{ title, pages?, summary? }` as `POST .../issues`. |
+| `job.answer` | direct, decision | Answers a paused job: `{ job, answers }`. |
+| `job.cancel` | direct, decision | Cancels a job: `{ job }`. |
+
+In overlay lettering mode, turning each overlay into a flat image happens in
+the browser on the Publish screen; the conversation can place the lettering
+(`lettering.apply`) and link to that screen, and cannot flatten.
+
+A card:
+
+| Field | Meaning |
+|---|---|
+| `id`, `action`, `kind` | The card, the action and `op` or `direct`. |
+| `params`, `why` | What the reply proposed, and its one-line reason. `"@attachments"` in a parameter stands for the ids of the message's attachments (images for `uploads` and `upload`, text files for `source_upload`). |
+| `title`, `summary` | What it will do, in the language of the request, with their codes. |
+| `details` | The parameters in plain form, `[{ name, value }]`, with upload names in place of ids. |
+| `uploads` | The uploads the parameters name, with their URLs, for thumbnails. |
+| `photo_rights` | `true` when a photo is used for a character: show the photo-rights notice of the Characters screen. |
+| `draws`, `decision`, `auto` | Whether it draws, whether it is the person's decision, and whether `chat_auto_run` may start it. |
+| `tools` | `[{ verb, tool, model, available }]`: which tool and model will do each part. |
+| `typical` | `{ ms, source, runs, pages }`: how long it usually takes. `source` is `measured` (from the finished jobs of the same operation in this project, per page for page work) or `reference` (the run measured in `studio/README.md`). |
+| `status` | `pending` (waiting for the person), `started` (its job is queued or running), `running` (a decision being made), `done`, `failed`, `cancelled`, `needs_decision` or `dismissed`. |
+| `job`, `run_by` | The job it started, and how it was started: `click`, `text` (confirmed in words) or `auto`. |
+| `result`, `error` | The job's or the decision's result, or why it failed. |
+| `conversation`, `message`, `proposed_by_job` | Where it lives, and the chat turn that proposed it. |
+
+When a job started from a card ends or stops to ask, the card takes the
+outcome and an `action_result` event message is added to the conversation
+that started it, with the images it drew and links to the screens where
+they are approved. A paused job's questions can be answered there, through
+`POST .../jobs/:job/answer`, or by the person replying in the chat, after
+which the reply proposes `job.answer`.
+
+### `POST /api/projects/:id/conversation/:conversation/actions/:card/run`
+
+Runs a waiting card. An operation is queued as a job with
+`origin: { conversation, card, message }`; a decision is made now. Answers
+`{ card, job }` with the card in its new state (`started`, `done` or
+`failed`) and the job, or `null`. When the action itself is refused (a
+review that is flagged, an approval of something that is not there), the
+card is `failed` with the reason; the request still answers 200. 409
+`card_not_pending` when the card already ran or was dismissed, 404
+`card_not_found` for an unknown card.
+
+### `POST /api/projects/:id/conversation/:conversation/actions/:card/dismiss`
+
+Marks a waiting card as dismissed; nothing is done. Answers `{ card }`. 409
+`card_not_pending` when it already ran or was dismissed.
 
 ### Conversations per screen (deprecated)
 
@@ -5826,24 +6008,56 @@ with `draw`.
 
 ### `character.sheet`
 
-Draws one more sheet of a character. The result is a candidate.
+Draws one more sheet of a character, or the next version of its full
+character sheet. The result is a candidate.
 
 | Param | Type | Meaning |
 |---|---|---|
 | `character` | string, required | Character id. |
-| `sheet` | string | `turnaround` (default), `expressions` or `wardrobe`. |
+| `sheet` | string | `turnaround` (default), `model` (the full character sheet), `expressions` or `wardrobe`. |
 | `outfit` | string | Wardrobe id, for a wardrobe sheet. Default: the character's default outfit. |
+| `closeups` | string[] | `model` only. The labelled close-ups, one per line, `label: what it shows`. At most 8. Saved in the character file's `sheet` block. |
+| `poses` | string[] | `model` only. The labelled expressions and poses. At most 8. Saved in the character file. |
+| `revise` | string | `model` only. The version of the full sheet to change (`CHAR_MARA_MODEL_V01`, or `latest`). |
+| `text` | string | With `revise`: what to change, in the person's words. |
+| `region` | object | With `revise` and `text`: `{ x, y, w, h }` as fractions of the sheet, the part the change is about. |
+| `changes` | object[] | With `revise`: several changes, each `{ text, region? }`. |
+| `uploads` | string[] | With `revise`: new photos for this round, used for likeness only. |
+| `update_file` | boolean | With `revise`. Default `true`: the character file is updated to match the changes first. |
 
-Steps: `sheet-compile`, `sheet-draw` (draw). Unlike `character.create`, a
-sheet that cannot be drawn fails the job (`sheet_blocked`).
+The identity chain decides what each sheet is drawn from. Photos and
+drawings the person uploaded are likeness sources: they go to the first
+turnaround or full sheet only, while no drawn sheet is approved. The
+approved turnaround or full sheet is the identity master (a full sheet
+outranks a turnaround), and expressions and wardrobe sheets are drawn from
+it. Without one they are refused with `409 master_required`.
+
+Steps: `sheet-compile`, `sheet-draw` (draw), and `plan` first when
+`closeups` or `poses` are given. A sheet drawn from the master is then
+compared with it: `sheet-check` (look). When the check finds a different
+person, `sheet-redraw` draws it once more with what the check found and
+`sheet-recheck` compares again. The result carries `identity_check` (`pass`,
+`flagged` or `not_checked`, with the findings) and, if the second drawing
+still differs, a `warning`; `first_candidate` names the drawing that failed.
+
+A revision has the steps `photos` (with uploads), `write` (plan, the
+character file follows the change; a story fact the run tries to add
+becomes a proposal), `sheet-compile` and `sheet-draw`. The previous version
+is the edit target, and everything the changes do not name is locked. The
+result names the version it came `from`.
+
+Unlike `character.create`, a sheet that cannot be drawn fails the job
+(`sheet_blocked`). `revise` names a version that does not exist: `409
+revise_target_missing`.
 
 <!-- example:op.character.sheet -->
 ```json
 {
-  "params": { "character": "CHAR_MARA", "sheet": "expressions", "outfit": null },
+  "params": { "character": "CHAR_MARA", "sheet": "expressions", "outfit": null, "closeups": null, "poses": null, "revise": null, "changes": [], "uploads": [], "update_file": true },
   "steps": [
     { "id": "sheet-compile", "label": "Prepare the expressions sheet", "status": "done" },
-    { "id": "sheet-draw", "label": "Draw the expressions sheet", "status": "done" }
+    { "id": "sheet-draw", "label": "Draw the expressions sheet", "status": "done" },
+    { "id": "sheet-check", "label": "Compare the new sheet with the approved one", "status": "done" }
   ],
   "result": {
     "character": "CHAR_MARA",
@@ -5851,7 +6065,8 @@ sheet that cannot be drawn fails the job (`sheet_blocked`).
       "candidate": "characters/CHAR_MARA/refs/CHAR_MARA_EXPR_V01.png",
       "candidate_id": "CHAR_MARA_EXPR_V01",
       "record": "GEN_CHAR_MARA_02",
-      "kind": "expressions"
+      "kind": "expressions",
+      "identity_check": { "verdict": "pass", "master": "CHAR_MARA_TURN_MASTER_V01", "findings": [], "redrawn": false, "at": "2026-11-27" }
     }
   }
 }
@@ -6664,12 +6879,16 @@ One message of the project conversation. It is started by
 `POST .../conversation` (or the deprecated `POST .../chats/:key`), which
 stores the person's message first; `POST .../ops` refuses it. Its parameters,
 which that route fills in: `screen` (`{ key, label, route }`), `text` (the
-message), `conversation` (the conversation id), and `key`, the screen key
-again, kept for older clients. Step: `reply` (plan). The reply may change the
-files of the screen, never the story bible: story text comes back as a
-proposal, and a reply that wrote the story bible anyway is undone inside the
-step and listed in `reverted`. Result: `{ conversation, key, message }` with
-the assistant's message.
+message), `conversation` (the conversation id), `attachments` (upload ids
+sent with the message), and `key`, the screen key again, kept for older
+clients. Step: `reply` (plan). The reply may change the files of the
+screen, never the story bible: story text comes back as a proposal, and a
+reply that wrote the story bible anyway is undone inside the step and listed
+in `reverted`. It may propose actions (`data.actions`) and run cards the
+person confirmed (`data.run_actions`). When another job runs, the turn runs
+in the read-only lane and changes nothing. Result:
+`{ conversation, key, message, ran, read_only }` with the assistant's
+message, its cards, and the cards it ran.
 
 <!-- example:op.chat.turn -->
 ```json
@@ -6730,7 +6949,11 @@ of the interface reachable:
 | `EDIT` | A chat message | The reply also changes the first file of the screen, never the story bible. |
 | `PROPOSE` | A chat message | The reply comes with a proposal of one fact (`user_change`) and one question. |
 | `LINK` | A chat message | The reply suggests three screens: Characters, and two that do not exist, which the server drops. |
-| `WRITEBIBLE` | A chat message | The reply writes the story bible directly, and the studio undoes it (`reverted`). |
+| `SHEETFLAG` | A character's description | The first comparison of a sheet drawn from the approved sheet finds a different face, so the sheet is drawn once more. `SHEETFLAGALWAYS` fails every comparison. |
+| `WRITEBIBLE` | A chat message, or a character's description | The run writes the story bible directly (a chat note, or an invented fact for a character), and the studio undoes it. A fact becomes a proposal. |
+| `ACTION:<name> {params}` | A chat message | The reply proposes that action, with the JSON object that follows as its params. Several may follow one another. The words inside the params steer the action, not the chat turn. |
+| `RUN` | A chat message | The reply runs every card waiting in the conversation, as a confirmation in words would. |
+| `STATE` | A chat message | The reply repeats the project state it was given, which shows what the conversation knows. |
 
 The proposal operations return placeholder parts built from the person's
 text: a draft proposes a premise, a tone, a world rule, the first sentences

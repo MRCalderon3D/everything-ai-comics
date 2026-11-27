@@ -10,6 +10,7 @@ What happens:
 {{text}}
 >>>
 {{#if append}}The issue already has pages up to {{last_page}}. The new scene or scenes continue after them: the new pages start at page number {{first_number}}, and continuity carries on from the last existing panel.
+{{/if}}{{#if opens_from_file}}This issue continues the series: it opens from where {{previous_issue}} ended. Read {{opens_from_file}} before anything else. It says where every character is, what they wear, what state they are in and what they hold, and where every tracked object is. The first scene starts from that state, not from a blank one.
 {{/if}}
 INSTRUCTIONS FOR THIS RUN
 - The scenes and beats come from the person's text and from nothing else. Add no event, no line of dialogue the text does not imply, no explanation and no character the text does not name. Splitting what the text says into beats is your job; adding to it is not.
@@ -17,4 +18,5 @@ INSTRUCTIONS FOR THIS RUN
 - Use only characters that exist under characters/. When the text names someone who has no character file, write the file with commands/character-bible.md from what the text says and say so under "decisions": the person has to draw and approve that character's sheet before the page can be generated.
 - A scene needs a location with a map. When the scene needs a place or a tracked object the workspace lacks, write the location or prop file now with commands/location-bible.md or commands/prop-bible.md, and list what you created in data.locations and data.props.
 - Whatever you had to choose that the text does not say (a time of day, the layout of a place, where someone enters from), list in data.assumptions as [{"page": "<PAGE_ID>", "panel": null, "text": "<what you chose, in the interface language>"}]. The person reads this list and can change any of it.
-- Do not write page files in this run.
+{{#if opens_from}}- Keep opens_from in issues/{{issue}}/issue.yaml as it is ({{opens_from}}).
+{{/if}}- Do not write page files in this run.

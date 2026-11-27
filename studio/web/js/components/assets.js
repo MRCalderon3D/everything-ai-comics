@@ -3,7 +3,7 @@
 // Approving a candidate is the person's call and is said plainly.
 
 import { h } from '/js/dom.js';
-import { t, tv, formatDate } from '/js/i18n.js';
+import { t, tn, tv, formatDate } from '/js/i18n.js';
 import { api } from '/js/api.js';
 import { frame, openViewer } from '/js/components/viewer.js';
 import { actionButton } from '/js/components/ui.js';
@@ -44,7 +44,23 @@ export async function approveAsset(ctx, candidate, { isLook, hasMaster } = {}) {
     run: (value) => api.approveAsset(ctx.projectId, { candidate: candidate.id, note: value.note || undefined, supersede: hasMaster ? true : undefined }),
   });
   if (!result) return false;
-  toast(isLook ? t('approve.look_done') : t('approve.sheet_done'), { kind: 'ok' });
+  // Characters added before the look was approved have no sheet yet: offer to draw them.
+  let missing = 0;
+  if (isLook) {
+    try {
+      const cast = await api.characters(ctx.projectId);
+      missing = cast.characters.filter((c) => !c.has_master && !c.candidates).length;
+    } catch (err) {
+      missing = 0;
+    }
+  }
+  if (missing) {
+    toast(tn('approve.look_done_sheets', missing), {
+      kind: 'ok', link: { href: `/p/${encodeURIComponent(ctx.projectId)}/characters`, label: t('approve.look_draw_sheets') },
+    });
+  } else {
+    toast(isLook ? t('approve.look_done') : t('approve.sheet_done'), { kind: 'ok' });
+  }
   ctx.refresh();
   return true;
 }

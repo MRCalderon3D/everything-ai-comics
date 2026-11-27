@@ -12,7 +12,12 @@ const timings = require('./timings');
 const { NeedsDecision, OpError } = require('./jobs');
 const { SCAFFOLD_ROOT, abortError } = require('./util');
 
+const { guard } = require('./bible-guard');
+
 const TOOL_LABELS = { claude: 'Claude Code', codex: 'Codex' };
+
+/** Prompt kinds allowed to write the story bible: a change the person asked for in their own words. */
+const UNGUARDED = ['story.update'];
 
 function aiTimeoutMs() {
   const value = Number.parseInt(process.env.STUDIO_AI_TIMEOUT_MS || '', 10);
@@ -62,7 +67,11 @@ async function runAi(ctx, handle, call) {
   const prompt = prompts.build(call.kind, call.vars || {}, Object.assign({ answers: ctx.answers, readOnly: !allowWrite }, context));
   const started = Date.now();
   handle.log(`${TOOL_LABELS[pick.name]} started${pick.model ? ` (${pick.model})` : ''}`);
-  const result = await pick.driver.run({
+  // The story bible is the person's: a run that may write cannot change it
+  // (story.update applies a change the person asked for; reviews and
+  // proposals run read-only). What it tried to add becomes a proposal.
+  const guarded = allowWrite && !UNGUARDED.includes(call.kind);
+  const run = () => pick.driver.run({
     cwd: SCAFFOLD_ROOT,
     addDirs: [project.dir],
     prompt,
@@ -88,8 +97,23 @@ async function runAi(ctx, handle, call) {
       text: call.fakeText || '',
       tool: pick.name,
       allowWrite,
+      images: call.images || [],
     },
   });
+  let bible = { reverted: false, proposal: null };
+  let result;
+  if (guarded) {
+    const out = await guard(project, run, {
+      log: (line) => handle.log(line),
+      job: ctx.job,
+      tool: pick.name,
+      instruction: call.fakeText ? String(call.fakeText).slice(0, 2000) : null,
+    });
+    result = out.result;
+    bible = { reverted: out.reverted, proposal: out.proposal };
+  } else {
+    result = await run();
+  }
   if (ctx.signal.aborted || result.cancelled) throw abortError();
   timings.record(project, {
     tool: pick.name,
@@ -135,6 +159,7 @@ async function runAi(ctx, handle, call) {
     sessionId: result.sessionId || null,
     costUsd: typeof result.costUsd === 'number' ? result.costUsd : null,
     durationMs: result.durationMs || (Date.now() - started),
+    bible,
   });
 }
 

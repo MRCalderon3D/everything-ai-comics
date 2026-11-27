@@ -319,3 +319,11 @@
 .model-option .m-time { grid-row: 1 / span 2; grid-column: 2; font-size: var(--step--1); color: var(--ink-2); text-align: right; font-variant-numeric: tabular-nums; }
 .model-custom { display: flex; gap: 8px; align-items: center; }
 .model-custom input { max-width: 280px; }
+
+/* The issues of the series: the picker the issue screens follow, and the row on the project home. */
+.issue-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.issue-bar .field.inline { flex-direction: row; align-items: center; gap: 8px; margin: 0; }
+.issue-bar select { min-width: 12rem; }
+.home-issues { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: var(--step--1); }
+.chip-link { display: inline-flex; padding: 3px 10px; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--sheet); color: var(--ink); text-decoration: none; }
+.chip-link:hover { background: var(--accent-wash); color: var(--accent); }

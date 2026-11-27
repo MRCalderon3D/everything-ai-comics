@@ -14,10 +14,10 @@ import { openViewer } from '/js/components/viewer.js';
 import { openDialog } from '/js/components/dialog.js';
 import { toast } from '/js/components/toast.js';
 import { pageName, versionName } from '/js/labels.js';
+import { currentIssue, issueBar } from '/js/components/issues.js';
 
 export async function load(ctx) {
-  const issue = state.issue || 'ISS_001';
-  return api.publish(ctx.projectId, issue);
+  return api.publish(ctx.projectId, currentIssue(ctx));
 }
 
 /** Draw the SVG overlay over the render on a canvas and send the PNG to the server. */
@@ -148,7 +148,8 @@ export function view(ctx, data) {
   if (!ready.draft_possible && !data.editions.length) {
     return h('div', { class: 'screen' },
       screenHead({ title: t('screen.publish'), lede: t('publish.lede') }),
-      emptyState(t('publish.empty_title'), t('publish.empty_body'), h('a', { class: 'btn primary', href: `${base}/pages` }, t('screen.pages'))));
+      issueBar(ctx, data.issue),
+      emptyState(t('publish.empty_title'), t('publish.empty_body'), h('a', { class: 'btn primary', href: `${base}/pages?issue=${encodeURIComponent(data.issue)}` }, t('screen.pages'))));
   }
 
   const formatBoxes = h('fieldset', { class: 'format-list' }, h('legend', null, t('publish.formats')),
@@ -215,5 +216,6 @@ export function view(ctx, data) {
 
   return h('div', { class: 'screen' },
     screenHead({ title: t('screen.publish'), lede: t('publish.lede') }),
+    issueBar(ctx, data.issue),
     bench(ctx, { text, images, chat: { key: data.chat_key } }));
 }

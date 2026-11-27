@@ -18,11 +18,10 @@ import { noDrawTool } from '/js/components/handoff.js';
 import { toast } from '/js/components/toast.js';
 import { pageName } from '/js/labels.js';
 import { blockerText } from '/js/screens/home.js';
+import { currentIssue, issueBar } from '/js/components/issues.js';
 
 export async function load(ctx) {
-  const issue = ctx.query.get('issue') || state.issue || 'ISS_001';
-  state.issue = issue;
-  return api.issue(ctx.projectId, issue);
+  return api.issue(ctx.projectId, currentIssue(ctx));
 }
 
 /** The findings of the mechanical checks of an issue or a page. Errors are always shown. */
@@ -140,7 +139,6 @@ export function view(ctx, data) {
   const counts = data.counts;
   const selected = ctx.ui.selected || (ctx.ui.selected = new Set());
   for (const id of [...selected]) if (!pages.some((p) => p.id === id)) selected.delete(id);
-  const issues = state.overview.issues || [];
   const overruled = pages.filter((p) => p.overruled).length;
 
   const toolbar = h('div', { class: 'pages-toolbar' });
@@ -207,10 +205,7 @@ export function view(ctx, data) {
   const text = h('div', { class: 'stack' },
     jobsFor((j) => j.op === 'pages.plan' || j.op === 'pages.generate'),
     plannedAssumptions(ctx, data),
-    issues.length > 1 ? h('div', { class: 'field' },
-      h('label', { for: 'issue-pick' }, t('pages.issue')),
-      h('select', { id: 'issue-pick', onchange: (e) => { state.issue = e.target.value; ctx.refresh(); } },
-        issues.map((i) => h('option', { value: i.id, selected: i.id === data.id }, `${i.number}. ${i.title}`)))) : null,
+    issueBar(ctx, data.id),
     panel(pages.length ? t('pages.more_title') : t('pages.first_title'), planForm(ctx, data)),
     panel(t('mech.title'), mechanicalBox(data.mechanical)),
     disclosure(ctx, 'issue-file', t('pages.advanced_issue'), () => docEditor(ctx, data.issue, { key: 'issue', title: t('pages.issue_file') })));

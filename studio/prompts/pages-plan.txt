@@ -9,7 +9,9 @@ What happens on these pages:
 <<<
 {{text}}
 >>>
-
+{{#if opens_from_file}}
+These are the first pages of an issue that continues the series. The ledger of the first panel of each character starts from {{opens_from_file}}: the same wardrobe, the same state tags, the same props in hand, unless the person's text says what changed (then declare the change: state_changes, transfers, wardrobe_change). check-continuity.js checks the first page against that file.
+{{/if}}
 INSTRUCTIONS FOR THIS RUN
 - Turn the person's text into panels. Add no story event, no line of dialogue and no reveal the person did not write. When the text is short, spend the panels on what it says (establishing shots, reactions, silent beats), not on new events.
 - A page must be drawable, so some things the text does not say have to be filled in: where each figure stands, who holds what, what is in the background, a facial expression. Fill them in plainly, and list every one in data.assumptions as [{"page": "<PAGE_ID>", "panel": "<PANEL_ID or null>", "text": "<what you filled in, in the interface language>"}]. The person reads this list and can change any of it.

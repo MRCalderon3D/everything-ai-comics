@@ -19,11 +19,12 @@ const projectOptions = require('./project-options');
 const publish = require('./ops/publish-build');
 const lettering = require('./ops/lettering-apply');
 const { lookState } = require('./ops/shared');
+const identity = require('./identity');
 const { msg } = require('./i18n');
 const { HttpError } = require('./util');
 
 const ASSET_STEM = /^(CHAR|LOC|PROP|LOOK)_[A-Z][A-Z0-9_]*_V\d{2}$/;
-const SHEET_BY_TAG = { TURN: 'turnaround', EXPR: 'expressions', WARD: 'wardrobe', PLATE: 'plate', SHEET: 'prop', DETAIL: 'detail', REF: 'reference' };
+const SHEET_BY_TAG = { MODEL: 'model', TURN: 'turnaround', EXPR: 'expressions', WARD: 'wardrobe', PLATE: 'plate', SHEET: 'prop', DETAIL: 'detail', REF: 'reference' };
 
 function safe(fn, fallback) {
   try {
@@ -472,6 +473,8 @@ function characterSummary(project, id) {
   const doc = safe(() => S.ws.loadCharacter(project.root, id), null) || {};
   const assets = entityAssets(project, id);
   const approved = assets.masters.filter((m) => m.status === 'approved');
+  // A photo is a likeness source, not an identity: only an approved drawn sheet counts.
+  const chain = safe(() => identity.identityState(project.root, id), null) || { master: null, identity: null, photos: [], photos_only: false, needs_master: true };
   return {
     id,
     name: doc.name || id,
@@ -481,7 +484,8 @@ function characterSummary(project, id) {
     file: `characters/${id}/character.yaml`,
     image: entityThumb(assets),
     has_master: approved.length > 0,
-    has_identity: approved.length > 0 || assets.references.some((r) => r.status === 'approved'),
+    has_identity: !!chain.identity,
+    identity: chain,
     candidates: assets.candidates.filter((c) => !c.promoted_to).length,
     references: assets.references.length,
     chat_key: `character:${id}`,
@@ -503,12 +507,17 @@ function character(project, id) {
   }
   const assets = entityAssets(project, id);
   const sheets = {};
-  for (const kind of ['turnaround', 'expressions', 'wardrobe', 'detail']) {
+  // Each candidate carries the identity check it had against the master, when it was drawn from one.
+  for (const c of assets.candidates) c.check = identity.checkOf(project, c.id);
+  for (const kind of ['model', 'turnaround', 'expressions', 'wardrobe', 'detail']) {
     sheets[kind] = {
       master: assets.masters.filter((m) => m.sheet === kind && m.status === 'approved').pop() || null,
       candidates: assets.candidates.filter((c) => c.sheet === kind),
     };
   }
+  // Every version of the full sheet, oldest first: a master stands for the candidate it was made from.
+  const versions = [...assets.masters.filter((m) => m.sheet === 'model'), ...assets.candidates.filter((c) => c.sheet === 'model' && !c.promoted_to)]
+    .sort((a, b) => a.version - b.version);
   const usedOn = [];
   for (const issue of S.ws.listIssues(root)) {
     for (const entry of S.ws.listPages(root, issue)) {
@@ -524,6 +533,8 @@ function character(project, id) {
     packages: packagesIn(project, `characters/${id}/refs/prompts`),
     used_on: usedOn,
     look_approved: lookState(project).frozen,
+    model_versions: versions,
+    sheet_plan: safe(() => identity.sheetPlan(root, id), { closeups: [], poses: [], saved: false }),
   });
 }
 
@@ -1035,7 +1046,7 @@ function overview(project, services) {
 }
 
 module.exports = {
-  entityAssets, reviewView, renderList, readablePlan, planApproval,
+  entityAssets, reviewView, renderList, readablePlan, planApproval, pageSummary, coverSummary,
   projectCard, overview, story, style, characters, character, entities, entity,
   issues, issue, page, cover, publishScreen, issueIds, requireIssueId,
 };

@@ -31,7 +31,10 @@ commands in pipeline order is in [commands/README.md](../commands/README.md).
 This guide is for working from an editor. The same pipeline can be run from
 the browser with the web studio: `npm run studio` starts it, and
 [studio/README.md](../studio/README.md) explains it. A project made in one
-opens in the other.
+opens in the other. In the studio every step can also be asked for in its
+conversation, which proposes the step as a card you run, and a finished
+issue can be continued with the next one (`opens_from` and the end state of
+section 12 are written for you).
 
 ## 1. Get set up
 
@@ -259,7 +262,10 @@ identity, a style, a wardrobe, a place, an object), writes what it finds
 into the bibles as drafts, moves the file to its home, and registers it in
 `production/references/manifest.yaml` with one `default_role`. A photograph
 of a face is an identity reference and says nothing about how the comic is
-drawn. A page by another artist is a style reference, and its faces belong
+drawn. It is shown to the drawing tool once, for the character's first
+turnaround or full character sheet. After you approve that sheet, the
+sheet is the face, and expressions, outfits, pages and the cover are drawn
+from it. A page by another artist is a style reference, and its faces belong
 to nobody in your cast.
 
 ```
@@ -268,8 +274,11 @@ to nobody in your cast.
 
 This is the first command that can spend money. It produces the reference
 images that every page conditions on, in a fixed order: the look page first,
-then each character's turnaround, then expression and wardrobe sheets, then
-location plates and props. A sheet whose parent is not approved is blocked.
+then each character's turnaround or full character sheet, then expression
+and wardrobe sheets, then location plates and props. A sheet whose parent is
+not approved is blocked: `compile-prompts.js` refuses an expression or
+wardrobe sheet until the character has an approved turnaround or full
+sheet.
 
 The script calls behind it compile one prompt package per sheet and run it:
 
@@ -292,9 +301,15 @@ generate-assets: 1 package(s), mode: DRY RUN
     target:  characters/CHAR_OSKAR/refs/CHAR_OSKAR_EXPR_V01.png
 ```
 
-`--sheet` takes `turnaround`, `expressions`, or `wardrobe` for a character,
-`plate` for a location, `prop` for a prop, `look` for a look, and `detail`
-with `--subject` for a close study of any entity. `--outfit` picks the
+`--sheet` takes `turnaround`, `model`, `expressions`, or `wardrobe` for a
+character, `plate` for a location, `prop` for a prop, `look` for a look, and
+`detail` with `--subject` for a close study of any entity. `model` is the
+full character sheet: the name, the turnaround, labelled close-ups of what
+identifies the character and a labelled row of expressions and poses, from
+the `sheet` block of `character.yaml` or from `--closeups` and `--poses`.
+Change it round by round with `--revise <CHAR_ID>_MODEL_V## --changes
+"shorter hair; the scar on the other arm"`: the version you name is edited
+into the next one and everything you did not name stays. `--outfit` picks the
 wardrobe state for a wardrobe sheet, `--expressions` the list for an
 expression sheet, and `--time` the time of day of a plate. Wardrobe and
 detail packages carry the outfit ID or a slug of the subject in their file

@@ -306,6 +306,8 @@ export function startJobs() {
   bus.on('repaint', paintDrawer);
   bus.on('job-ended', (job) => {
     if (job.op === 'chat.turn') return;
+    // A job started from a card of the conversation reports there, with its images and links.
+    if (job.origin) return;
     const link = jobLink(job);
     const here = link && location.pathname === link;
     // On the screen that shows the result, a finished job needs no announcement.
