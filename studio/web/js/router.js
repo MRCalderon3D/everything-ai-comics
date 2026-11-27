@@ -7,7 +7,7 @@ import { h, mount } from '/js/dom.js';
 import { t } from '/js/i18n.js';
 import { errorText } from '/js/api.js';
 import { state, bus, openProject, closeProject, setScreen } from '/js/store.js';
-import { motionReduced } from '/js/gl/stage.js';
+import { motionReduced, releaseStage } from '/js/gl/stage.js';
 import { openScreen } from '/js/unseen.js';
 
 const routes = [];
@@ -107,8 +107,18 @@ function makeContext(found, path) {
     hasUnsaved: () => dirty.size > 0,
     /** Build something once and keep the same node across refreshes (the chat panel). */
     persist(key, factory) {
-      if (!keep.has(key)) keep.set(key, factory());
+      if (!keep.has(key)) {
+        const node = factory();
+        // A kept 3D stage pauses while a refresh takes it out of the page.
+        if (node && typeof node === 'object') node.persistent = true;
+        keep.set(key, node);
+      }
       return keep.get(key);
+    },
+    /** The screen is left: kept 3D stages let their graphics go. */
+    release() {
+      for (const node of keep.values()) releaseStage(node);
+      keep.clear();
     },
     cleanup() {
       for (const fn of cleanups.splice(0)) {
@@ -186,7 +196,10 @@ async function render() {
   const main = document.getElementById('main');
   const path = location.pathname;
   const found = match(path);
-  if (current) current.ctx.cleanup();
+  if (current) {
+    current.ctx.cleanup();
+    current.ctx.release();
+  }
   current = null;
   clearTimeout(refreshTimer);
   if (!found) {

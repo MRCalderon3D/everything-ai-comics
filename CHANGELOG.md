@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Web studio, 3D scenes: the style ring (and the other 3D stages) could show
+  its pages squashed or stretched. The stage measured itself with
+  `getBoundingClientRect`, which includes the page-turn animation, and kept
+  that size after the animation ended; it now uses the layout size. A stage
+  kept across refreshes also ended when a refresh took it out of the page,
+  leaving a frozen frame that stretched with the next width; kept stages now
+  pause while out of the page and end when their screen is left.
 - Web studio, design pass: `studio/design/PRODUCT.md` and
   `studio/design/DESIGN.md` record who the studio is for and its visual
   system. Fixes from an audit of every screen in both themes and languages:

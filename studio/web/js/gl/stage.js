@@ -112,6 +112,7 @@ async function start(el, canvas, build, onReady) {
     el.dataset.gl = 'off';
     return;
   }
+  if (el.released) return;
   if (!document.contains(el)) {
     // Built for a screen that is already gone; a later mount starts again.
     el.dataset.gl = 'pending';
@@ -145,10 +146,12 @@ async function start(el, canvas, build, onReady) {
     return;
   }
 
+  // The layout size, not getBoundingClientRect: the page-turn animation
+  // transforms the screen, and a size measured mid-turn stayed after it,
+  // stretching every page in the scene. A transform ending fires no resize.
   const size = () => {
-    const rect = el.getBoundingClientRect();
-    const w = Math.max(1, Math.round(rect.width));
-    const hgt = Math.max(1, Math.round(rect.height));
+    const w = Math.max(1, el.clientWidth);
+    const hgt = Math.max(1, el.clientHeight);
     renderer.setSize(w, hgt, false);
     if (sceneApi.resize) sceneApi.resize(w, hgt);
     invalidate();
@@ -157,7 +160,8 @@ async function start(el, canvas, build, onReady) {
   function frame(now) {
     state.raf = 0;
     if (state.disposed) return;
-    if (!document.contains(el)) { dispose(); return; }
+    // A stage the screen keeps across refreshes may come back: it only pauses.
+    if (!document.contains(el)) { if (!kept(el)) dispose(); return; }
     const dt = state.last ? Math.min(0.1, (now - state.last) / 1000) : 0.016;
     state.last = now;
     let keep = false;
@@ -232,10 +236,27 @@ async function start(el, canvas, build, onReady) {
   if (onReady) onReady(el.controller);
 }
 
+/**
+ * True for a stage a screen keeps across refreshes (ctx.persist) and has not
+ * let go yet. A refresh takes it out of the page and puts it back, so being
+ * out of the page for a moment must not end it: an ended stage left its last
+ * frame on the canvas, stretched to whatever width the stage had next.
+ */
+function kept(el) {
+  return !!el.persistent && !el.released;
+}
+
+/** The screen that kept this stage is gone: end it now. */
+export function releaseStage(el) {
+  if (!el) return;
+  el.released = true;
+  if (el.controller) el.controller.dispose();
+}
+
 // A stage removed from the page lets its graphics context go even while it
-// is not drawing.
+// is not drawing. Kept stages end when their screen releases them.
 setInterval(() => {
   for (const s of [...live]) {
-    if (!document.contains(s.el) && s.el.controller) s.el.controller.dispose();
+    if (!document.contains(s.el) && !kept(s.el) && s.el.controller) s.el.controller.dispose();
   }
 }, 3000);

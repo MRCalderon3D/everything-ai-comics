@@ -115,6 +115,13 @@ function checkThree() {
   assert.ok(/prefers-reduced-motion/.test(stage), 'the 3D layer does not respect reduced motion');
   assert.ok(/IntersectionObserver/.test(stage) && /visibilitychange/.test(stage), 'the 3D layer does not pause off screen or in a hidden tab');
   assert.ok(/getContext\('webgl2'\)|getContext\('webgl'\)/.test(stage) && /gl-fallback/.test(stage), 'the 3D layer has no WebGL check or flat fallback');
+  // A size measured with getBoundingClientRect includes the page-turn transform
+  // and stretched the scenes; the drawing size must come from the layout.
+  const sizeFn = (stage.match(/const size = \(\) => \{[\s\S]*?\n {2}\};/) || [''])[0];
+  assert.ok(/clientWidth/.test(sizeFn) && !/getBoundingClientRect/.test(sizeFn), 'the 3D stage sizes its canvas from a transformed rect');
+  // Stages kept across refreshes pause while out of the page and end with their screen.
+  const router = code(read(path.join(WEB, 'js', 'router.js')));
+  assert.ok(/releaseStage/.test(stage) && /\.release\(\)/.test(router), 'kept 3D stages are not released when their screen is left');
 }
 
 function checkNoNetwork() {
