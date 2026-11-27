@@ -74,9 +74,11 @@ function createServer(options = {}) {
   // The model lists of the installed tools are looked up once at start (and on request).
   drivers.refreshModels().catch(() => {});
   if (options.previewsDir) require('./looks').setPreviewsDir(options.previewsDir);
-  const services = { registry, events, drivers, ops, fake, touched: new Map() };
+  const services = { registry, events, drivers, ops, fake };
   const jobs = new JobManager({ events, ops, services });
   services.jobs = jobs;
+  // After a step that wrote files: the characters, places and objects it added, and possible duplicates.
+  services.inspectStep = (project, job, step, changes, before) => require('./entities').inspectStep(project, job, step, changes, before);
   // A job started from a card of the conversation posts its result back there.
   services.onJobSettled = (project, job) => require('./actions').jobSettled(services, project, job);
   const webDir = options.webDir || path.join(STUDIO_ROOT, 'web');

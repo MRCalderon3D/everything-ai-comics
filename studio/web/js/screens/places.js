@@ -10,6 +10,8 @@ import { panel, actionButton, checkField, emptyState } from '/js/components/ui.j
 import { askForm, queueOp } from '/js/components/ask.js';
 import { jobsFor } from '/js/components/jobs.js';
 import { frame } from '/js/components/viewer.js';
+import { newsBar, newsMark } from '/js/components/news.js';
+import { cleanupButton } from '/js/components/deleting.js';
 
 export async function load(ctx) {
   return api.entities(ctx.projectId);
@@ -21,6 +23,7 @@ function entityCard(ctx, kind, e) {
     h('a', { href, class: 'cast-art', 'aria-label': t('places.open', { name: e.name || e.id }) },
       frame(e.image, { alt: e.name || e.id, ratio: '3 / 2', placeholder: kind === 'location' ? t('places.no_plate') : t('places.no_prop_sheet') })),
     h('h3', null, h('a', { href }, e.name || e.id)),
+    newsMark(`${kind}:${e.id}`),
     e.summary ? h('p', { class: 'muted clamp' }, e.summary) : null,
     h('p', { class: 'small faint' }, e.has_master ? t('places.has_master') : (e.candidates ? tn('characters.candidates_waiting', e.candidates) : t('places.text_only'))));
 }
@@ -35,6 +38,7 @@ export function view(ctx, data) {
     hint: canDraw ? t('places.plates_hint') : t('places.plates_blocked'),
   });
   const text = h('div', { class: 'stack' },
+    newsBar('places'),
     jobsFor((j) => j.op === 'entities.derive'),
     panel(t('places.derive_title'),
       h('p', { class: 'muted' }, t('places.derive_body')),
@@ -64,6 +68,6 @@ export function view(ctx, data) {
     : emptyState(t('places.empty_title'), t('places.empty_body'),
       h('a', { class: 'btn', href: `/p/${encodeURIComponent(ctx.projectId)}/pages` }, t('screen.pages')));
   return h('div', { class: 'screen' },
-    screenHead({ title: t('screen.places'), lede: t('places.lede') }),
+    screenHead({ title: t('screen.places'), lede: t('places.lede'), actions: any ? [cleanupButton(ctx, 'places')] : null }),
     bench(ctx, { text, images, chat: { key: data.chat_key } }));
 }

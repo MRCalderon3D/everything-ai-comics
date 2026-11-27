@@ -12,8 +12,12 @@
  * chat did so far), the files the person attached, and the catalog of
  * actions (studio/server/actions.js). The reply may propose actions
  * (`data.actions`), which become cards the person runs or dismisses, and
- * may run cards the person confirmed in words (`data.run_actions`). The turn
- * itself never starts a job or approves anything on its own.
+ * may run cards the person confirmed in words (`data.run_actions`). A card
+ * the person's current message asks for explicitly ("draw the look page",
+ * "acepta toda la propuesta") carries `run: true` and starts in the same
+ * turn, drawing included, with run_by "request"; deletes and merges always
+ * wait (actions.ALWAYS_CONFIRM). Anything the model suggests on its own
+ * waits for a click.
  *
  * When another job runs, the turn runs in the read-only lane of the queue
  * (studio/server/jobs.js): it answers and proposes, and changes no file.
@@ -217,8 +221,19 @@ module.exports = {
     const message = Object.assign({}, stored, { actions: proposed.cards });
     emit(message);
 
-    // Cards the person confirmed in words, then text-only cards when the setting allows it.
+    // Cards the person asked for in this very message ("draw the look page", "acepta toda la
+    // propuesta") start now, drawing included; cards the model only suggests wait for a click.
     const ran = [];
+    for (const card of proposed.cards.filter((c) => c.requested)) {
+      try {
+        const out = await actions.runCard(services, project, convId, card.id, { by: 'request' });
+        ran.push({ card: card.id, status: out.card.status, job: out.job ? out.job.id : null, requested: true });
+        ctx.log(`ran card ${card.id} (${card.action}) at once: the person's message asked for it`);
+      } catch (err) {
+        ctx.log(`card ${card.id} could not run: ${err.message}`);
+      }
+    }
+    // Cards the person confirmed in words, then text-only cards when the setting allows it.
     const asked = Array.isArray(reply.data && reply.data.run_actions) ? reply.data.run_actions.map(String).slice(0, 6) : [];
     for (const id of asked) {
       if (!pendingCards.includes(id)) {
@@ -234,7 +249,7 @@ module.exports = {
       }
     }
     if (project.settings().chat_auto_run) {
-      for (const card of proposed.cards.filter((c) => c.auto)) {
+      for (const card of proposed.cards.filter((c) => c.auto && !c.requested)) {
         try {
           const out = await actions.runCard(services, project, convId, card.id, { by: 'auto' });
           ran.push({ card: card.id, status: out.card.status, job: out.job ? out.job.id : null });

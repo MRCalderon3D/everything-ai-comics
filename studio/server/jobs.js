@@ -76,7 +76,7 @@ function view(job) {
   const out = {};
   for (const key of ['id', 'project', 'op', 'title', 'params', 'status', 'created_at', 'started_at', 'ended_at',
     'current_step', 'steps', 'questions', 'answers', 'result', 'error', 'tools', 'commits', 'position', 'cost_usd',
-    'read_only', 'origin', 'story_proposals']) {
+    'read_only', 'origin', 'story_proposals', 'added_entities']) {
     out[key] = job[key] === undefined ? null : job[key];
   }
   return out;
@@ -332,6 +332,33 @@ class JobManager {
     return view(job);
   }
 
+  // --- who wrote what ---------------------------------------------------------
+
+  /** Start tracking a step that may write: what the person does meanwhile is claimed away from it. */
+  startTracking(project) {
+    if (!this.trackers) this.trackers = new Map();
+    if (!this.trackers.has(project.id)) this.trackers.set(project.id, new Set());
+    const tracker = { claimed: new Set() };
+    this.trackers.get(project.id).add(tracker);
+    return tracker;
+  }
+
+  endTracking(project, tracker) {
+    if (!tracker || !this.trackers || !this.trackers.has(project.id)) return;
+    this.trackers.get(project.id).delete(tracker);
+  }
+
+  /**
+   * Workspace-relative paths an action of the person changed (a save, an
+   * approval, a delete). Every step running now leaves them out of its own
+   * diff and commit.
+   */
+  claimPaths(project, paths) {
+    const set = this.trackers ? this.trackers.get(project.id) : null;
+    if (!set || !set.size) return;
+    for (const tracker of set) for (const p of paths) tracker.claimed.add(p);
+  }
+
   // --- running ---------------------------------------------------------------
 
   log(project, job, line, stepId) {
@@ -537,6 +564,7 @@ class JobManager {
     // A read-only turn runs beside a job that writes: what changes on disk now is that job's.
     const readOnly = !!job.read_only;
     const before = readOnly ? null : snapshot(project.root, []);
+    const tracker = readOnly ? null : this.startTracking(project);
     const handle = {
       setTool: (name) => {
         step.tool = name;
@@ -562,11 +590,16 @@ class JobManager {
     } catch (err) {
       changes = [];
     }
-    // Files the person saved or approved while this step ran are theirs, not the step's.
-    const manual = this.services.touched && !readOnly ? this.services.touched.get(project.id) : null;
-    if (manual && manual.size) {
-      changes = changes.filter((c) => !manual.has(c.path));
-      manual.clear();
+    // Files the person saved, approved or deleted while this step ran are
+    // theirs: they went into their own commit, never into this one.
+    this.endTracking(project, tracker);
+    if (tracker && tracker.claimed.size) changes = changes.filter((c) => !tracker.claimed.has(c.path));
+    if (!readOnly && changes.length && typeof this.services.inspectStep === 'function') {
+      try {
+        this.services.inspectStep(project, job, step, changes, before);
+      } catch (err) {
+        if (process.env.STUDIO_DEBUG) console.error(err);
+      }
     }
     if (changes.length) {
       const suffix = failure
@@ -576,7 +609,8 @@ class JobManager {
       let commit = null;
       try {
         // Commit messages are in English: the person reads the activity log, which is localized.
-        commit = await git.commitAll(project.dir, i18n.render('en', title));
+        // Only this step's own files: anything else changing on disk is someone else's.
+        commit = await git.commitPaths(project.dir, i18n.render('en', title), changes.map((c) => `production/${c.path}`));
       } catch (err) {
         commit = null;
       }

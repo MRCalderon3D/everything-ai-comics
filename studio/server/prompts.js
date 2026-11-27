@@ -216,6 +216,8 @@ function build(kind, vars, context) {
     // The contract has two wordings: one for runs that write, one for read-only runs.
     writes: !context.readOnly,
     read_only: !!context.readOnly,
+    // The characters, places and objects that already have an ID (entities.knownText).
+    known_entities: context.knownEntities || '',
   };
   const all = Object.assign({}, vars, shared);
   const parts = [render(template('header.txt'), all).trim(), render(template(file), all).trim()];

@@ -233,7 +233,20 @@ in this project or taken from the run below. A proposal that does not check
 out is left out, with the reason in the reply and in the job log.
 
 The model proposes and the server runs. A card runs when the person clicks
-Run, or when they confirm in words and the next reply names the card. An
+Run, or when they confirm in words and the next reply names the card. When
+the message itself asks for exactly that action, now ("draw the look page",
+"acepta toda la propuesta"), the reply marks the card `run` and it starts in
+the same turn, drawing included, and the card says it ran on the person's
+request. A card the model only suggests waits. A delete or a merge always
+waits for a click.
+
+Cards proposed together are a sequence. "Approve the plan of page 1 and draw
+it" gives two cards; the drawing would be refused on its own, because the
+plan is not approved yet, so it is kept as "after card 1", checked again
+when its turn comes, and runs once the approval is done. If the first card
+fails or is dismissed, the second is cancelled with the reason. A card's
+parameters show with plain labels and the names of characters and places;
+the raw names stay under "Details". An
 operation goes through the normal queue, with its progress shown live on the
 card; a decision runs through the same code as the screen's button. Work
 that only writes text may start at once if the person turns that on in
@@ -275,6 +288,67 @@ the character file to match (a story fact becomes a proposal, as for any
 run), then edits the chosen version into the next one with everything else
 locked. Approving a version makes it the face; approving another later
 replaces it, so the person can go back.
+
+## What a page plan adds
+
+Planning pages from the person's text can create the files of people,
+places and objects the text describes and nobody had written yet: two
+unnamed attackers and a child, say. They need a file to stay the same from
+panel to panel. After every step that wrote files the studio lists the ones
+it created on the job, and the Pages screen shows them under "What the plan
+added", each with a link, "needs a sheet" for a character, and buttons to
+rename it or edit it.
+
+Before a step creates someone, its prompt lists every ID the project
+already knows: entity files, the characters of the story bible, and the
+characters of story proposals still waiting for the person, and asks to
+reuse an ID for the same person. A word check runs after the step as well
+(`server/entities.js`): a new file whose name and description match one of
+those is flagged "may be the same as", with a button to merge it into that
+one, or to take its ID when only the story names it so far.
+
+A merge (`server/entity-edit.js`) points every reference of the merged ID
+at the one kept, in pages, scenes, the story bible, open proposals and
+wardrobe; the one kept keeps its file and its sheets, and the merged name
+becomes an alias. A rename moves the files, sheets and every reference to the
+new ID and leaves approved page plans approved. Both run the workspace
+checks before and after and say if they broke anything.
+
+While a page plan is being written, the plan's checks are not run for its
+issue: they would report pages that do not exist yet. The Pages and page
+screens say "planning page 6 of 12" instead.
+
+## What changed while you were away
+
+Sheets, plans and pages take minutes, and the person keeps working
+elsewhere. When a job ends, its screen gets a dot with a count in the side
+navigation (the collapsed rail keeps it), and the item inside the screen
+gets a marker with one short line: "new expressions sheet", "page 4 drawn,
+needs review", "the plan is ready". A job that failed or waits for an answer
+counts too, in red, and comes first. An item stops being new when the person
+opens it; it keeps its marker until they leave, so they see what changed.
+Each screen has "Mark all as seen". The seen state lives in the browser per
+project (`web/js/unseen.js`), survives a reload, and is built from the jobs
+the server already sends; the chat's result messages carry the same dots.
+With reduced motion the dots appear without animation.
+
+## Deleting
+
+Every image that is not in use has a delete control: sheet candidates and
+old masters, look pages, page versions and repair attempts, cover versions,
+uploads, draft editions. A whole character, place or prop can go, and the
+last page of an issue. "Clean up unused tries" on a screen lists every
+unused try there, all ticked, to delete at once.
+
+One module (`server/deletion.js`) knows what belongs to each thing (the
+file, its registry entry, its generation record, the reviews of a render,
+the references in character files and plans) and what uses it. It refuses,
+saying what to do first, when pages were drawn from it, an edition ships
+it, or a planned page lists it. Deleting an approved master asks twice and
+lists what depends on it. Each delete is one commit, so History can bring it
+back; uploads live outside the history, and the confirmation says so. The
+workspace checks run after, and the answer says if anything broke. The chat
+can delete too, always as a card the person runs.
 
 ## The next issue
 
@@ -428,10 +502,13 @@ on other screens while a job runs: nothing here is quick.
 
 ## History
 
-After every step that changed files the studio commits the project directory
-with a readable message, under its own identity (`Comics Studio
+After every step that changed files the studio commits the files of that
+step, and only those, with a readable message, under its own identity (`Comics Studio
 <studio@localhost>`), so nothing depends on the person's git configuration.
-Every entry of the activity log links to its commit. Restoring an earlier
+Every entry of the activity log links to its commit. An approval, a save or
+a delete made while a job writes in the same workspace commits only its own
+files: the job's files stay in the job's commits, so undoing the approval
+takes back the approval alone. Restoring an earlier
 point makes a new commit that brings the workspace back to that state: files
 added later leave the workspace and stay in git, so the later state can be
 restored too. The same repository answers two read-only questions for the
@@ -487,7 +564,10 @@ lists (read from files in a temporary home), cancel, questions and answers,
 the event stream, the checks above, and the command lines built for both
 tools. Two of them make a whole comic: one only through the conversation
 endpoints (messages, cards, answers), one mixing screens and conversation.
-No test starts a real CLI.
+Others cover a commit made while another writer is busy in the same
+workspace, possible duplicates with merge and rename, deletes and their
+refusals, and chat cards that run in order on an explicit request. No test
+starts a real CLI.
 `studio/test-support/record-api-examples.js` refreshes the examples in the
 API reference from such a run.
 

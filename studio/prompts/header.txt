@@ -10,3 +10,8 @@ LANGUAGE
 - Project language: {{language}}. The story is written in it: the prose of the workspace files (premise, descriptions, panel moments), dialogue, captions, sound effects and every other piece of lettering.
 - IDs, enum values, file names and field names stay in English.
 - These three lines override any other language preference you may have loaded from your own settings, memory or instruction files.
+{{#if known_entities}}
+IDS THAT ALREADY EXIST
+These characters, places and objects already have an ID: in a file, in the story bible, or in a story proposal still waiting for the person. Before you create or name a character, place or prop, match it against this list by who or what it is (the name, the look, the part it plays in the text), not by the words of the ID. When it is the same person, place or object, use the ID on the list, even when it has no file yet, and do not make a second one. Make a new ID only for someone or something that is not on the list, and say so under "decisions".
+{{known_entities}}
+{{/if}}

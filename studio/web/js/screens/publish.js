@@ -15,6 +15,8 @@ import { openDialog } from '/js/components/dialog.js';
 import { toast } from '/js/components/toast.js';
 import { pageName, versionName } from '/js/labels.js';
 import { currentIssue, issueBar } from '/js/components/issues.js';
+import { newsBar } from '/js/components/news.js';
+import { deleteButton, cleanupButton } from '/js/components/deleting.js';
 
 export async function load(ctx) {
   return api.publish(ctx.projectId, currentIssue(ctx));
@@ -111,7 +113,7 @@ function readerTabLink(exp, { small = true } = {}) {
     icon('open'), h('span', null, t('publish.reader_tab')));
 }
 
-function editionCard(ed, formatLabel) {
+function editionCard(ctx, ed, formatLabel) {
   const draft = ed.status === 'draft';
   return h('li', { class: 'edition', dataset: { status: ed.status } },
     h('div', { class: 'row spread' },
@@ -119,6 +121,7 @@ function editionCard(ed, formatLabel) {
       h('span', { class: `edition-state ${ed.status}` }, tv('edition_status', ed.status, ed.status))),
     h('p', { class: 'small faint', title: ed.id }, `${formatDate(ed.created_at)}. ${tn('publish.edition_pages', ed.pages)}${ed.cover ? `. ${t('publish.with_cover')}` : ''}`),
     draft ? h('p', { class: 'small' }, t('publish.draft_note')) : null,
+    draft ? h('div', { class: 'row' }, deleteButton(ctx, { kind: 'edition', id: ed.id }, { label: t('publish.delete_draft') })) : null,
     ed.changes && ed.changes.length ? h('ul', { class: 'bullets small' }, ed.changes.map((c) => h('li', null, typeof c === 'string' ? c : JSON.stringify(c)))) : null,
     ed.exports && ed.exports.length
       ? h('ul', { class: 'export-list' }, ed.exports.map((exp) => {
@@ -173,6 +176,7 @@ export function view(ctx, data) {
   const blockers = ready.blockers || [];
   const formatLabel = (id) => (data.formats.find((f) => f.id === id) || {}).label || id;
   const text = h('div', { class: 'stack' },
+    newsBar('publish'),
     jobsFor((j) => j.op === 'publish.build' || j.op === 'lettering.apply'),
     h('section', { class: `panel stack-s readiness ${ready.final_possible ? 'ok' : 'wait'}` },
       h('h2', { class: 'panel-title' }, ready.final_possible ? t('publish.ready_final') : t('publish.ready_draft')),
@@ -211,11 +215,11 @@ export function view(ctx, data) {
     h('section', { class: 'stack-s' },
       h('h2', { class: 'panel-title' }, t('publish.editions_title')),
       data.editions.length
-        ? h('ul', { class: 'edition-list' }, data.editions.map((ed) => editionCard(ed, formatLabel)))
+        ? h('ul', { class: 'edition-list' }, data.editions.map((ed) => editionCard(ctx, ed, formatLabel)))
         : h('p', { class: 'muted' }, t('publish.no_editions'))));
 
   return h('div', { class: 'screen' },
-    screenHead({ title: t('screen.publish'), lede: t('publish.lede') }),
+    screenHead({ title: t('screen.publish'), lede: t('publish.lede'), actions: data.editions.length > 1 ? [cleanupButton(ctx, `publish:${data.issue}`)] : null }),
     issueBar(ctx, data.issue),
     bench(ctx, { text, images, chat: { key: data.chat_key } }));
 }

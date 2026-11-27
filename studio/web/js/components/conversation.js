@@ -25,6 +25,7 @@ import { toast } from '/js/components/toast.js';
 import { dockFloats, dockExpanded, setLayout, setTransient, resizeHandle } from '/js/layout.js';
 import { jobCard, liveNode } from '/js/components/jobs.js';
 import { openViewer } from '/js/components/viewer.js';
+import { newsFor } from '/js/unseen.js';
 
 let root = null;
 let conv = null; // the current conversation
@@ -185,6 +186,36 @@ async function dismissCard(card) {
   }
 }
 
+/** A parameter of a card in plain words: its label from the dictionary, else the name with spaces. */
+function paramLabel(name) {
+  const label = t(`param.${name}`);
+  return label === `param.${name}` ? String(name).replace(/_/g, ' ') : label;
+}
+
+/**
+ * The parameters of a card: plain labels and values; the raw names and the
+ * values as sent stay under a "Details" toggle.
+ */
+function cardDetails(card) {
+  const details = card.details || [];
+  if (!details.length) return null;
+  return h('div', { class: 'action-params' },
+    h('dl', { class: 'action-details plain' }, details.map((d) => [h('dt', null, paramLabel(d.name)), h('dd', null, d.name === 'sheet' ? tv('sheet', d.value, d.value) : d.value)])),
+    h('details', { class: 'action-raw' },
+      h('summary', { class: 'small muted' }, t('card.raw_details')),
+      h('dl', { class: 'action-details' }, Object.entries(card.params || {}).map(([name, value]) => [h('dt', null, h('code', null, name)),
+        h('dd', null, h('code', null, typeof value === 'string' ? value : JSON.stringify(value)))]))));
+}
+
+/** The news marker of a screen a card or result links to (unseen.js). */
+function linkNews(link) {
+  const key = String(link.key || link.screen || '');
+  const item = /^pages:/.test(key) ? key.replace(/^pages:/, 'plan:') : key;
+  const list = item ? newsFor(item) : [];
+  if (!list.length) return null;
+  return h('span', { class: `news-dot${list.some((e) => e.tone === 'alert') ? ' alert' : ''}`, title: t('unseen.new'), 'aria-label': t('unseen.new') });
+}
+
 /** What a card does, its tool and time, and Run / Dismiss while it waits. A running card shows its job live. */
 function actionCard(card) {
   const pending = card.status === 'pending';
@@ -199,25 +230,28 @@ function actionCard(card) {
     h('div', { class: 'action-head' }, h('strong', null, card.title), status),
     h('p', { class: 'small muted' }, card.summary),
     card.why ? h('p', { class: 'action-why' }, h('span', { class: 'muted' }, t('card.why')), ' ', card.why) : null,
-    card.details && card.details.length
-      ? h('dl', { class: 'action-details' }, card.details.map((d) => [h('dt', null, d.name), h('dd', null, d.value)]))
-      : null,
+    cardDetails(card),
+    card.after ? h('p', { class: 'small action-after' }, icon('right'), ' ', t('card.after', { n: card.after.n, title: card.after.title || '' })) : null,
     card.uploads && card.uploads.length ? uploadThumbs(card.uploads) : null,
     card.photo_rights ? h('p', { class: 'notice warn small' }, t('characters.photo_rights')) : null,
     h('p', { class: 'action-meta small' }, cardTools(card), card.tools && card.tools.length ? ' · ' : '', cardTime(card)),
     pending && card.draws ? h('p', { class: 'small action-warn' }, icon('alert'), ' ', t('card.draws')) : null,
     pending && card.decision ? h('p', { class: 'small action-warn' }, icon('alert'), ' ', t('card.decision')) : null,
+    pending && card.always_confirm ? h('p', { class: 'small action-warn' }, icon('alert'), ' ', t('card.always_confirm')) : null,
+    card.status === 'waiting' ? h('p', { class: 'small muted' }, t('card.waiting_for', { n: card.after ? card.after.n : '?' })) : null,
+    card.status === 'cancelled' && card.error ? h('p', { class: 'small muted' }, error) : null,
     pending
       ? h('div', { class: 'row' },
         button(t('card.run'), { kind: card.draws ? 'accent' : 'primary', small: true, onclick: () => runCard(card) }),
         button(t('card.dismiss'), { kind: 'quiet', small: true, onclick: () => dismissCard(card) }))
       : null,
     card.run_by === 'text' && !pending ? h('p', { class: 'small muted' }, t('card.by_text')) : null,
+    card.run_by === 'request' && !pending ? h('p', { class: 'small muted' }, t('card.by_request')) : null,
     card.run_by === 'auto' && !pending ? h('p', { class: 'small muted' }, t('card.by_auto')) : null,
     card.status === 'dismissed' ? h('p', { class: 'small muted' }, t('card.dismissed')) : null,
     card.status === 'done' && card.kind === 'direct' ? h('p', { class: 'small state-ok' }, t('card.done')) : null,
     card.status === 'failed' ? h('p', { class: 'small bad' }, t('card.failed'), ' ', error) : null,
-    card.links && card.links.length ? h('div', { class: 'msg-links' }, card.links.map((l) => h('a', { href: l.route }, icon('right'), h('span', null, l.label || l.screen_label)))) : null,
+    card.links && card.links.length ? h('div', { class: 'msg-links' }, card.links.map((l) => h('a', { href: l.route }, icon('right'), h('span', null, l.label || l.screen_label), linkNews(l)))) : null,
     live);
 }
 
@@ -269,6 +303,18 @@ function questionsForm(m) {
   }, 'div');
 }
 
+/** What the job added (characters, places, objects), each with its link and any possible duplicate. */
+function addedLines(list) {
+  const base = `/p/${encodeURIComponent(state.projectId)}`;
+  return h('div', { class: 'result-added' },
+    h('p', { class: 'small' }, h('strong', null, tn('added.title', list.length))),
+    h('ul', { class: 'bullets small' }, list.map((e) => h('li', null,
+      h('a', { href: e.kind === 'character' ? `${base}/characters/${e.id}` : `${base}/places/${e.kind}/${e.id}` }, e.name),
+      e.needs_sheet ? ` · ${t('added.needs_sheet')}` : '',
+      (e.duplicates || []).length ? h('span', { class: 'action-warn' }, ` · ${t('added.maybe_same', { other: e.duplicates[0].name })}`) : null))),
+    h('a', { class: 'small', href: `${base}/pages` }, t('added.review_link')));
+}
+
 /** A job started from a card ended or paused: its outcome, images, links and questions. */
 function resultNode(m) {
   const base = `/p/${encodeURIComponent(state.projectId)}`;
@@ -289,7 +335,8 @@ function resultNode(m) {
         : null,
       (m.proposals || []).map((p) => h('a', { class: 'btn small primary', href: `${base}/story?proposal=${encodeURIComponent(p.id)}` },
         p.guard ? t('result.guard_proposal') : t('result.review_proposal'))),
-      m.links && m.links.length ? h('div', { class: 'msg-links' }, m.links.map((l) => h('a', { href: l.route }, icon('right'), h('span', null, l.label || l.screen_label)))) : null,
+      (m.added || []).length ? addedLines(m.added) : null,
+      m.links && m.links.length ? h('div', { class: 'msg-links' }, m.links.map((l) => h('a', { href: l.route }, icon('right'), h('span', null, l.label || l.screen_label), linkNews(l)))) : null,
       m.status === 'needs_decision' && (m.questions || []).length ? questionsForm(m) : null));
 }
 

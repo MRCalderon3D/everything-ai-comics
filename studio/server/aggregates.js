@@ -402,7 +402,7 @@ function projectCard(project, jobs) {
     id: project.id,
     title: doc.title || project.id,
     logline: doc.logline && !/^TODO/.test(doc.logline) ? doc.logline : '',
-    description: project.state().description || '',
+    description: safe(() => require('./story').personText(project), ''),
     comic_format: doc.comic_format || 'paged',
     language: doc.language || 'en',
     created_at: doc.created_at || null,
@@ -429,11 +429,13 @@ function story(project) {
   const written = bible.exists && typeof data.premise === 'string' && !/^TODO/i.test(data.premise) &&
     Array.isArray(data.facts) && data.facts.some((f) => f && f.statement && !/^TODO/i.test(String(f.statement)));
   const sources = files.listDir(project, 'story/source');
+  const personText = safe(() => require('./story').personText(project), '') || '';
   return {
     written,
     // The person's own text is there: a description or a source file. Enough to go on to the style.
-    has_text: !!(project.state().description || '').trim() || sources.length > 0,
-    description: project.state().description || '',
+    has_text: !!personText.trim() || sources.length > 0,
+    // The file is the source of truth: what the chat or the editor wrote there shows at once.
+    description: personText,
     bible,
     series_plan: files.readDoc(project, 'story/series-plan.yaml'),
     sources,
@@ -653,13 +655,68 @@ function issues(project) {
   };
 }
 
-function issue(project, issueId, drivers) {
+/**
+ * The page plan running for an issue, or null. While it writes, the plan's
+ * checks would report pages that do not exist yet and a broken chain: they
+ * are not errors yet, so the screens show this progress instead.
+ * @returns {{job, status, step, pages, written, current}|null}
+ */
+function planningState(project, jobs, issueId) {
+  if (!jobs) return null;
+  const active = safe(() => jobs.list(project, { active: true }), []);
+  const job = active.find((j) => j.op === 'pages.plan' && ['running', 'needs_decision'].includes(j.status)
+    && ((j.params && j.params.issue) || 'ISS_001') === issueId);
+  if (!job) return null;
+  const raw = safe(() => jobs.getRaw(project, job.id), null) || {};
+  const ids = raw.stepResults && raw.stepResults.breakdown && Array.isArray(raw.stepResults.breakdown.page_ids)
+    ? raw.stepResults.breakdown.page_ids : [];
+  const total = ids.length || (job.params && job.params.pages) || 0;
+  const written = ids.filter((id) => fs.existsSync(path.join(S.ws.pageDir(project.root, id), 'page.yaml'))).length;
+  const step = job.current_step || null;
+  return {
+    job: job.id,
+    status: job.status,
+    step,
+    pages: total,
+    written,
+    // The page being written now, one past the last one on disk.
+    current: total ? Math.min(written + 1, total) : 0,
+    phase: !step || step === 'breakdown' ? 'breakdown' : step === 'pages' ? 'pages' : 'checks',
+  };
+}
+
+/**
+ * The characters, places and objects page plans of an issue added: all of
+ * the latest plan's, and those of earlier plans that still need something
+ * (a sheet, or a decision about a possible duplicate).
+ */
+function addedByPlan(project, jobs, issueId) {
+  if (!jobs) return null;
+  const plans = safe(() => jobs.list(project, { limit: 200 }), []).filter((j) => j.op === 'pages.plan' && j.status === 'done'
+    && ((j.params && j.params.issue) || 'ISS_001') === issueId && Array.isArray(j.added_entities) && j.added_entities.length);
+  if (!plans.length) return null;
+  const out = [];
+  const seen = new Set();
+  plans.slice(0, 10).forEach((job, index) => {
+    for (const e of safe(() => require('./entities').addedView(project, job), [])) {
+      if (seen.has(e.id)) continue;
+      const latest = index === 0;
+      if (!latest && !(e.exists && (e.needs_sheet || e.duplicates.length))) continue;
+      seen.add(e.id);
+      out.push(Object.assign({ job: job.id }, e));
+    }
+  });
+  return out.length ? { job: plans[0].id, ended_at: plans[0].ended_at, entities: out } : null;
+}
+
+function issue(project, issueId, drivers, jobs) {
   requireIssueId(project, issueId);
   const root = project.root;
   const provider = pipeline.compileProvider(project, drivers);
   const draw = drivers.pick('draw', project.settings());
   const pages = S.ws.listPages(root, issueId).map((entry) => pageSummary(project, entry, provider));
-  const gates = S.ws.listIssues(root).includes(issueId)
+  const planning = planningState(project, jobs, issueId);
+  const gates = S.ws.listIssues(root).includes(issueId) && !planning
     ? pipeline.mechanical(root, issueId)
     : { continuity: [], validation: { errors: [], warnings: [] }, errors: 0 };
   const plan = loadYamlSafe(S.ws.abs(root, 'story/series-plan.yaml'));
@@ -691,7 +748,11 @@ function issue(project, issueId, drivers) {
       continuity: gates.continuity,
       validation: gates.validation,
       errors: gates.errors,
+      // Not run while the issue's page plan is writing: see `planning`.
+      skipped: !!planning,
     },
+    planning,
+    added: addedByPlan(project, jobs, issueId),
     draw: { available: draw.available && S.providerIds().includes('codex-cli'), tool: draw.name, reason: draw.reason, look_approved: lookState(project).frozen },
     repair_limit: pipeline.repairLimit(project),
     cover: coverSummary(project, issueId),
@@ -699,7 +760,7 @@ function issue(project, issueId, drivers) {
   };
 }
 
-function page(project, pageId, drivers) {
+function page(project, pageId, drivers, jobs) {
   const root = project.root;
   if (!S.ws.ID.page.test(String(pageId)) || !fs.existsSync(path.join(S.ws.pageDir(root, pageId), 'page.yaml'))) {
     throw new HttpError(404, 'page_not_found', `${pageId} does not exist in this project.`);
@@ -709,7 +770,8 @@ function page(project, pageId, drivers) {
   const doc = files.readDoc(project, `${base}/page.yaml`);
   const data = doc.data && typeof doc.data === 'object' ? doc.data : null;
   const provider = pipeline.compileProvider(project, drivers);
-  const gates = pipeline.mechanical(root, issueId);
+  const planning = planningState(project, jobs, issueId);
+  const gates = planning ? { continuity: [], validation: { errors: [], warnings: [] }, errors: 0 } : pipeline.mechanical(root, issueId);
   const planDoc = files.readDoc(project, `${base}/reference-plan.yaml`);
   const assets = S.ws.loadReferenceAssets(root);
   const planEntries = [];
@@ -745,7 +807,9 @@ function page(project, pageId, drivers) {
     renders: renderList(project, { kind: 'page', id: pageId, issue: issueId }, data ? data.current_render : null),
     prompts: packagesIn(project, `${base}/prompts`),
     reference_plan: Object.assign(planDoc, { entries: planEntries }),
+    planning,
     findings: {
+      skipped: !!planning,
       note: msg('note.mechanical.page'),
       continuity: gates.continuity.filter((f) => f.page === pageId),
       validation: {
@@ -1048,5 +1112,5 @@ function overview(project, services) {
 module.exports = {
   entityAssets, reviewView, renderList, readablePlan, planApproval, pageSummary, coverSummary,
   projectCard, overview, story, style, characters, character, entities, entity,
-  issues, issue, page, cover, publishScreen, issueIds, requireIssueId,
+  issues, issue, page, cover, publishScreen, issueIds, requireIssueId, planningState,
 };

@@ -19,6 +19,9 @@ import { toast } from '/js/components/toast.js';
 import { pageName } from '/js/labels.js';
 import { blockerText } from '/js/screens/home.js';
 import { currentIssue, issueBar } from '/js/components/issues.js';
+import { newsBar, newsMark } from '/js/components/news.js';
+import { deleteButton, cleanupButton } from '/js/components/deleting.js';
+import { mergeInto, renameEntity } from '/js/components/entity-tools.js';
 
 export async function load(ctx) {
   return api.issue(ctx.projectId, currentIssue(ctx));
@@ -132,6 +135,50 @@ function plannedAssumptions(ctx, data) {
       h('a', { class: 'small', href: `${base}/pages/${page}` }, t('assume.open_page', { name: pageName(page) }))))));
 }
 
+/**
+ * While the plan of this issue is being written its checks would report
+ * pages that do not exist yet: the screen says how far the plan is instead,
+ * and looks again every few seconds.
+ */
+export function planningBox(ctx, planning) {
+  if (!ctx.ui.planTimer) {
+    ctx.ui.planTimer = setInterval(() => ctx.refresh(), 4000);
+  }
+  ctx.onCleanup(() => { clearInterval(ctx.ui.planTimer); ctx.ui.planTimer = null; });
+  const line = planning.phase === 'pages' && planning.pages
+    ? t('plan.progress_pages', { current: planning.current, total: planning.pages })
+    : planning.phase === 'breakdown' ? t('plan.progress_breakdown') : t('plan.progress_checks');
+  return notice('info', h('p', null, h('span', { class: 'pulse', 'aria-hidden': 'true' }), ' ', h('strong', null, line)),
+    h('p', { class: 'small muted' }, planning.status === 'needs_decision' ? t('plan.progress_waiting') : t('plan.progress_checks_later')));
+}
+
+/** What the last plan added: characters, places and objects, each with what can be done about it. */
+function addedPanel(ctx, data) {
+  const added = data.added && Array.isArray(data.added.entities) ? data.added.entities : [];
+  if (!added.length) return null;
+  const base = `/p/${encodeURIComponent(ctx.projectId)}`;
+  const linkOf = (e) => (e.kind === 'character' ? `${base}/characters/${e.id}` : `${base}/places/${e.kind}/${e.id}`);
+  return h('section', { class: 'panel stack-s added-panel' },
+    h('h2', { class: 'panel-title' }, tn('added.title', added.length)),
+    h('p', { class: 'small muted' }, t('added.intro')),
+    h('ul', { class: 'added-list' }, added.map((e) => h('li', { class: 'added-item', dataset: { exists: String(e.exists) } },
+      h('div', { class: 'row spread' },
+        h('span', null, h('span', { class: 'chip' }, t(`added.kind.${e.kind}`)), ' ',
+          e.exists ? h('a', { href: linkOf(e) }, e.name) : h('span', { class: 'muted' }, e.name)),
+        e.needs_sheet ? h('span', { class: 'chip warn' }, t('added.needs_sheet')) : null),
+      (e.duplicates || []).length ? null : newsMark(`${e.kind}:${e.id}`),
+      !e.exists ? h('p', { class: 'small muted' }, t('added.gone', { id: e.id })) : null,
+      e.exists ? (e.duplicates || []).map((d) => h('div', { class: 'notice warn small added-dup' },
+        h('p', null, t(`added.duplicate.${d.source}`, { name: e.name, other: d.name, id: d.id })),
+        h('div', { class: 'row' },
+          button(d.has_file ? t('added.merge', { other: d.name }) : t('added.use_id', { id: d.id }), {
+            kind: 'primary', small: true, onclick: () => mergeInto(ctx, e.id, d.id, { fromName: e.name, intoName: d.name, adopt: !d.has_file }),
+          })))) : null,
+      e.exists ? h('div', { class: 'row' },
+        h('a', { class: 'btn quiet small', href: linkOf(e) }, t('added.edit')),
+        button(t('added.rename'), { kind: 'quiet', small: true, onclick: () => renameEntity(ctx, e.id) })) : null))));
+}
+
 export function view(ctx, data) {
   ctx.title = t('screen.pages');
   const base = `/p/${encodeURIComponent(ctx.projectId)}`;
@@ -140,6 +187,7 @@ export function view(ctx, data) {
   const selected = ctx.ui.selected || (ctx.ui.selected = new Set());
   for (const id of [...selected]) if (!pages.some((p) => p.id === id)) selected.delete(id);
   const overruled = pages.filter((p) => p.overruled).length;
+  const lastId = pages.length ? pages.map((p) => p.id).sort().pop() : null;
 
   const toolbar = h('div', { class: 'pages-toolbar' });
   const paintToolbar = () => {
@@ -185,7 +233,7 @@ export function view(ctx, data) {
         frame(p.image, { alt: t('pages.render_alt', { name: pageName(p.id) }), placeholder: t('pages.not_drawn') })),
       h('div', { class: 'page-info' },
         h('div', { class: 'row spread' },
-          h('h3', null, h('a', { href: `${base}/pages/${p.id}` }, pageName(p.id))),
+          h('h3', null, h('a', { href: `${base}/pages/${p.id}` }, pageName(p.id)), ' ', newsMark(`page:${p.id}`, { short: true })),
           h('span', { class: 'check inline' }, box, h('label', { for: id }, t('pages.select')))),
         h('p', { class: 'page-purpose clamp' }, p.purpose),
         h('p', { class: 'small faint' }, tn('pages.panels', p.panels || 0),
@@ -199,15 +247,19 @@ export function view(ctx, data) {
         h('div', { class: 'row page-links' },
           h('a', { href: `${base}/pages/${p.id}` }, t('pages.link_plan')),
           p.current_render ? h('a', { href: `${base}/check/${p.id}` }, t('pages.link_check')) : null,
-          p.current_render ? h('a', { href: `${base}/corrections/${p.id}` }, t('pages.link_correct')) : null)));
+          p.current_render ? h('a', { href: `${base}/corrections/${p.id}` }, t('pages.link_correct')) : null,
+          // Only the last page can go: page numbers stay without gaps.
+          p.id === lastId ? deleteButton(ctx, { kind: 'page', id: p.id }, { label: t('pages.delete_last') }) : null)));
   };
 
   const text = h('div', { class: 'stack' },
+    newsBar('pages'),
     jobsFor((j) => j.op === 'pages.plan' || j.op === 'pages.generate'),
+    addedPanel(ctx, data),
     plannedAssumptions(ctx, data),
     issueBar(ctx, data.id),
     panel(pages.length ? t('pages.more_title') : t('pages.first_title'), planForm(ctx, data)),
-    panel(t('mech.title'), mechanicalBox(data.mechanical)),
+    panel(t('mech.title'), data.planning ? planningBox(ctx, data.planning) : mechanicalBox(data.mechanical)),
     disclosure(ctx, 'issue-file', t('pages.advanced_issue'), () => docEditor(ctx, data.issue, { key: 'issue', title: t('pages.issue_file') })));
 
   let images;
@@ -232,6 +284,7 @@ export function view(ctx, data) {
         ? t('pages.lede', { pages: counts.pages, approved: counts.plan_approved, drawn: counts.rendered, passed: counts.passed - overruled, flagged: counts.flagged })
           + (overruled ? ` ${tn('pages.lede_overruled', overruled)}` : '')
         : t('pages.lede_empty', { budget: counts.planned_budget || 0 }),
+      actions: pages.length ? [cleanupButton(ctx, `pages:${data.id}`)] : null,
     }),
     bench(ctx, { text, images, chat: { key: data.chat_key, examples: [t('pages.example_1'), t('pages.example_2')] } }));
 }

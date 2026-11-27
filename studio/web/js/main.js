@@ -7,6 +7,7 @@ import { startShell, paintShell } from '/js/shell.js';
 import { startJobs } from '/js/components/jobs.js';
 import { startConversation } from '/js/components/conversation.js';
 import { startLayout } from '/js/layout.js';
+import { startUnseen } from '/js/unseen.js';
 
 applyTheme();
 setLang(localLanguage());
@@ -45,6 +46,7 @@ onLangChange(() => {
 });
 
 startLayout();
+startUnseen();
 startShell();
 startConversation();
 startJobs();

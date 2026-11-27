@@ -29,7 +29,7 @@ const EXAMPLE = path.join(ROOT, 'examples', 'the-night-ferry');
 const STUB = path.join(__dirname, 'fixtures', 'codex-stub', 'codex-stub.js');
 const IS_WIN = process.platform === 'win32';
 const ENV_KEYS = ['CODEX_BIN', 'CODEX_IMAGE_TIMEOUT_MS', 'CODEX_IMAGE_MODEL', 'CODEX_STUB_MODE', 'CODEX_STUB_LOG',
-  'CODEX_STUB_SIZE', 'CODEX_STUB_MODEL', 'CODEX_STUB_PASSED', 'CODEX_STUB_MARKER'];
+  'CODEX_STUB_SIZE', 'CODEX_STUB_MODEL', 'CODEX_STUB_COUNT', 'CODEX_STUB_REF_MODE', 'CODEX_STUB_MARKER'];
 const quiet = () => {};
 const temps = [];
 
@@ -321,7 +321,7 @@ async function testProvider() {
     assert.strictEqual(record._media[0].format, 'png');
     const info = imageInfo(Buffer.from(record._media[0].data_base64, 'base64'));
     assert.deepStrictEqual([info.width, info.height], [20, 30]);
-    assert.ok(/^Codex saved one 20x30 PNG in \d+ s; 2 reference image\(s\) passed to the image tool, as Codex reports\.$/
+    assert.ok(/^Codex saved one 20x30 PNG in \d+ s; 2 of 2 reference image\(s\) passed to the image tool as referenced_image_paths, as Codex reports\.$/
       .test(record.response.summary), record.response.summary);
     assert.strictEqual(record.response.provider_job_id, 'stub-thread-0001');
     assert.strictEqual(record.model, 'unreported', 'the stub named no image model');
@@ -352,7 +352,14 @@ async function testProvider() {
     assert.ok(/Do not write code/.test(seen.stdin));
     assert.ok(/Aspect ratio 2:3 \(portrait\)/.test(seen.stdin));
     assert.ok(seen.stdin.includes('Avoid: watermark, signature'));
-    assert.ok(/reply with one JSON object/.test(seen.stdin) && /"references_passed"/.test(seen.stdin));
+    assert.ok(/reply with one JSON object/.test(seen.stdin) && /"reference_mode"/.test(seen.stdin) && /"references_count"/.test(seen.stdin));
+    // The images also go to the image tool as file paths: absolute, in attachment order.
+    const lookFile = ref('references/style/LOOK_NOIR_INK_MASTER_V01.png');
+    const maraFile = ref('characters/CHAR_MARA/refs/CHAR_MARA_TURN_MASTER_V01.png');
+    assert.ok(seen.stdin.includes(`  file: ${lookFile}`) && seen.stdin.includes(`  file: ${maraFile}`));
+    assert.ok(seen.stdin.indexOf(lookFile) < seen.stdin.indexOf(maraFile));
+    assert.ok(/referenced_image_paths set to exactly these 2 file paths, in this order/.test(seen.stdin));
+    assert.ok(/Do not use num_last_images_to_include/.test(seen.stdin));
     const target = seen.stdin.split('\n')[seen.stdin.split('\n').findIndex((l) => /^Save exactly one PNG/.test(l)) + 1];
     assert.ok(path.isAbsolute(target) && path.dirname(target) === outDir && target.endsWith('.png'), target);
   });
@@ -370,7 +377,7 @@ async function testProvider() {
   });
 
   // Repair: Image 1 is the page to edit. A frame the tool lacks: a crop note.
-  await withEnv({ CODEX_STUB_LOG: log, CODEX_STUB_PASSED: 'false' }, async () => {
+  await withEnv({ CODEX_STUB_LOG: log, CODEX_STUB_REF_MODE: 'num_last_images_to_include' }, async () => {
     const repair = pageSpec(root, {
       mode: 'repair',
       parameters: { aspect_ratio: '3:4', seed: null },
@@ -379,14 +386,39 @@ async function testProvider() {
     });
     const record = await provider.generate(repair, { dryRun: false, outDir, root });
     assert.strictEqual(record.status, 'succeeded');
-    assert.ok(/NOT passed to the image tool/.test(record.response.summary));
-    assert.ok(/did not reach the image tool/.test(record.notes));
+    assert.ok(/3 of 3 reference image\(s\) passed to the image tool as num_last_images_to_include/.test(record.response.summary),
+      record.response.summary);
+    assert.ok(/not as referenced_image_paths: that way takes at most 5 images/.test(record.notes), record.notes);
     assert.ok(/Rendered as 2:3 because 3:4 is not a frame of the image tool: crop the file to 3:4/.test(record.notes), record.notes);
     const seen = JSON.parse(fs.readFileSync(log, 'utf8'));
     assert.ok(seen.stdin.includes('Image 1: edit target (PG_001_001_V01)'));
     assert.ok(seen.stdin.includes('Image 1 is the page to edit.'));
     assert.ok(/render the 2:3 frame/.test(seen.stdin) && /cropped to 3:4 afterwards/.test(seen.stdin));
     assert.strictEqual(seen.argv.filter((a) => a === '-i').length, 3);
+  });
+
+  // Fewer references reached the image tool than were sent: a failed run, the image discarded.
+  await withEnv({ CODEX_STUB_COUNT: '1' }, async () => {
+    const record = await provider.generate(pageSpec(root), { dryRun: false, outDir, root });
+    assert.strictEqual(record.status, 'failed');
+    assert.ok(/^Codex passed 1 of the 2 reference images to its image tool \(as referenced_image_paths\), so the image was drawn without 1 of them and was discarded\./
+      .test(record.response.error), record.response.error);
+    assert.strictEqual(record._media, undefined);
+    assert.ok(validateDoc('generation-record', record).valid);
+    assert.deepStrictEqual(leftovers(outDir), []);
+  });
+  // None reached it: failed too.
+  await withEnv({ CODEX_STUB_REF_MODE: 'none', CODEX_STUB_COUNT: '2' }, async () => {
+    const record = await provider.generate(pageSpec(root), { dryRun: false, outDir, root });
+    assert.strictEqual(record.status, 'failed');
+    assert.ok(/received none of the 2 reference images/.test(record.response.error), record.response.error);
+  });
+  // A reply that does not say: the image is kept, and the record says the count is unknown.
+  await withEnv({ CODEX_STUB_REF_MODE: 'omit' }, async () => {
+    const record = await provider.generate(pageSpec(root), { dryRun: false, outDir, root });
+    assert.strictEqual(record.status, 'succeeded');
+    assert.ok(/2 reference image\(s\) sent, how many reached the image tool not reported/.test(record.response.summary));
+    assert.ok(/did not report how many reference images reached its image tool/.test(record.notes), record.notes);
   });
 
   // The image exists but the exit code is not zero: the image counts, the code is noted.

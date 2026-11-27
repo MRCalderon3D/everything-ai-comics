@@ -54,10 +54,15 @@ Options:
   --provider <id>    Image provider whose reference budget applies. Default:
                      the page's generation.provider, then the project's
                      default_providers.image.
+  --if-stale         Keep the plan on disk when it was built for the page's
+                     current generation.mode, this provider, and its budget;
+                     rebuild it otherwise (or when there is none).
   --help             Show this help.
 
 Output: reference-plan.yaml next to page.yaml. Exit 1 when a required
 reference is missing, unapproved, or does not fit the provider's budget.
+The plan records the generation.mode it was built for; compile-prompts.js
+rebuilds a plan whose mode, provider, or budget no longer matches.
 `;
 
 const ROLES = ['style', 'identity', 'wardrobe', 'spatial_continuity', 'prop_consistency', 'composition'];
@@ -617,6 +622,7 @@ function buildReferencePlan(root, page, options = {}) {
   };
   const doc = { page: page.id, provider: providerId };
   if (capacity !== Infinity) doc.budget = capacity;
+  doc.mode = perPanel ? 'per_panel' : 'full_page';
   doc.required = required.map(toEntry);
   doc.optional = kept.map(toEntry);
   // An asset the page asked for by name is attached, whatever left it out earlier.
@@ -628,6 +634,144 @@ function buildReferencePlan(root, page, options = {}) {
   return { doc, providerId };
 }
 
+/** The generation mode of a page: per_panel, or full_page (the default). */
+function pageMode(page) {
+  return page && page.generation && page.generation.mode === 'per_panel' ? 'per_panel' : 'full_page';
+}
+
+function budgetText(n) {
+  return n === Infinity ? 'unlimited' : String(n);
+}
+
+/**
+ * Why a stored reference plan no longer fits the page and the provider it
+ * is about to be compiled for, in plain sentences; [] when it still fits.
+ * A plan written before plans recorded their mode counts as full_page.
+ * @param {object} plan reference-plan.yaml document
+ * @param {object} page page.yaml document
+ * @param {string} providerId provider the page is compiled for
+ * @param {number} capacity that provider's referenceImages (Infinity when unlimited)
+ */
+function planStaleness(plan, page, providerId, capacity) {
+  if (!plan) return ['there is no reference plan'];
+  const reasons = [];
+  if (plan.page && page && plan.page !== page.id) reasons.push(`it is the plan of ${plan.page}`);
+  const built = plan.mode === 'per_panel' ? 'per_panel' : 'full_page';
+  const now = pageMode(page);
+  if (built !== now) {
+    reasons.push(`it was built for ${built === 'per_panel' ? 'drawing panel by panel' : 'drawing the whole page at once'} ` +
+      `and the page is now set to ${now === 'per_panel' ? 'panel by panel' : 'the whole page at once'} (generation.mode ${now})`);
+  }
+  if (plan.provider && plan.provider !== providerId) {
+    reasons.push(`it was built for ${plan.provider} and the page is now drawn with ${providerId}`);
+  }
+  const planned = typeof plan.budget === 'number' ? plan.budget : Infinity;
+  if (planned !== capacity) {
+    reasons.push(`it was budgeted for ${budgetText(planned)} images and ${providerId} takes ${budgetText(capacity)}`);
+  }
+  return reasons;
+}
+
+/**
+ * The reference plan a compile can use: the one on disk when it still fits
+ * the page's generation mode, the provider, and its budget, otherwise a new
+ * one built and written in its place. A plan that cannot be rebuilt throws
+ * the build error with the reason the old plan was out of date in front.
+ * @param {string} root workspace root
+ * @param {object} page page.yaml document
+ * @param {{providerId?: string, capabilities?: object, project?: object, now?: Date,
+ *          providers?: object[], buildMissing?: boolean, write?: boolean}} [options]
+ *   buildMissing: build a plan when there is none (default false: doc is null)
+ *   write: write a rebuilt plan to reference-plan.yaml (default true)
+ * @returns {{doc: object|null, rebuilt: boolean, reasons: string[], file: string, providerId: string}}
+ */
+function ensureReferencePlan(root, page, options = {}) {
+  const project = options.project || ws.loadProject(root) || {};
+  const providerId = resolveProviderId(options.providerId, page, project);
+  const capabilities = options.capabilities || loadImageProvider(providerId).capabilities;
+  const capacity = typeof capabilities.referenceImages === 'number' ? capabilities.referenceImages : Infinity;
+  const file = path.join(ws.pageDir(root, page.id), 'reference-plan.yaml');
+  const existing = ws.loadYaml(file);
+  if (!existing && !options.buildMissing) return { doc: null, rebuilt: false, reasons: [], file, providerId };
+  const reasons = planStaleness(existing, page, providerId, capacity);
+  if (existing && !reasons.length) return { doc: existing, rebuilt: false, reasons, file, providerId };
+
+  let doc;
+  try {
+    ({ doc } = buildReferencePlan(root, page, {
+      providerId, capabilities, project, now: options.now, providers: options.providers,
+    }));
+  } catch (err) {
+    if (!existing || !err.code) throw err;
+    throw pipelineError(err.code,
+      `${page.id}: the reference plan is out of date (${reasons.join('; ')}) and could not be rebuilt: ` +
+      String(err.message).replace(new RegExp(`^${page.id}: `), ''));
+  }
+  assertValid('reference-plan', doc, `reference plan of ${page.id}`);
+  if (options.write !== false) writeFileEnsuring(file, yaml.stringify(doc));
+  return { doc, rebuilt: true, reasons, file, providerId };
+}
+
+/**
+ * How many required reference images a planned page needs, page-wide and
+ * per panel, read from the plan before any image is drawn: the look master,
+ * one identity master per character drawn (off-panel rows do not count),
+ * an approved wardrobe sheet for an outfit that is not the character's
+ * default, and what page.yaml lists under references.required. Whether the
+ * sheets exist or are approved yet does not matter: each drawn character
+ * will need one. Never throws on a missing bible or registry.
+ * @returns {{page: {count: number, items: string[]},
+ *            panels: Array<{id: string, count: number, items: string[]}>}}
+ */
+function referenceDemand(root, page) {
+  const demand = pageDemand(page);
+  let assets = new Map();
+  try {
+    assets = ws.loadReferenceAssets(root);
+  } catch (err) { /* an unreadable registry counts as empty */ }
+  const safe = (fn) => {
+    try {
+      return fn();
+    } catch (err) {
+      return null;
+    }
+  };
+
+  // Each item: { label, panels: Set|null } (null: every panel).
+  const items = [{ label: 'look master', panels: null }];
+  for (const charId of demand.characters) {
+    items.push({ label: charId, panels: demand.panelsOfCharacter.get(charId) });
+  }
+  for (const outfit of demand.outfits.values()) {
+    const character = safe(() => ws.loadCharacter(root, outfit.character)) || {};
+    if (character.default_wardrobe === outfit.wardrobe) continue;
+    const wardrobe = safe(() => ws.loadWardrobe(root, outfit.character));
+    const entry = wardrobe && Array.isArray(wardrobe.outfits)
+      ? wardrobe.outfits.find((o) => o && o.id === outfit.wardrobe) : null;
+    const listed = entry && Array.isArray(entry.references) ? entry.references : [];
+    const sheets = listed.map((id) => assets.get(id)).filter((a) => a && (a.kind === 'wardrobe' || a.default_role === 'wardrobe'));
+    const sheet = bestApproved(sheets, listed);
+    if (sheet) items.push({ label: sheet.id, panels: outfit.panels });
+  }
+  const named = page.references && Array.isArray(page.references.required) ? page.references.required : [];
+  for (const id of named) {
+    const asset = assets.get(id);
+    const role = asset ? roleOfAsset(asset) : null;
+    // The look master and a drawn character's identity sheet are counted already.
+    if (role === 'style' || (role === 'identity' && demand.characters.includes(asset.entity))) continue;
+    if (!items.some((i) => i.label === id)) items.push({ label: id, panels: null });
+  }
+
+  const pageItems = items.map((i) => i.label);
+  return {
+    page: { count: pageItems.length, items: pageItems },
+    panels: demand.panelIds.map((id) => {
+      const list = items.filter((i) => i.panels === null || i.panels.has(id)).map((i) => i.label);
+      return { id, count: list.length, items: list };
+    }),
+  };
+}
+
 function main() {
   helpIfRequested(process.argv.slice(2), HELP);
   const { flags } = parseArgs();
@@ -637,19 +781,34 @@ function main() {
   }
   let result;
   let ctx;
+  const outFileOf = () => path.join(ctx.pageDir, 'reference-plan.yaml');
   try {
     ctx = loadPageContext(flags.page);
-    result = buildReferencePlan(ctx.root, ctx.page, { providerId: flags.provider, project: ctx.project });
-    const check = assertValid('reference-plan', result.doc, `reference plan of ${ctx.page.id}`);
-    if (check.skipped) console.warn('warning: schemas/reference-plan.schema.json not found, schema validation skipped');
+    if (flags['if-stale']) {
+      const ensured = ensureReferencePlan(ctx.root, ctx.page, {
+        providerId: flags.provider, project: ctx.project, buildMissing: true,
+      });
+      if (!ensured.rebuilt) {
+        console.log(`reference plan of ${ctx.page.id} is current (${ensured.doc.provider}, budget ${budgetText(
+          typeof ensured.doc.budget === 'number' ? ensured.doc.budget : Infinity)}, ${ensured.doc.mode || 'full_page'}): kept`);
+        console.log(`  -> ${toPosix(outFileOf())}`);
+        return;
+      }
+      console.log(`reference plan of ${ctx.page.id} rebuilt: ${ensured.reasons.join('; ')}`);
+      result = { doc: ensured.doc, written: true };
+    } else {
+      result = buildReferencePlan(ctx.root, ctx.page, { providerId: flags.provider, project: ctx.project });
+      const check = assertValid('reference-plan', result.doc, `reference plan of ${ctx.page.id}`);
+      if (check.skipped) console.warn('warning: schemas/reference-plan.schema.json not found, schema validation skipped');
+    }
   } catch (err) {
     console.error(`error: ${err.message}`);
     process.exit(1);
   }
   const { doc } = result;
-  const outFile = path.join(ctx.pageDir, 'reference-plan.yaml');
-  writeFileEnsuring(outFile, yaml.stringify(doc));
-  console.log(`reference plan: ${doc.required.length} required + ${doc.optional.length} optional for ${doc.page} via ${doc.provider} (budget ${doc.budget === undefined ? 'unlimited' : doc.budget})`);
+  const outFile = outFileOf();
+  if (!result.written) writeFileEnsuring(outFile, yaml.stringify(doc));
+  console.log(`reference plan: ${doc.required.length} required + ${doc.optional.length} optional for ${doc.page} via ${doc.provider} (budget ${doc.budget === undefined ? 'unlimited' : doc.budget}, ${doc.mode})`);
   console.log(`  -> ${toPosix(outFile)}`);
   for (const e of doc.required) console.log(`  + ${e.asset_id} [${e.role}/${e.priority}] ${e.reason}`);
   for (const e of doc.optional) console.log(`  ~ ${e.asset_id} [${e.role}/${e.priority}] ${e.reason}`);
@@ -671,6 +830,10 @@ module.exports = {
   isLikenessSource,
   identityRefusal,
   roomierProviders,
+  pageMode,
+  planStaleness,
+  ensureReferencePlan,
+  referenceDemand,
   IDENTITY_KIND_RANK,
   MASTER_KINDS,
 };

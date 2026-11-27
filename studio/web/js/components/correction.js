@@ -3,7 +3,7 @@
 // it came from, with the path the studio took said in plain words.
 
 import { h, nextId } from '/js/dom.js';
-import { t } from '/js/i18n.js';
+import { t, tn } from '/js/i18n.js';
 import { findJob, ENDED } from '/js/store.js';
 import { textField, checkField, actionButton, button, notice } from '/js/components/ui.js';
 import { regionPicker } from '/js/components/region.js';
@@ -136,7 +136,9 @@ export function correction(ctx, { key, render, panels = [], repairLimit, send })
     lettering.el,
     notice(willRedraw ? 'warn' : 'info', willRedraw
       ? t('correct.will_redraw', { limit: repairLimit })
-      : t('correct.will_edit', { used: cycle, limit: repairLimit ?? '?' })),
+      : (Number.isInteger(repairLimit)
+        ? tn(String(render.id).startsWith('CV_') ? 'correct.will_edit_cover' : 'correct.will_edit', Math.max(0, repairLimit - cycle), { left: Math.max(0, repairLimit - cycle) })
+        : t('correct.will_edit_unknown'))),
     h('div', { class: 'row' },
       actionButton(t('correct.send'), go, { kind: 'primary' }),
       h('span', { class: 'small muted' }, t('correct.time'))));

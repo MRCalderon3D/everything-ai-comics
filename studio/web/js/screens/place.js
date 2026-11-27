@@ -11,6 +11,9 @@ import { jobsFor } from '/js/components/jobs.js';
 import { frame, openViewer } from '/js/components/viewer.js';
 import { assetGrid, viewerItems } from '/js/components/assets.js';
 import { handoff } from '/js/components/handoff.js';
+import { newsMark } from '/js/components/news.js';
+import { cleanupButton } from '/js/components/deleting.js';
+import { entityTools } from '/js/components/entity-tools.js';
 
 export async function load(ctx) {
   const { kind, entity } = ctx.params;
@@ -27,7 +30,7 @@ export function view(ctx, { kind, data }) {
   const assets = data.assets || { masters: [], candidates: [], references: [] };
   const all = [...assets.masters, ...assets.candidates, ...assets.references];
   const sheet = kind === 'location' ? 'plate' : 'prop';
-  const text = h('section', { class: 'panel' },
+  const tabsPanel = h('section', { class: 'panel' },
     tabs(ctx, 'place', [
       kind === 'location'
         ? { id: 'main', label: t('place.tab_location'), render: () => docEditor(ctx, data.location, { key: 'location', title: t('place.location_title') }) }
@@ -36,7 +39,15 @@ export function view(ctx, { kind, data }) {
         ? { id: 'map', label: t('place.tab_map'), render: () => h('div', { class: 'stack-s' }, h('p', { class: 'muted' }, t('place.map_intro')), docEditor(ctx, data.map, { key: 'map', title: t('place.map_title'), startInFile: true })) }
         : null,
     ], { label: name }));
+  const text = h('div', { class: 'stack' }, tabsPanel, entityTools(ctx, {
+    id: data.id, name,
+    others: async () => {
+      const all2 = await api.entities(ctx.projectId);
+      return (kind === 'location' ? all2.locations : all2.props).map((e) => ({ id: e.id, name: e.name || e.id }));
+    },
+  }));
   const images = h('div', { class: 'stack' },
+    newsMark(`${kind}:${data.id}`),
     jobsFor((j) => (j.op === 'entities.derive') || (j.op === 'page.manual' && j.params && j.params.entity === data.id)),
     data.image
       ? frame(data.image, { alt: name, onclick: () => openViewer(viewerItems(all), all[0] && all[0].id) })
@@ -46,6 +57,6 @@ export function view(ctx, { kind, data }) {
       ? panel(t('handoff.title'), handoff(ctx, `ent:${data.id}`, { entity: data.id, sheet }, { intro: t('place.handoff_intro') }))
       : notice('info', t('characters.look_first')));
   return h('div', { class: 'screen' },
-    screenHead({ title: name, lede: data.summary || '', back: { href: `${base}/places`, label: t('screen.places') } }),
+    screenHead({ title: name, lede: data.summary || '', back: { href: `${base}/places`, label: t('screen.places') }, actions: [cleanupButton(ctx, `${kind}:${data.id}`)] }),
     bench(ctx, { text, images, chat: { key: data.chat_key, title: t('chat.title_about', { name }) } }));
 }

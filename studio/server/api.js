@@ -20,6 +20,8 @@ const history = require('./history');
 const aggregates = require('./aggregates');
 const projectOptions = require('./project-options');
 const actions = require('./actions');
+const deletion = require('./deletion');
+const entities = require('./entities');
 const { lookState } = require('./ops/shared');
 const { Router, readBody, readJsonBody, sendFile, contentTypeOf } = require('./http');
 const { resolveInside, safeName } = require('./security');
@@ -304,10 +306,10 @@ function createApi(services) {
     res.statusCode = 201;
     return result;
   });
-  screenRoute(`${P}/issues/:issue`, (proj, ctx) => aggregates.issue(proj, ctx.params.issue, drivers));
+  screenRoute(`${P}/issues/:issue`, (proj, ctx) => aggregates.issue(proj, ctx.params.issue, drivers, jobs));
   screenRoute(`${P}/issues/:issue/cover`, (proj, ctx) => aggregates.cover(proj, ctx.params.issue));
   screenRoute(`${P}/issues/:issue/publish`, (proj, ctx) => aggregates.publishScreen(proj, ctx.params.issue));
-  screenRoute(`${P}/pages/:page`, (proj, ctx) => aggregates.page(proj, ctx.params.page, drivers));
+  screenRoute(`${P}/pages/:page`, (proj, ctx) => aggregates.page(proj, ctx.params.page, drivers, jobs));
 
   // --- text artifacts ------------------------------------------------------------------
 
@@ -345,7 +347,7 @@ function createApi(services) {
       }
     }
     const checked = files.checkText(clean, text);
-    const saved = await history.record(services, proj, { kind: 'save', title: msg('activity.edited', { path: clean }) }, () => {
+    const saved = await history.record(services, proj, { kind: 'save', title: msg('activity.edited', { path: clean }), scope: [clean] }, () => {
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, text.endsWith('\n') ? text : `${text}\n`);
     });
@@ -516,8 +518,51 @@ function createApi(services) {
 
   del(`${P}/uploads/:upload`, (req, res, ctx) => {
     const proj = project(ctx);
-    if (!proj.removeUpload(ctx.params.upload)) throw new HttpError(404, 'upload_not_found', 'There is no upload with that id.');
+    if (!proj.upload(ctx.params.upload)) throw new HttpError(404, 'upload_not_found', 'There is no upload with that id.');
+    // An upload a queued or running job still reads stays until the job is over.
+    const [checked] = deletion.plan(proj, services, [{ kind: 'upload', id: ctx.params.upload }]);
+    if (checked.refused) throw new HttpError(409, 'delete_refused', 'The upload is in use.', { items: [deletion.publicView(checked)] }, { reasons: [checked.refused.message] });
+    proj.removeUpload(ctx.params.upload);
     return { deleted: ctx.params.upload };
+  });
+
+  // --- deleting what the person does not want to keep ------------------------------------------
+
+  // What a delete would remove, or why it is refused. Nothing is written.
+  post(`${P}/delete/check`, async (req, res, ctx) => {
+    const proj = project(ctx);
+    const body = await readJsonBody(req, JSON_LIMIT);
+    const clean = actions.DIRECT.delete.validate(body);
+    return { items: deletion.plan(proj, services, clean.items).map(deletion.publicView) };
+  });
+
+  post(`${P}/delete`, async (req, res, ctx) => {
+    const proj = project(ctx);
+    const body = await readJsonBody(req, JSON_LIMIT);
+    return actions.DIRECT.delete.run(services, proj, body);
+  });
+
+  // The unused tries of a screen, ready to delete in one go.
+  get(`${P}/cleanup`, (req, res, ctx) => {
+    const proj = project(ctx);
+    const scope = ctx.query.get('scope') || '';
+    return { scope, items: deletion.cleanup(proj, services, scope) };
+  });
+
+  // --- characters, places and objects: merge two into one, or rename an ID ------------------------
+
+  post(`${P}/entities/merge`, async (req, res, ctx) => {
+    const proj = project(ctx);
+    const body = await readJsonBody(req, JSON_LIMIT);
+    const def = actions.DIRECT['entity.merge'];
+    return def.run(services, proj, def.validate(body));
+  });
+
+  post(`${P}/entities/rename`, async (req, res, ctx) => {
+    const proj = project(ctx);
+    const body = await readJsonBody(req, JSON_LIMIT);
+    const def = actions.DIRECT['entity.rename'];
+    return def.run(services, proj, def.validate(body));
   });
 
   // --- operations and jobs -----------------------------------------------------------------
@@ -816,7 +861,10 @@ function createApi(services) {
     }
     if (!['png', 'jpeg'].includes(info.format)) throw new HttpError(415, 'not_an_image', 'Send the lettered page as a PNG or JPEG image.');
     let result;
-    const saved = await history.record(services, proj, { kind: 'lettering', title: msg('activity.lettered', { page: pageId }) }, () => {
+    const saved = await history.record(services, proj, {
+      kind: 'lettering', title: msg('activity.lettered', { page: pageId }),
+      scope: [S.ws.rel(root, S.ws.pageDir(root, pageId)), 'editions'],
+    }, () => {
       try {
         result = S.registerLetteredFile({ root, page: pageId, render, file: body });
       } catch (err) {

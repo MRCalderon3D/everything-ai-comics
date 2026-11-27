@@ -25,6 +25,15 @@
  *   ACTION:<name> {params}
  *               (chat) the reply proposes that action, with those params
  *               (JSON); "@attachments" stands for the message's uploads
+ *   DO:<name> {params}
+ *               (chat) the same, as an explicit request: the card carries
+ *               run: true and starts in the same turn
+ *   MYTEXT      (chat) the reply saves the message as the person's own text,
+ *               story/source/description.md
+ *   NEWCHAR     (pages breakdown) the text names someone with no file: the
+ *               breakdown writes CHAR_ORANGE_GREY, a grey-haired man in an
+ *               orange jumpsuit; (story proposal) the proposal gives an arc
+ *               to CHAR_GREY_HAIRED_MAN, the same man under another ID
  *   RUN         (chat) the reply runs every card waiting in the conversation
  *   STATE       (chat) the reply repeats the project state it was given
  *   WRITEBIBLE  (chat, character) the run writes the story bible directly,
@@ -135,6 +144,9 @@ const handlers = {
       if (!Array.isArray(bible.timeline) || !bible.timeline.length) proposal.timeline = [{ order: 1, event: firstSentence(first.text || bible.premise || 'Something happens.', 200), issue: 'ISS_001' }];
       proposal.questions = [{ question: 'Placeholder question: what does the main character want?', blocking: false, options: [] }];
     } else {
+      if (has(task.text, 'NEWCHAR') || has(vars.instruction, 'NEWCHAR')) {
+        proposal.arcs = [{ character: 'CHAR_GREY_HAIRED_MAN', role: 'antagonist', arc: 'A man in an orange jumpsuit, no beard, grey hair and white eyes. He attacks first. The text gives him no change.' }];
+      }
       proposal.facts = [{ statement: `Placeholder addition for the request: ${words(vars.instruction, 20)}`, provenance: 'addition', affects: [] }];
       proposal.timeline = [{ order: 1, event: `Placeholder event for the request: ${words(vars.instruction, 20)}`, issue: 'ISS_001' }];
       proposal.questions = [{ question: 'Placeholder question: is this the direction you want?', blocking: false, options: ['Yes', 'No'] }];
@@ -279,6 +291,7 @@ const handlers = {
     const pageIds = vars.page_list || [];
     const made = ensureLocation(root, out);
     const location = ws.listEntityIds(root, 'locations')[0];
+    if (has(task.text, 'NEWCHAR') && !ws.loadCharacter(root, 'CHAR_ORANGE_GREY')) addStranger(root, out);
     const scenes = ws.listScenes(root, issue);
     const sceneNumber = scenes.reduce((max, s) => Math.max(max, parseInt(s.id.slice(-2), 10) || 0), 0) + 1;
     const sceneId = `SC_${issue.slice(4)}_${String(sceneNumber).padStart(2, '0')}`;
@@ -327,8 +340,10 @@ const handlers = {
     out.summary = `Broke the text into one scene, ${sceneId}, over ${pageIds.length} page(s).`;
   },
 
-  'pages.plan'(task, out) {
+  async 'pages.plan'(task, out, signal) {
     const { root, vars } = task;
+    // SLOW: the pages are written one by one, the way a real planner does, so progress can be watched.
+    const slowMs = has(task.text, 'SLOW') ? (Number.parseInt(process.env.STUDIO_FAKE_SLOW_MS || '', 10) || 3000) : 0;
     const issue = vars.issue;
     const pageIds = vars.page_list || [];
     const project = ws.loadProject(root) || {};
@@ -352,7 +367,8 @@ const handlers = {
     const opening = vars.opens_from_file ? (ws.loadYaml(vars.opens_from_file) || {}) : {};
     const carried = opening.characters && typeof opening.characters === 'object' ? opening.characters : {};
 
-    pageIds.forEach((pageId, index) => {
+    for (const [index, pageId] of pageIds.entries()) {
+      if (slowMs) await sleep(Math.max(50, Math.round(slowMs / Math.max(1, pageIds.length))), signal);
       const number = parseInt(pageId.slice(-3), 10);
       const text = parts[index];
       const pn = (n) => `PN_${pageId.slice(3)}_${String(n).padStart(2, '0')}`;
@@ -424,7 +440,7 @@ const handlers = {
       }
       panelTotal += page.panels.length;
       writeYaml(root, `issues/${issue}/pages/${pageId}/page.yaml`, page, out.files, 'Schema: schemas/page.schema.json');
-    });
+    }
 
     // The page before the new ones now leads into them.
     if (lastExisting) {
@@ -670,8 +686,9 @@ const handlers = {
     // ACTION:<name> {json params} proposes an action; RUN runs the waiting cards.
     const proposed = parseActions(message);
     if (proposed.length) {
-      out.data.actions = proposed.map((a) => ({ action: a.action, params: a.params, why: `The fake assistant was asked for ${a.action}.` }));
-      out.summary += ` I propose ${proposed.length} action(s): ${proposed.map((a) => a.action).join(', ')}. Each waits for your click.`;
+      out.data.actions = proposed.map((a) => Object.assign({ action: a.action, params: a.params, why: `The fake assistant was asked for ${a.action}.` }, a.run ? { run: true } : {}));
+      const now = proposed.filter((a) => a.run).length;
+      out.summary += ` I propose ${proposed.length} action(s): ${proposed.map((a) => a.action).join(', ')}.${now ? ` ${now} of them start now, as you asked.` : ' Each waits for your click.'}`;
     }
     if (has(message, 'RUN') && Array.isArray(vars.pending_cards) && vars.pending_cards.length) {
       out.data.run_actions = vars.pending_cards.slice();
@@ -699,6 +716,13 @@ const handlers = {
       const file = ws.abs(root, 'story/story-bible.yaml');
       fs.writeFileSync(file, `${fs.readFileSync(file, 'utf8').replace(/\n*$/, '\n')}notes: "Written by the fake assistant, which should not."\n`);
       out.files.push('story/story-bible.yaml');
+    }
+    if (has(message, 'MYTEXT') && task.allowWrite) {
+      // The person's own text, saved where the studio keeps it: story/source/description.md.
+      const rel = 'story/source/description.md';
+      const title = (ws.loadProject(root) || {}).title || 'Untitled';
+      write(root, rel, `# ${title}\n\n${message.replace(/\bMYTEXT\b/g, '').replace(/\s+/g, ' ').trim()}\n`, out.files);
+      out.summary += ' I saved your text.';
     }
     if (!has(message, 'EDIT') || !task.allowWrite) return;
     // The story bible is never the file a chat edits.
@@ -729,7 +753,7 @@ const handlers = {
  */
 function parseActions(text) {
   const out = [];
-  const re = /ACTION:([a-z][a-z.]*[a-z])/g;
+  const re = /(?<![A-Za-z])(ACTION|DO):([a-z][a-z.]*[a-z])/g;
   let m;
   while ((m = re.exec(text))) {
     let params = {};
@@ -759,7 +783,7 @@ function parseActions(text) {
         }
       }
     }
-    out.push({ action: m[1], params, from: m.index, to: re.lastIndex > m.index ? re.lastIndex : m.index + m[0].length });
+    out.push({ action: m[2], params, run: m[1] === 'DO', from: m.index, to: re.lastIndex > m.index ? re.lastIndex : m.index + m[0].length });
   }
   return out;
 }
@@ -788,6 +812,32 @@ function addInventedFact(root, charId, out) {
     affects: [charId],
   });
   writeYaml(root, rel, doc, out.files, 'Schema: schemas/story-bible.schema.json');
+}
+
+/** Someone the text describes who has no file yet: what a real breakdown does (TODO item 11). */
+function addStranger(root, out) {
+  const id = 'CHAR_ORANGE_GREY';
+  writeYaml(root, `characters/${id}/character.yaml`, {
+    id,
+    name: 'Grey-haired man in the orange jumpsuit',
+    aliases: ['the man in orange'],
+    role: 'antagonist',
+    description: {
+      summary: 'An older man in an orange jumpsuit, grey hair combed back, no beard, white eyes.',
+      distinguishing_features: ['orange jumpsuit', 'grey hair combed back', 'white eyes'],
+    },
+    prompt_summary: 'An older man in an orange jumpsuit with grey hair combed back and white eyes.',
+    visually_adjacent_to: [],
+    default_wardrobe: 'WARD_ORANGE_GREY_JUMPSUIT',
+    wardrobe_file: 'wardrobe.yaml',
+    references: [],
+    status: 'draft',
+  }, out.files, 'Schema: schemas/character.schema.json');
+  writeYaml(root, `characters/${id}/wardrobe.yaml`, {
+    character: id,
+    outfits: [{ id: 'WARD_ORANGE_GREY_JUMPSUIT', description: 'An orange jumpsuit.', layers: ['jumpsuit'], accessories: [], hands: 'bare', references: [], used_in: [] }],
+  }, out.files, 'Schema: schemas/wardrobe.schema.json');
+  out.decisions.push(`The text describes a grey-haired man in an orange jumpsuit who has no file: wrote ${id}. Draw and approve his sheet before the page is drawn.`);
 }
 
 /** A location with a map, when the workspace has none. Returns the ID it made, or null. */
@@ -854,7 +904,7 @@ async function run(options) {
     // A review reacts to FLAG words only: the other words are for steps that plan.
     // A chat turn reacts to the words outside the actions it is asked to propose.
     const text = task.kind === 'review' ? '' : task.kind === 'chat' ? withoutActions(task.text) : String(task.text || '');
-    if (has(text, 'SLOW')) {
+    if (has(text, 'SLOW') && task.kind !== 'pages.plan') {
       const ms = Number.parseInt(process.env.STUDIO_FAKE_SLOW_MS || '', 10);
       emit('working slowly, as asked');
       await sleep(Number.isFinite(ms) && ms > 0 ? ms : 3000, options.signal);
@@ -876,7 +926,7 @@ async function run(options) {
       if (task.allowWrite === false && !['review', 'chat', 'story.propose', 'sheet.check'].includes(task.kind)) {
         return finish({ status: 'failed', summary: 'This step needs to write files and was run read-only.', files_written: [] });
       }
-      handler(task, out);
+      await handler(task, out, options.signal);
     }
     const answers = Object.values(task.answers || {});
     if (answers.length) out.decisions.push(`Went with the answer given: ${answers.map((a) => a.answer).join(', ')}.`);

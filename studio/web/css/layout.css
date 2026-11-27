@@ -273,3 +273,14 @@
   .app .main { grid-row: 2; }
   .resize-handle { display: none; }
 }
+
+/* The count of what is new on a step of the path. It stays on the collapsed rail. */
+.rail ol a { position: relative; }
+.nav-news {
+  position: absolute; top: 2px; left: 26px; min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 9px; background: var(--accent); color: var(--accent-ink);
+  font-size: 0.7rem; font-weight: 700; line-height: 18px; text-align: center;
+  animation: news-pop var(--slow, 240ms) var(--ease, ease-out) 1;
+}
+.nav-news.alert { background: var(--bad); color: #fff; }
+.app[data-rail="collapsed"] .nav-news { left: auto; right: 6px; }

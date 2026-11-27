@@ -37,11 +37,19 @@ const history = require('./history');
 const approvals = require('./approvals');
 const conversation = require('./conversation');
 const projectOptions = require('./project-options');
+const deletion = require('./deletion');
+const entityEdit = require('./entity-edit');
 const { msg } = require('./i18n');
 const { HttpError, errorText, newId, nowIso } = require('./util');
 
 const IMAGE_RE = /\.(png|jpe?g|webp)$/i;
 const MAX_CARDS = 6;
+/**
+ * Actions that wait for a click even when the person's message asked for
+ * them in so many words: a delete, and a merge, which drops the sheets of
+ * the merged entity.
+ */
+const ALWAYS_CONFIRM = ['delete', 'entity.merge'];
 
 // --- the operations, as actions -------------------------------------------------
 
@@ -63,7 +71,8 @@ const OP_TRAITS = {
   'style.look': { verbs: () => ['draw'], draws: always, text: never },
   'character.create': { verbs: (p) => (p.draw === false ? ['plan'] : ['plan', 'draw']), draws: (p) => p.draw !== false, text: (p) => p.draw === false },
   'character.update': { verbs: (p) => (p.draw === true ? ['plan', 'draw'] : ['plan']), draws: (p) => p.draw === true, text: (p) => p.draw !== true },
-  'character.sheet': { verbs: () => ['draw'], draws: always, text: never },
+  // A revision round first rewrites the character file (the writing tool), then draws.
+  'character.sheet': { verbs: (p) => (p.revise && p.update_file !== false ? ['plan', 'draw'] : ['draw']), draws: always, text: never },
   'entities.derive': { verbs: (p) => (p.plates === true ? ['plan', 'draw'] : ['plan']), draws: (p) => p.plates === true, text: (p) => p.plates !== true },
   'pages.plan': { verbs: () => ['plan'], draws: never, text: always },
   'pages.generate': { verbs: () => ['draw', 'look'], draws: always, text: never },
@@ -106,6 +115,13 @@ const REFERENCE_MS = {
 
 // --- the actions that are not jobs --------------------------------------------------
 
+/** The workspace directory of an entity: characters/<ID>, locations/<ID>, props/<ID>, or references/style for a look. */
+function entityDir(entityId) {
+  const refs = S.assetPaths.refsDir(String(entityId || ''));
+  if (!refs) return null;
+  return refs === 'references/style' ? refs : refs.replace(/\/refs$/, '');
+}
+
 function text(params, name, { required = false, max = 2000 } = {}) {
   const value = params[name];
   if (value === undefined || value === null || value === '') {
@@ -121,6 +137,14 @@ function flag(params, name) {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== 'boolean') throw new HttpError(400, 'bad_params', `"${name}" must be true or false.`);
   return value;
+}
+
+/** A merge or a rename rewrites files a running job may be writing: it waits for the job. */
+function requireIdle(services, project) {
+  const running = services.jobs.running(project);
+  if (running && running.op !== 'chat.turn') {
+    throw new HttpError(409, 'project_busy', `A job is running (${running.op}). Wait for it to finish, then try again.`);
+  }
 }
 
 function checkJob(services, project, params) {
@@ -146,9 +170,13 @@ const DIRECT = {
     async run(services, project, body) {
       let result;
       const saved = await history.record(services, project, {
-        kind: 'approval', title: msg('activity.approved_asset', { candidate: String(body.candidate || '').split('/').pop() }),
+        kind: 'approval',
+        title: msg('activity.approved_asset', { candidate: String(body.candidate || '').split('/').pop() }),
+        // The master, the registry, the entity's own directory (its file, its wardrobe), and project.yaml for a look.
+        scope: (res) => (res ? [res.file, 'references/manifest.yaml', 'project.yaml', entityDir(res.entity)] : []),
       }, () => {
         result = approvals.approveAsset(project, body);
+        return result;
       });
       return Object.assign({}, result, { image: files.image(project, result.file), style_frozen: result.kind === 'look', commit: saved.commit });
     },
@@ -190,7 +218,11 @@ const DIRECT = {
     },
     async run(services, project, body) {
       let result;
-      const saved = await history.record(services, project, { kind: 'approval', title: msg('activity.approved_page', { page: String(body.page || '') }) }, () => {
+      const pageId = String(body.page || '');
+      const saved = await history.record(services, project, {
+        kind: 'approval', title: msg('activity.approved_page', { page: pageId }),
+        scope: S.ws.ID.page.test(pageId) ? [S.ws.rel(project.root, S.ws.pageDir(project.root, pageId))] : [],
+      }, () => {
         result = approvals.approvePage(project, body);
       });
       return Object.assign({}, result, { commit: saved.commit });
@@ -209,7 +241,11 @@ const DIRECT = {
     },
     async run(services, project, body) {
       let result;
-      const saved = await history.record(services, project, { kind: 'approval', title: msg('activity.approved_cover', { issue: String(body.issue || 'ISS_001') }) }, () => {
+      const issueId = String(body.issue || 'ISS_001');
+      const saved = await history.record(services, project, {
+        kind: 'approval', title: msg('activity.approved_cover', { issue: issueId }),
+        scope: S.ws.ID.issue.test(issueId) ? [`issues/${issueId}/cover`] : [],
+      }, () => {
         result = approvals.approveCover(project, body);
       });
       return Object.assign({}, result, { commit: saved.commit });
@@ -241,6 +277,7 @@ const DIRECT = {
       const saved = await history.record(services, project, {
         kind: 'proposal',
         title: msg('activity.proposal_decided', { accepted: accepting, rejected: clean.length - accepting }),
+        scope: [story.BIBLE],
       }, () => {
         outcome = story.decide(project, proposal, clean);
       });
@@ -286,7 +323,7 @@ const DIRECT = {
       if (partial.comic_format && partial.comic_format !== current.comic_format && hasPages) {
         throw new HttpError(409, 'format_locked', 'The format cannot change once pages are planned: their layout depends on it.');
       }
-      const saved = await history.record(services, project, { kind: 'save', title: msg('activity.options') }, () => {
+      const saved = await history.record(services, project, { kind: 'save', title: msg('activity.options'), scope: ['project.yaml'] }, () => {
         projectOptions.applyToProject(project.root, partial);
       });
       const doc = files.readDoc(project, 'project.yaml');
@@ -335,6 +372,86 @@ const DIRECT = {
     },
   },
 
+  delete: {
+    params: [
+      { name: 'items', type: 'object[]', required: true, description: 'What to delete: [{ "id": "<ID>" }], each an image of a sheet or look (CHAR_MARA_TURN_V02, LOOK_NOIR_INK_V03), a page or cover version (PG_001_004_V02, CV_001_V01), an upload (up_...), a draft edition (ED_001_02), a whole character, place or prop (CHAR_MARA), or the last page of an issue (PG_001_012). "kind" (asset, render, upload, edition, entity, page) is optional.' },
+      { name: 'confirm_master', type: 'boolean', required: false, description: 'true only after the person was told what depends on an approved master (or a whole entity, or a drawn page) and said again to delete it.' },
+    ],
+    validate(p) {
+      if (!Array.isArray(p.items) || !p.items.length || p.items.length > 100) throw new HttpError(400, 'bad_params', '"items" must be a list of 1 to 100 things to delete.');
+      return { items: p.items.map((i) => deletion.checkItem(typeof i === 'string' ? { id: i } : i)), confirm_master: flag(p, 'confirm_master') };
+    },
+    async run(services, project, params) {
+      const clean = DIRECT.delete.validate(params);
+      const plans = deletion.plan(project, services, clean.items);
+      const refused = plans.filter((p) => p.refused);
+      if (refused.length) {
+        throw new HttpError(409, 'delete_refused', refused.map((p) => `${p.id}: ${require('./i18n').render('en', p.refused.message)}`).join(' '),
+          { items: refused.map(deletion.publicView) }, { reasons: refused.map((p) => p.refused.message) });
+      }
+      const twice = plans.filter((p) => p.confirm_twice);
+      if (twice.length && clean.confirm_master !== true) {
+        throw new HttpError(409, 'delete_confirm_twice', `Deleting ${twice.map((p) => p.id).join(', ')} needs a second confirmation.`,
+          { items: twice.map(deletion.publicView) }, { items: twice.map((p) => p.label).join(', ') });
+      }
+      let outcome;
+      const label = plans.length === 1 ? plans[0].id : String(plans.length);
+      const saved = await history.record(services, project, {
+        kind: 'delete',
+        title: msg(plans.length === 1 ? 'activity.deleted_one' : 'activity.deleted_many', { what: label, n: plans.length }),
+        scope: (res) => (res ? res.files : []),
+      }, () => {
+        outcome = deletion.apply(project, plans);
+        return outcome;
+      });
+      return Object.assign({}, outcome, { commit: saved.commit, can_undo: !!saved.commit });
+    },
+  },
+
+  'entity.merge': {
+    params: [
+      { name: 'from', type: 'string', required: true, description: 'The ID to merge away: a character, place or prop that is the same as another one (CHAR_ORANGE_GREY).' },
+      { name: 'into', type: 'string', required: true, description: 'The ID to keep (CHAR_GREY_HAIRED_MAN). It keeps its file and its sheets; every reference to "from" points at it.' },
+    ],
+    validate(p) {
+      return { from: text(p, 'from', { required: true, max: 80 }), into: text(p, 'into', { required: true, max: 80 }) };
+    },
+    async run(services, project, params) {
+      requireIdle(services, project);
+      let outcome;
+      const saved = await history.record(services, project, {
+        kind: 'entity', title: msg('activity.entity_merged', { from: params.from, into: params.into }),
+        scope: (res) => (res ? [...res.files, ...res.removed, ...(res.moved || []).flat()] : []),
+      }, () => {
+        outcome = entityEdit.merge(project, params.from, params.into);
+        return outcome;
+      });
+      return Object.assign({}, outcome, { commit: saved.commit });
+    },
+  },
+
+  'entity.rename': {
+    params: [
+      { name: 'from', type: 'string', required: true, description: 'The ID to rename (CHAR_ORANGE_GREY).' },
+      { name: 'to', type: 'string', required: true, description: 'The new ID, same kind (CHAR_GREY_HAIRED_MAN). Files, sheets and every reference follow.' },
+    ],
+    validate(p) {
+      return { from: text(p, 'from', { required: true, max: 80 }), to: text(p, 'to', { required: true, max: 80 }) };
+    },
+    async run(services, project, params) {
+      requireIdle(services, project);
+      let outcome;
+      const saved = await history.record(services, project, {
+        kind: 'entity', title: msg('activity.entity_renamed', { from: params.from, to: params.to }),
+        scope: (res) => (res ? [...res.files, ...(res.moved || []).flat()] : []),
+      }, () => {
+        outcome = entityEdit.rename(project, params.from, params.to);
+        return outcome;
+      });
+      return Object.assign({}, outcome, { commit: saved.commit });
+    },
+  },
+
   'issue.create': {
     params: [
       { name: 'title', type: 'string', required: true, description: 'Title of the next issue.' },
@@ -355,7 +472,11 @@ const DIRECT = {
       }
       let made;
       const n = issues.allIssues(project.root).reduce((max, id) => Math.max(max, parseInt(id.slice(4), 10)), 0) + 1;
-      const saved = await history.record(services, project, { kind: 'issue', title: msg('activity.issue_created', { number: n, title: clean.title }) }, () => {
+      const issueId = `ISS_${String(n).padStart(3, '0')}`;
+      const saved = await history.record(services, project, {
+        kind: 'issue', title: msg('activity.issue_created', { number: n, title: clean.title }),
+        scope: [story.PLAN, `issues/${issueId}`, 'continuity'],
+      }, () => {
         made = issues.createIssue(project, clean);
       });
       return Object.assign({}, made, { commit: saved.commit, screen: screens.screenOf(project, `pages:${made.issue}`) });
@@ -446,6 +567,15 @@ function typical(project, services, name, params) {
   return { ms, source: ms ? 'reference' : null, runs: 0, pages };
 }
 
+/** The name of a character, place or prop for a card, or the ID when it has no file. */
+function entityName(project, id) {
+  const m = /^(CHAR|LOC|PROP)_[A-Z][A-Z0-9_]*$/.exec(String(id));
+  if (!m) return null;
+  const dirs = { CHAR: ['characters', 'character.yaml'], LOC: ['locations', 'location.yaml'], PROP: ['props', 'prop.yaml'] }[m[1]];
+  const doc = attempt(() => S.ws.loadYaml(S.ws.abs(project.root, `${dirs[0]}/${id}/${dirs[1]}`)), null);
+  return doc && doc.name ? doc.name : null;
+}
+
 function plainValue(project, name, value) {
   if (Array.isArray(value)) {
     return value.map((v) => {
@@ -453,9 +583,12 @@ function plainValue(project, name, value) {
         const up = project.upload(v);
         return up ? up.name : v;
       }
+      if (v && typeof v === 'object' && typeof v.id === 'string') return entityName(project, v.id) || v.id;
+      if (typeof v === 'string') return entityName(project, v) || v;
       return typeof v === 'object' ? JSON.stringify(v) : String(v);
     }).join(', ');
   }
+  if (typeof value === 'string' && entityName(project, value)) return entityName(project, value);
   if (value && typeof value === 'object') return JSON.stringify(value).slice(0, 400);
   if (typeof value === 'string' && name === 'upload') {
     const up = project.upload(value);
@@ -475,11 +608,12 @@ function uploadsOf(project, params) {
  * Check one proposed action and make its card. Throws the action's own
  * HttpError when it does not validate.
  */
-function makeCard(project, services, item, { conversation: convId, message, job } = {}) {
+function makeCard(project, services, item, { conversation: convId, message, job, after = null, deferred = null } = {}) {
   const found = find(item.action);
   if (!found) throw new HttpError(400, 'unknown_action', `"${String(item.action).slice(0, 60)}" is not an action of the studio.`);
   const params = item.params && typeof item.params === 'object' && !Array.isArray(item.params) ? JSON.parse(JSON.stringify(item.params)) : {};
-  const clean = found.def.validate ? found.def.validate(params, { project, services }) : params;
+  // A card that waits for an earlier one is checked again when it is about to run.
+  const clean = deferred ? params : (found.def.validate ? found.def.validate(params, { project, services }) : params);
   const traits = found.kind === 'op' ? OP_TRAITS[found.name] : null;
   const settings = project.settings();
   const tools = (traits ? traits.verbs(clean) : []).map((verb) => {
@@ -504,7 +638,14 @@ function makeCard(project, services, item, { conversation: convId, message, job 
     typical: typical(project, services, found.name, clean),
     uploads,
     photo_rights: ['character.create', 'character.update'].includes(found.name) && uploads.some((u) => u.kind === 'image'),
+    // The person's message asked for exactly this, now: the card starts in the same turn (see runRequested).
+    requested: item.run === true && !ALWAYS_CONFIRM.includes(found.name),
+    always_confirm: ALWAYS_CONFIRM.includes(found.name),
     status: 'pending',
+    // Proposed together with an earlier card that makes it possible ("approve the plan and draw it"):
+    // it runs after that card has finished, and is cancelled when that card fails or is dismissed.
+    after: after ? { card: after.id, n: after.n, title: after.title } : null,
+    waits_for: deferred ? errorText(deferred) : null,
     job: null,
     result: null,
     error: null,
@@ -552,7 +693,21 @@ function propose(project, services, list, { conversation: convId, message, job, 
     const name = item && typeof item.action === 'string' ? item.action : String((item && item.action) || '?');
     try {
       if (!item || typeof item !== 'object') throw new HttpError(400, 'unknown_action', 'An action must be an object.');
-      const card = makeCard(project, services, Object.assign({}, item, { params: withAttachments(project, item.params, attachments) }), { conversation: convId, message, job });
+      const prepared = Object.assign({}, item, { params: withAttachments(project, item.params, attachments) });
+      const options = { conversation: convId, message, job };
+      let card;
+      try {
+        card = makeCard(project, services, prepared, options);
+      } catch (err) {
+        // The cards are a sequence: what fails now only because of the state of the project
+        // (a plan not approved yet, a character not made yet) may be what an earlier card of
+        // this reply makes true. It is kept, to run after that card, and checked again then.
+        const previous = out.cards[out.cards.length - 1];
+        if (!previous || !stateDependent(err)) throw err;
+        card = makeCard(project, services, prepared, Object.assign({}, options, {
+          after: { id: previous.id, n: out.cards.length, title: previous.title }, deferred: err,
+        }));
+      }
       conversation.saveCard(project, convId, card);
       out.cards.push(card);
     } catch (err) {
@@ -563,6 +718,11 @@ function propose(project, services, list, { conversation: convId, message, job, 
     out.dropped.push({ action: String((item && item.action) || '?').slice(0, 60), reason: msg('action.too_many', { limit: MAX_CARDS }) });
   }
   return out;
+}
+
+/** An error about the project as it is now (404, 409), not about the request itself. */
+function stateDependent(err) {
+  return !!err && (err.status === 404 || err.status === 409) && err.code !== 'unknown_action';
 }
 
 function emitCard(services, project, card) {
@@ -586,14 +746,38 @@ function compact(result) {
  * @param {{by: 'click'|'text'|'auto'}} how
  * @returns {Promise<{card: object, job: object|null}>}
  */
-async function runCard(services, project, convId, cardId, { by = 'click' } = {}) {
+async function runCard(services, project, convId, cardId, { by = 'click', chained = false } = {}) {
   const card = conversation.getCard(project, convId, cardId);
-  if (card.status !== 'pending') {
+  if (card.status !== 'pending' && !(chained && card.status === 'waiting')) {
     throw new HttpError(409, 'card_not_pending', `This card was already ${card.status}.`, undefined, { status: card.status });
   }
   const found = find(card.action);
-  card.run_by = by;
+  if (!chained) card.run_by = by;
   card.updated_at = nowIso();
+  // A card that runs after an earlier one: it waits until that one is done, or goes with it.
+  if (card.after && card.after.card) {
+    let before = null;
+    try {
+      before = conversation.getCard(project, convId, card.after.card);
+    } catch (err) {
+      before = null;
+    }
+    const status = before ? before.status : 'done';
+    if (['failed', 'cancelled', 'dismissed'].includes(status)) {
+      card.status = 'cancelled';
+      card.error = msg('card.cancelled_after', { title: card.after.title, n: card.after.n });
+      conversation.saveCard(project, convId, card);
+      emitCard(services, project, card);
+      afterSettled(services, project, convId, card);
+      return { card, job: null };
+    }
+    if (status !== 'done') {
+      card.status = 'waiting';
+      conversation.saveCard(project, convId, card);
+      emitCard(services, project, card);
+      return { card, job: null };
+    }
+  }
   let job = null;
   if (!found) {
     card.status = 'failed';
@@ -628,7 +812,39 @@ async function runCard(services, project, convId, cardId, { by = 'click' } = {})
   card.updated_at = nowIso();
   conversation.saveCard(project, convId, card);
   emitCard(services, project, card);
+  afterSettled(services, project, convId, card);
   return { card, job };
+}
+
+/**
+ * A card settled: the cards waiting for it run now (when it is done), or are
+ * cancelled with the reason (when it failed, was cancelled or dismissed).
+ */
+function afterSettled(services, project, convId, card) {
+  const ok = card.status === 'done';
+  const over = ['failed', 'cancelled', 'dismissed'].includes(card.status);
+  if (!ok && !over) return;
+  let all = {};
+  try {
+    all = conversation.cards(project, convId) || {};
+  } catch (err) {
+    return;
+  }
+  for (const next of Object.values(all)) {
+    if (!next || !next.after || next.after.card !== card.id) continue;
+    if (ok && next.status === 'waiting') {
+      setImmediate(() => {
+        runCard(services, project, convId, next.id, { chained: true }).catch(() => {});
+      });
+    } else if (over && ['pending', 'waiting'].includes(next.status)) {
+      next.status = 'cancelled';
+      next.error = msg('card.cancelled_after', { title: card.title, n: next.after.n });
+      next.updated_at = nowIso();
+      conversation.saveCard(project, convId, next);
+      emitCard(services, project, next);
+      afterSettled(services, project, convId, next);
+    }
+  }
 }
 
 function dismissCard(services, project, convId, cardId) {
@@ -640,6 +856,7 @@ function dismissCard(services, project, convId, cardId) {
   card.updated_at = nowIso();
   conversation.saveCard(project, convId, card);
   emitCard(services, project, card);
+  afterSettled(services, project, convId, card);
   return card;
 }
 
@@ -716,6 +933,7 @@ function jobSettled(services, project, job) {
   if (job.status === 'done') card.result = compact(job.result);
   conversation.saveCard(project, origin.conversation, card);
   emitCard(services, project, card);
+  afterSettled(services, project, origin.conversation, card);
   if (!['done', 'failed', 'cancelled', 'needs_decision'].includes(job.status)) return;
 
   const { links } = screens.checkLinks(project, resultScreens(job).map((key) => ({ screen: key })));
@@ -737,6 +955,8 @@ function jobSettled(services, project, job) {
     links,
     proposals,
     questions: job.status === 'needs_decision' ? job.questions : [],
+    // The characters, places and objects the job added, with possible duplicates (entities.js).
+    added: job.status === 'done' ? attempt(() => require('./entities').addedView(project, job), []) : [],
     reply_to: origin.message || null,
   });
   services.events.emit(project.id, 'chat', { conversation: origin.conversation, message });
@@ -862,6 +1082,6 @@ function stateBlock(project, services, convId) {
 }
 
 module.exports = {
-  OP_TRAITS, DIRECT, REFERENCE_MS, MAX_CARDS,
+  OP_TRAITS, DIRECT, REFERENCE_MS, MAX_CARDS, ALWAYS_CONFIRM,
   catalog, find, promptText, makeCard, propose, runCard, dismissCard, jobSettled, stateBlock, typical, resultScreens, withAttachments,
 };

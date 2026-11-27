@@ -91,6 +91,24 @@ function writeStarterStory(project, { title, description, pages }) {
   return written;
 }
 
+/**
+ * The person's own text: story/source/description.md, the one place it is
+ * kept. The chat, the Story screen's editor and the AI steps all write that
+ * file. The heading line the studio writes on top ("# <title>") is not part
+ * of the text. A project from before the file existed falls back to the
+ * description saved in the studio state at creation.
+ */
+function personText(project) {
+  let text = null;
+  try {
+    text = fs.readFileSync(S.ws.abs(project.root, SOURCE), 'utf8').replace(/\r\n/g, '\n');
+  } catch (err) {
+    text = null;
+  }
+  if (text === null) return String(project.state().description || '').trim();
+  return text.replace(/^\s*#[^\n]*\n+/, '').trim();
+}
+
 /** The person's own story text: the description and the files under story/source/. */
 function sourceFiles(project) {
   const dir = path.join(project.root, 'story', 'source');
@@ -533,6 +551,6 @@ function discard(project, proposal) {
 
 module.exports = {
   SOURCE, BIBLE, PLAN, PART_TYPES, PROPOSAL_RE,
-  writeStarterStory, sourceFiles,
+  writeStarterStory, sourceFiles, personText,
   partsFrom, create, read, save, list, view, summaryView, checkDecisions, decide, discard, applyParts,
 };

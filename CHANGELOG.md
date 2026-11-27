@@ -2,6 +2,50 @@
 
 ## Unreleased
 
+- Web studio: a commit holds only the files of its own step or action. A
+  job step commits the files that changed while it ran; a save, an
+  approval, a delete or a merge commits the files it names, through a
+  temporary index (`git.commitPaths`), and running steps leave those files
+  out. Found in a real run: three character files written by a page plan
+  went into the commit of a sheet approval made at the same time.
+- Web studio: what a step added. After every step that wrote files, the
+  character, place and prop files it created are listed on the job
+  (`added_entities`) and compared, by the words of their names, aliases,
+  descriptions and IDs, with the entity files, the story bible's characters
+  and the open story proposals; a close match is flagged as a possible
+  duplicate. The prompts that may create an entity list the known IDs and
+  ask to reuse them. New routes merge one entity into another and rename an
+  ID (`POST .../entities/merge`, `POST .../entities/rename`, and the chat
+  actions `entity.merge` and `entity.rename`), rewriting every reference and
+  running the workspace checks before and after. The Pages screen lists what
+  the plan added, and its checks wait while the plan is written ("planning
+  page 6 of 12").
+- Web studio: markers of what changed while the person was on another
+  screen. A dot with a count per step of the side navigation (kept on the
+  collapsed rail), a line on each item that is new, failures and questions
+  in red, "Mark all as seen" per screen. Kept per project in the browser.
+- Web studio: delete what is not wanted (`server/deletion.js`): sheet
+  candidates and old masters, look pages, page and cover versions, uploads,
+  draft editions, a whole character, place or prop, the last page of an
+  issue. A delete removes the file, its registry entry, its generation record
+  and reviews, and the references to it, as one commit; it is refused, with
+  what to do first, when something uses it, and an approved master asks
+  twice. "Clean up unused tries" per screen. Routes `POST .../delete/check`,
+  `POST .../delete`, `GET .../cleanup`; chat action `delete`, which always
+  waits for a click.
+- Web studio, chat: a card the person's message asks for explicitly carries
+  `run: true` and starts in the same turn (`run_by: "request"`); cards
+  proposed together run in order, a card that needs an earlier one waits
+  for it (`after`, status `waiting`) and is cancelled if that one fails.
+  Card parameters show with plain labels and names. The chat prompt asks for
+  replies without IDs or file names. The suggestion chips no longer quote
+  the placeholder story.
+- Web studio: the person's text is read from `story/source/description.md`,
+  so what the chat or the editor saves there shows on the Story screen at
+  once. The action card of a sheet revision names both tools it uses. The
+  correction form says how many touch-ups are left before the next change
+  redraws the whole page.
+
 - One identity chain per character. Photos and drawings a person supplied
   are likeness sources, attached only to the character's first turnaround
   or full character sheet while no drawn sheet is approved. The approved

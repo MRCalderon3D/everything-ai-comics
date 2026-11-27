@@ -13,6 +13,7 @@ import { docEditor, showFile, findingsList } from '/js/components/editor.js';
 import { queueOp } from '/js/components/ask.js';
 import { uploader } from '/js/components/uploader.js';
 import { jobsFor } from '/js/components/jobs.js';
+import { newsBar, newsMark } from '/js/components/news.js';
 import { openDialog, confirmDialog } from '/js/components/dialog.js';
 import { askInConversation } from '/js/components/conversation.js';
 import { toast } from '/js/components/toast.js';
@@ -157,6 +158,7 @@ function proposalCards(ctx, proposals) {
     h('h2', { class: 'panel-title' }, tn('story.proposals_waiting', proposals.length)),
     proposals.map((p) => h('div', { class: 'proposal-card' },
       h('h3', null, p.title),
+      newsMark(`proposal:${p.id}`),
       p.instruction ? h('p', { class: 'small muted' }, `"${p.instruction}"`) : null,
       meter(p.counts || {}),
       h('p', { class: 'small' }, t('story.proposal_counts', { pending: p.counts.pending, parts: p.counts.parts })),
@@ -356,6 +358,7 @@ export function view(ctx, data) {
     ], { label: t('screen.story') }));
 
   const body = h('div', { class: 'stack' },
+    newsBar('story'),
     working,
     data.blocking_questions && data.blocking_questions.length
       ? notice('warn', h('p', null, h('strong', null, tn('story.blocking', data.blocking_questions.length))),

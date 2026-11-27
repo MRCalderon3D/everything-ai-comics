@@ -18,6 +18,10 @@
       "minimum": 0,
       "description": "The provider's reference image limit at planning time."
     },
+    "mode": {
+      "enum": ["full_page", "per_panel"],
+      "description": "The page's generation.mode the plan was built for. A plan whose mode, provider, or budget no longer matches the page is rebuilt before compiling. Absent in older plans, which count as full_page."
+    },
     "required": {
       "type": "array",
       "description": "Images the request must carry, in priority order.",

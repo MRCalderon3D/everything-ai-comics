@@ -340,6 +340,88 @@ want, starting with character sheet images.
 - The chat can delete too (item 8), always as an action card the person
   confirms.
 
+### 14. Edit the lettering of a planned page
+
+In the plan review of a page, the person can only change the words of the
+balloons the plan already has. They cannot add one, remove one, change who
+says it, or change its kind. The scaffold already knows the kinds
+(`letteringElement.type` in `schemas/page.schema.json`: caption, narration,
+balloon, thought, whisper, shout, radio, sfx, sign); the screen does not
+offer them.
+
+- Per panel: add a lettering element, remove one, reorder them (reading
+  order), and pick its kind with plain names and a small icon each: speech,
+  thought, shout, whisper, radio or phone, caption, narration, sound
+  effect, sign.
+- Pick the speaker from the characters in that panel (or off panel, for a
+  voice from outside the frame), and say where the tail points.
+- Keep the scaffold's limits visible while typing (words per balloon,
+  balloons per panel from the lettering rules) and warn before saving
+  when a panel goes over them.
+- Saving re-runs the plan checks for that page. If the page already has a
+  render, say that the lettering changes need the page drawn again (or
+  only re-lettered, in overlay mode) and offer that action.
+- The chat can do the same from the page screen ("add a thought balloon for
+  her in panel 3"), as an edit to the plan it shows before saving.
+
+### 15. Pages with more characters than the drawing tool takes references
+
+Found in a real run: a page with four characters needs five reference
+images (the look plus four identity masters) and the `codex-cli` provider
+declares a budget of four. Drawing refused, which is right. What followed
+was wrong:
+
+- The chat first switched the page to `per_panel` without rebuilding the
+  reference plan, so the next draw failed with a message about running
+  `build-reference-plan.js` by hand. Changing the generation mode must
+  rebuild the reference plan in the same step.
+- The chat then put one of the four characters off panel in two panels to
+  fit four images. It changed the person's staging to get around a tool
+  limit, without asking. A change to who is in a panel is a story change:
+  it goes to the person as a proposal with the reason, never silently.
+- The error text shown to the person is developer text (asset IDs,
+  provider names, script names). Say it in plain words and offer the
+  choices as buttons.
+
+What to build:
+
+- Done in part: asked directly, Codex says its image tool takes attached
+  images as "recent conversation images", up to 5
+  (`num_last_images_to_include`), and separately takes file paths in
+  `referenced_image_paths` with no declared maximum. The budget is now 5.
+  Next: make the provider ask Codex to pass the references as
+  `referenced_image_paths` (absolute paths, in order) instead of relying on
+  the attachments, have it report how many it passed, then measure 6, 8 and
+  10 references with real sheets and raise the budget to what holds.
+- When a page still goes over the budget, offer, in this order: draw it
+  panel by panel (the reference plan rebuilt for that, each panel carrying
+  only its own cast), or combine the secondary characters' approved sheets
+  into one labelled cast image that takes one slot, or change the staging
+  (as a proposal the person accepts).
+- The page plan should know the budget: when planning, warn on panels and
+  pages whose cast would go over it, before anything is drawn.
+
+### 16. The touch-up limit is a warning, and the person decides
+
+Today a page (and a cover) takes two touch-ups on the same image
+(`repair_cycle`); the third change redraws the page from its plan. The
+reason is real: the image tool regenerates the whole image on every edit,
+so colours shift, line softens, faces drift and lettering degrades a little
+more each round, while a redraw starts clean from the approved sheets. The
+cost is also real: a redraw can lose a composition or a gesture the person
+liked. The person should choose.
+
+- The limit becomes a warning: "this image has had 2 touch-ups; more may
+  start to degrade it". At the limit, the correction form offers both:
+  touch up anyway, or redraw the whole page with the change.
+- The number is a setting (default 2), per project, in Settings, with one
+  line on what it trades.
+- The scaffold side: `repair_cycle` limits in the rules and the review
+  policy read the setting instead of a fixed number; automatic repairs
+  after a blocking review keep their own limit so a loop cannot run on its
+  own.
+- The chat offers the same choice when a correction hits the limit.
+
 ## Scaffold
 
 ### 6. More comic styles

@@ -3,12 +3,13 @@
 // the next step) and the conversation docked on the right.
 
 import { h, icon, mount } from '/js/dom.js';
-import { t, tv, getLang, LANGUAGES } from '/js/i18n.js';
+import { t, tn, tv, getLang, LANGUAGES } from '/js/i18n.js';
 import { errorText } from '/js/api.js';
 import { state, bus, getTheme, setTheme, effectiveTheme, changeLanguage } from '/js/store.js';
 import { jobsIndicator } from '/js/components/jobs.js';
 import { toggleDock, dockOpen, unreadCount } from '/js/components/conversation.js';
 import { toast } from '/js/components/toast.js';
+import { countFor } from '/js/unseen.js';
 import { layout, setLayout, toggleFocus, resizeHandle, railIsDrawer, transient, setTransient } from '/js/layout.js';
 
 export const SCREENS = ['story', 'style', 'characters', 'places', 'pages', 'check', 'corrections', 'cover', 'publish'];
@@ -94,11 +95,14 @@ function paintRail() {
       const s = byKey.get(key) || { status: 'todo' };
       const isNext = overview.next && overview.next.screen === key;
       const stateText = isNext ? t('status.next') : tv('status', s.status);
+      const news = countFor(key);
+      const newsText = news.n ? (news.alert ? tn('unseen.nav_alert', news.n) : tn('unseen.nav', news.n)) : '';
       return h('li', { dataset: { status: s.status, next: String(!!isNext) } },
-        h('a', { href: `${base}/${key}`, 'aria-current': current(key), title: `${t(`screen.${key}`)}: ${stateText}` },
+        h('a', { href: `${base}/${key}`, 'aria-current': current(key), title: `${t(`screen.${key}`)}: ${stateText}${newsText ? `. ${newsText}` : ''}` },
           h('span', { class: 'n', 'aria-hidden': 'true' }, String(index + 1)),
           h('span', { class: 'name' }, t(`screen.${key}`)),
-          h('span', { class: 'state' }, stateText)));
+          h('span', { class: 'state' }, stateText),
+          news.n ? h('span', { class: `nav-news${news.alert ? ' alert' : ''}`, role: 'status' }, h('span', { 'aria-hidden': 'true' }, String(news.n)), h('span', { class: 'sr-only' }, newsText)) : null));
     })),
     h('div', { class: 'rail-foot' },
       railIsDrawer() ? null : h('button', {
@@ -135,6 +139,8 @@ export function startShell() {
   bus.on('project', paintShell);
   bus.on('health', paintTopbar);
   bus.on('theme', paintTopbar);
+  // New things on other screens: the dots of the path.
+  bus.on('unseen', () => keepFocus(document.getElementById('rail'), paintRail));
   bus.on('dock', () => keepFocus(document.getElementById('topbar'), paintTopbar));
   // A new width needs no repaint (and repainting would drop the handle being
   // dragged); collapsing, focus mode and the drawer do.

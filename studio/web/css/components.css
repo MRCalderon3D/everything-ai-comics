@@ -591,3 +591,45 @@ button.frame-art:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0
 .overrule-note p { margin: 0; }
 .result-questions .question { padding: 0; border: 0; margin: 0; }
 .result-questions .question > legend { font-size: var(--step--1); font-weight: 600; line-height: 1.4; }
+
+/* What is new since the person was last here (unseen.js). The dot of an
+   item and of a step of the path; alerts (a failure, a question) in the
+   colour of a problem. It pops in once; with reduced motion it just appears. */
+.news-dot {
+  display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--accent); flex: none; vertical-align: middle;
+  animation: news-pop var(--slow, 240ms) var(--ease, ease-out) 1;
+}
+.news-dot.alert, .news-mark.alert .news-dot, .news-item.alert .news-dot { background: var(--bad); }
+@keyframes news-pop { from { transform: scale(0.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .news-dot, .nav-news { animation: none; } }
+.news-mark { display: inline-flex; align-items: flex-start; gap: 6px; font-size: var(--step--1); color: var(--accent); font-weight: 600; }
+.news-mark.alert { color: var(--bad); }
+.news-bar { border: 2px solid var(--accent); background: var(--accent-wash); border-radius: var(--r-ctl); padding: 10px 12px; }
+.news-bar.alert { border-color: var(--bad); background: var(--bad-wash); }
+.news-list { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 0; padding: 0; list-style: none; }
+.news-item { display: flex; align-items: center; gap: 8px; font-size: var(--step--1); }
+.news-item.shown { opacity: 0.75; }
+.msg-links .news-dot { margin-left: 6px; }
+
+/* Deleting: what goes, why not, and the unused tries of a screen. */
+.delete-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; max-height: 50vh; overflow: auto; }
+.delete-list li { display: flex; gap: 10px; align-items: flex-start; }
+.delete-list p { margin: 2px 0 0; }
+.delete-thumb { width: 56px; height: 56px; object-fit: cover; border-radius: var(--r-art); border: 1px solid var(--line); flex: none; background: var(--art-bg); }
+.cleanup-list .check label { display: flex; gap: 10px; align-items: center; }
+.asset-actions { gap: 6px; flex-wrap: wrap; }
+
+/* What a page plan added, and its possible duplicates. */
+.added-list { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.added-item { border-top: 1px solid var(--line); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.added-item[data-exists="false"] { opacity: 0.7; }
+.added-dup p { margin: 0 0 6px; }
+.chip.warn { background: var(--warn-wash); color: var(--warn); border-color: var(--warn); }
+.result-added { margin-top: 6px; }
+
+/* A card's parameters: plain labels, the raw names under "Details". */
+.action-params .action-raw summary { cursor: pointer; }
+.action-after { color: var(--ink-2); }
+.news-mark .news-dot { margin-top: 0.4em; }
+.action-details.plain dt { font-family: inherit; font-size: var(--step--1); color: var(--ink-2); }

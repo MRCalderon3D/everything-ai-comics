@@ -34,7 +34,11 @@ the browser with the web studio: `npm run studio` starts it, and
 opens in the other. In the studio every step can also be asked for in its
 conversation, which proposes the step as a card you run, and a finished
 issue can be continued with the next one (`opens_from` and the end state of
-section 12 are written for you).
+section 12 are written for you). The studio also lists the characters,
+places and props a page plan created (the breakdown of section 6 can write
+them), flags one that looks like an ID the story already uses so the two can
+be merged, and deletes tries you do not keep without leaving the registry or
+the generation records behind.
 
 ## 1. Get set up
 

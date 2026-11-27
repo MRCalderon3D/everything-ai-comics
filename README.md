@@ -165,18 +165,35 @@ review is marked as not independent.
 Every step shows the text and the images of what is being made. You change
 anything by editing it or by asking in the conversation docked beside every
 screen. Each finished step is a commit in a local git repository inside the
-project, so the History screen can take the project back to an earlier point.
+project, holding that step's files only, so the History screen can take the
+project back to an earlier point.
 
 The conversation can also do the work itself. Drop a photo into it and ask
 for a character in the comic's style, ask for two more pages where she opens
 the box, or for the cover. The reply proposes each step as a card that says
 what it will do, which tool and model will do it, and how long it usually
-takes, and nothing runs until you click Run or say yes. Approvals and
+takes. A card you asked for in so many words ("draw the look page") starts
+at once, and cards that depend on each other ("approve the plan and draw
+it") run one after the other; anything the conversation only suggests waits
+until you click Run or say yes. Approvals and
 answers to a job's questions work the same way. When a job ends, the sheet,
 the plan or the drawn page comes back into the conversation with a link to
 the screen where you approve it. A question asked while a drawing runs is
 answered at once, without waiting for it. A whole comic can be made from the
 conversation alone, from the screens alone, or mixing both.
+
+While you work on one screen, the others mark what changed there: a dot
+with a count beside the step in the side navigation, and a short line on
+the character, page or plan that is new, in red when a job failed or waits
+for your answer.
+
+When a page plan creates a character the text describes but nobody had
+written yet, the Pages screen lists it with "needs a sheet", and flags it
+when it looks like someone the story already has under another ID, with a
+button to merge the two. Images you do not want (old tries of a sheet, page
+versions, cover versions, uploads, draft editions) have a delete control, and
+each screen can clean up its unused tries at once. A delete is refused while
+something uses the image, and History brings it back.
 
 When an issue is finished, "New issue" on the Pages screen or the project
 home starts the next one. It keeps the look, the characters, the places and

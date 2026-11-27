@@ -9,6 +9,7 @@ import { frame, openViewer } from '/js/components/viewer.js';
 import { actionButton } from '/js/components/ui.js';
 import { confirmDialog } from '/js/components/dialog.js';
 import { toast } from '/js/components/toast.js';
+import { deleteButton } from '/js/components/deleting.js';
 
 export function sheetName(sheet) {
   return tv('sheet', sheet, sheet);
@@ -69,7 +70,7 @@ export async function approveAsset(ctx, candidate, { isLook, hasMaster } = {}) {
  * A grid of assets. Each candidate that is not yet a master gets an
  * "approve" button. `masterOf(sheet)` says whether that sheet has a master.
  */
-export function assetGrid(ctx, assets, { all, isLook, masterOf, emptyText, canApprove = true } = {}) {
+export function assetGrid(ctx, assets, { all, isLook, masterOf, emptyText, canApprove = true, canDelete = true } = {}) {
   if (!assets.length) return emptyText ? h('p', { class: 'muted' }, emptyText) : h('div');
   const items = viewerItems(all || assets);
   return h('div', { class: 'asset-grid' }, assets.map((a) => {
@@ -85,10 +86,13 @@ export function assetGrid(ctx, assets, { all, isLook, masterOf, emptyText, canAp
             : tv('asset_status', a.status, a.status)),
         a.approved_at && a.status === 'approved' ? h('span', { class: 'small faint' }, t('asset.approved_on', { date: formatDate(a.approved_at) })) : null,
         a.generation && a.generation.supplied_by_person ? h('span', { class: 'small faint' }, t('asset.supplied')) : null),
-      pending && canApprove
-        ? actionButton(isLook ? t('approve.look_action') : t('approve.sheet_action'),
-          () => approveAsset(ctx, a, { isLook, hasMaster: masterOf ? masterOf(a.sheet) : false }),
-          { small: true, kind: 'primary' })
-        : null);
+      h('div', { class: 'row asset-actions' },
+        pending && canApprove
+          ? actionButton(isLook ? t('approve.look_action') : t('approve.sheet_action'),
+            () => approveAsset(ctx, a, { isLook, hasMaster: masterOf ? masterOf(a.sheet) : false }),
+            { small: true, kind: 'primary' })
+          : null,
+        // The server says whether it can go: an approved master that pages were drawn from stays.
+        canDelete && !a.promoted_to ? deleteButton(ctx, { kind: 'asset', id: a.id }) : null));
   }));
 }

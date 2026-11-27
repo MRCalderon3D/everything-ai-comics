@@ -125,9 +125,10 @@ async function main() {
     assert.strictEqual(whole.buffer.length, Buffer.byteLength(big), 'the URL serves the whole file');
 
     // --- HTML from the history runs sandboxed, like HTML from the workspace ---------------------------------------------
+    // A save commits only its own file, so the HTML file goes into the history by a commit of its own.
     fs.writeFileSync(path.join(root, 'story', 'page.html'), '<!doctype html><script>fetch("/api/projects")</script>');
-    r = await s.api('PUT', `${P}/file`, { path: 'style/color-script.md', text: '# Color\n\nThree palettes.\n' });
-    const withHtml = r.body.commit;
+    const withHtml = await require('../studio/server/git').commitAll(path.join(s.home, id), 'An HTML file');
+    assert.ok(withHtml);
     r = await s.api('GET', `${P}/diff?commit=${withHtml}`);
     const html = r.body.files.find((f) => f.path === 'story/page.html');
     assert.deepStrictEqual([html.status, html.kind], ['added', 'text']);

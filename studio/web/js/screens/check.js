@@ -16,6 +16,8 @@ import { pageName, versionName } from '/js/labels.js';
 import { renderItems } from '/js/screens/page.js';
 import { queueLine } from '/js/screens/pages.js';
 import { currentIssue } from '/js/components/issues.js';
+import { newsBar, newsMark } from '/js/components/news.js';
+import { deleteButton, cleanupButton } from '/js/components/deleting.js';
 
 export async function load(ctx) {
   // A page names its issue; otherwise the issue chosen on the Pages screen.
@@ -34,12 +36,12 @@ export function pageStrip(ctx, issue, currentId, section) {
     h('ul', null, issue.pages.map((p) => h('li', null,
       h('a', { href: `${base}/${p.id}`, 'aria-current': p.id === currentId ? 'page' : null, class: 'strip-item', dataset: { verdict: verdictClass(p) } },
         p.image ? h('img', { src: p.image.url, alt: '' }) : h('span', { class: 'thumb-empty' }),
-        h('span', { class: 'strip-name' }, pageName(p.id)),
+        h('span', { class: 'strip-name' }, pageName(p.id), ' ', newsMark(`page:${p.id}`, { short: true })),
         h('span', { class: 'strip-verdict' }, p.current_render ? verdictWords(p) : t('pages.not_drawn')))))));
 }
 
 /** How each version came to be, oldest first. */
-function versionHistory(renders, repairLimit) {
+function versionHistory(ctx, renders, repairLimit) {
   return h('ol', { class: 'version-history' }, renders.map((r, index) => {
     const review = r.review;
     const gen = r.generation || {};
@@ -57,7 +59,8 @@ function versionHistory(renders, repairLimit) {
         review && review.independent === false ? ` · ${t('verdict.not_independent_short')}` : ''),
       fixed.length ? h('ul', { class: 'bullets small' }, fixed.map((f) => h('li', null, t('check.fixed_line', { what: f.repair || f.expected }), ' ', h('span', { class: 'muted' }, f.recheck.evidence)))) : null,
       open.length ? h('ul', { class: 'bullets small' }, open.map((f) => h('li', null, outcomeOf(review) === 'notes' ? t('check.note_line', { what: f.visible || f.repair }) : t('check.open_line', { what: f.visible || f.repair })))) : null,
-      gen.status === 'rejected' ? h('p', { class: 'small faint' }, t('check.replaced')) : null);
+      gen.status === 'rejected' ? h('p', { class: 'small faint' }, t('check.replaced')) : null,
+      deleteButton(ctx, { kind: 'render', id: r.id }, { label: t('page.delete_version') }));
   }),
   h('li', { class: 'version-limit small muted' }, tn('check.repair_limit', repairLimit)));
 }
@@ -110,12 +113,13 @@ export function view(ctx, { issue, page }) {
   }
 
   const text = h('div', { class: 'stack' },
+    newsBar('check'),
     jobsFor(mine),
     h('section', { class: 'panel' },
       h('h2', { class: 'panel-title' }, t('check.review_of', { name, version: versionName(shown.id) })),
       !shown.current ? notice('info', t('check.older_version')) : null,
       reviewPanel(review, { panels, repairLimit: page.repair_limit, onCorrect: shown.current ? correctFinding : null })),
-    panel(t('check.history_title'), versionHistory(renders, page.repair_limit)));
+    panel(t('check.history_title'), versionHistory(ctx, renders, page.repair_limit)));
 
   const decision = h('div', { class: 'panel stack-s' },
     h('h2', { class: 'panel-title' }, t('review.your_decision')),
@@ -146,6 +150,7 @@ export function view(ctx, { issue, page }) {
       title: t('screen.check'),
       lede: t('check.lede_counts', { passed: issue.counts.passed - overruledCount - notesCount, notes: notesCount, flagged: issue.counts.flagged, drawn: issue.counts.rendered })
         + (overruledCount ? ` ${tn('pages.lede_overruled', overruledCount)}` : '') + ` ${t('check.lede_tail')}`,
+      actions: [cleanupButton(ctx, `check:${issue.id}`)],
     }),
     pageStrip(ctx, issue, page.id, 'check'),
     bench(ctx, { text, images, focus: 'even', chat: { key: page.chat_key, title: t('chat.title_about', { name }) } }));

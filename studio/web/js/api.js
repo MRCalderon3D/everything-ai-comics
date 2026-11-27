@@ -148,6 +148,13 @@ export const api = {
   approvePage: (id, body) => request('POST', `${project(id)}/approve/page`, { body }),
   approveCover: (id, body) => request('POST', `${project(id)}/approve/cover`, { body }),
 
+  /** Delete: what it would remove or why not (check), then the delete itself. */
+  deleteCheck: (id, items) => request('POST', `${project(id)}/delete/check`, { body: { items } }),
+  deleteItems: (id, items, confirmMaster) => request('POST', `${project(id)}/delete`, { body: { items, confirm_master: confirmMaster ? true : undefined } }),
+  cleanup: (id, scope) => request('GET', `${project(id)}/cleanup${q({ scope })}`),
+  mergeEntity: (id, from, into) => request('POST', `${project(id)}/entities/merge`, { body: { from, into } }),
+  renameEntity: (id, from, to) => request('POST', `${project(id)}/entities/rename`, { body: { from, to } }),
+
   lettering: (id, page, render) => request('GET', `${project(id)}/pages/${enc(page)}/lettering${q({ render })}`),
   sendLettered: (id, page, render, blob) => request('POST', `${project(id)}/pages/${enc(page)}/lettered${q({ render })}`, { raw: blob }),
 

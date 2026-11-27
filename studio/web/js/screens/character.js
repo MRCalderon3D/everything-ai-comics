@@ -19,6 +19,9 @@ import { assetGrid, viewerItems, sheetName, approveAsset } from '/js/components/
 import { handoff, noDrawTool } from '/js/components/handoff.js';
 import { toast } from '/js/components/toast.js';
 import { pageName } from '/js/labels.js';
+import { newsMark } from '/js/components/news.js';
+import { deleteButton, cleanupButton } from '/js/components/deleting.js';
+import { entityTools } from '/js/components/entity-tools.js';
 
 const SHEETS = ['turnaround', 'model', 'expressions', 'wardrobe'];
 const NEEDS_MASTER = ['expressions', 'wardrobe'];
@@ -151,7 +154,8 @@ function modelPart(ctx, data, all, canDraw) {
           : null,
         s.base === v.id
           ? h('span', { class: 'small muted' }, t('character.model_is_base'))
-          : button(t('character.model_use_base'), { small: true, kind: 'quiet', onclick: () => { s.base = v.id; s.chosen = v.id !== latest.id; s.region = null; ctx.refresh(); } })));
+          : button(t('character.model_use_base'), { small: true, kind: 'quiet', onclick: () => { s.base = v.id; s.chosen = v.id !== latest.id; s.region = null; ctx.refresh(); } }),
+        deleteButton(ctx, { kind: 'asset', id: v.id })));
   }));
 
   const nodes = [h('h2', { class: 'panel-title' }, sheetName('model')), h('p', { class: 'small muted' }, t('character.model_intro')), cards];
@@ -220,7 +224,7 @@ function imagesPart(ctx, data, draw) {
   const outfits = data.wardrobe && data.wardrobe.data && Array.isArray(data.wardrobe.data.outfits) ? data.wardrobe.data.outfits : [];
   const mine = (j) => (j.op === 'character.sheet' || j.op === 'character.update' || j.op === 'character.create' || j.op === 'page.manual')
     && j.params && (j.params.character === data.id || j.params.entity === data.id);
-  const nodes = [jobsFor(mine)];
+  const nodes = [newsMark(`character:${data.id}`), jobsFor(mine)];
 
   if (data.image) {
     const main = all.find((a) => a.image && a.image.path === data.image.path);
@@ -297,12 +301,17 @@ export function view(ctx, data) {
     data.used_on && data.used_on.length
       ? h('p', { class: 'small muted' }, tn('character.used_on', data.used_on.length), ' ',
         data.used_on.map((p, i) => [i ? ', ' : '', h('a', { href: `${base}/pages/${p}` }, pageName(p))]))
-      : null);
+      : null,
+    entityTools(ctx, {
+      id: data.id, name: data.name,
+      others: async () => (await api.characters(ctx.projectId)).characters.map((c) => ({ id: c.id, name: c.name })),
+    }));
   return h('div', { class: 'screen' },
     screenHead({
       title: data.name,
       lede: data.summary || t('character.no_summary'),
       back: { href: `${base}/characters`, label: t('screen.characters') },
+      actions: [cleanupButton(ctx, `character:${data.id}`)],
     }),
     bench(ctx, {
       text,

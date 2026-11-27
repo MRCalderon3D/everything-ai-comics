@@ -11,6 +11,8 @@ import { uploader } from '/js/components/uploader.js';
 import { jobsFor } from '/js/components/jobs.js';
 import { frame } from '/js/components/viewer.js';
 import { toast } from '/js/components/toast.js';
+import { newsBar, newsMark } from '/js/components/news.js';
+import { cleanupButton } from '/js/components/deleting.js';
 
 export async function load(ctx) {
   const [cast, story] = await Promise.all([api.characters(ctx.projectId), api.story(ctx.projectId).catch(() => null)]);
@@ -92,6 +94,7 @@ export function view(ctx, data) {
     : null;
 
   const text = h('div', { class: 'stack' },
+    newsBar('characters'),
     jobsFor((j) => j.op === 'character.create' || (j.op === 'character.sheet' && j.params && unsheeted.some((c) => c.id === j.params.character))),
     !data.cast.look_approved ? notice('info', t('characters.look_first'), ' ',
       h('a', { href: `/p/${encodeURIComponent(ctx.projectId)}/style` }, t('screen.style'))) : null,
@@ -113,6 +116,7 @@ export function view(ctx, data) {
       h('a', { href: `${base}/${c.id}`, class: 'cast-art', 'aria-label': t('characters.open', { name: c.name }) },
         frame(c.image, { alt: t('characters.image_alt', { name: c.name }), ratio: '1 / 1', placeholder: t('characters.no_image') })),
       h('h3', null, h('a', { href: `${base}/${c.id}` }, c.name)),
+      newsMark(`character:${c.id}`),
       c.role ? h('p', { class: 'small faint' }, tv('value', c.role, c.role)) : null,
       c.summary ? h('p', { class: 'muted clamp' }, c.summary) : null,
       h('p', { class: `small ${c.has_master ? 'state-ok' : 'state-wait'}` },
@@ -123,6 +127,10 @@ export function view(ctx, data) {
     : emptyState(t('characters.empty_title'), t('characters.empty_body'));
 
   return h('div', { class: 'screen' },
-    screenHead({ title: t('screen.characters'), lede: cast.length ? tn('characters.lede', cast.length) : t('characters.lede_empty') }),
+    screenHead({
+      title: t('screen.characters'),
+      lede: cast.length ? tn('characters.lede', cast.length) : t('characters.lede_empty'),
+      actions: cast.length ? [cleanupButton(ctx, 'characters')] : null,
+    }),
     bench(ctx, { text, images, chat: { key: data.cast.chat_key, examples: [t('characters.example_1')] } }));
 }

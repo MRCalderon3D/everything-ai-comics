@@ -17,6 +17,8 @@ import { handoff, noDrawTool } from '/js/components/handoff.js';
 import { versionName } from '/js/labels.js';
 import { toast } from '/js/components/toast.js';
 import { currentIssue, issueBar } from '/js/components/issues.js';
+import { newsBar } from '/js/components/news.js';
+import { deleteButton, cleanupButton } from '/js/components/deleting.js';
 
 const mine = (j) => j.op === 'cover.create' || j.op === 'cover.correct'
   || (j.op === 'page.manual' && j.params && j.params.cover)
@@ -128,6 +130,7 @@ export function view(ctx, { issue, cover, repairLimit }) {
   }) : null;
 
   const text = h('div', { class: 'stack' },
+    newsBar('cover'),
     jobsFor(mine),
     h('section', { class: 'panel' },
       tabs(ctx, 'cover', [
@@ -158,7 +161,9 @@ export function view(ctx, { issue, cover, repairLimit }) {
       ? h('div', { class: 'stack-s' },
         h('div', { class: 'row spread' },
           h('span', null, h('strong', null, versionName((shown || current).id)), ' ', verdictChip((shown || current).review || {})),
-          h('button', { type: 'button', class: 'link', onclick: () => openViewer(items, (shown || current).id, { title: t('cover.name') }) }, t('image.open_large_short'))),
+          h('span', { class: 'row' },
+            h('button', { type: 'button', class: 'link', onclick: () => openViewer(items, (shown || current).id, { title: t('cover.name') }) }, t('image.open_large_short')),
+            deleteButton(ctx, { kind: 'render', id: (shown || current).id }, { label: t('page.delete_version') }))),
         shown && shown.id !== current.id
           ? frame(shown.lettered || shown.image, { alt: `${t('cover.name')}, ${versionName(shown.id)}`, onclick: () => openViewer(items, shown.id) })
           : box.stage,
@@ -178,6 +183,7 @@ export function view(ctx, { issue, cover, repairLimit }) {
     screenHead({
       title: t('screen.cover'),
       lede: approved ? t('cover.lede_approved') : (current ? t('cover.lede_drawn') : t('cover.lede_written')),
+      actions: renders.length > 1 ? [cleanupButton(ctx, `cover:${issue}`)] : null,
     }),
     issueBar(ctx, issue),
     bench(ctx, { text, images, chat: { key: cover.chat_key, examples: [t('cover.example_1')] } }));

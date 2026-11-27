@@ -16,6 +16,8 @@ import { jobsFor } from '/js/components/jobs.js';
 import { frame, openViewer, compareBox } from '/js/components/viewer.js';
 import { openDialog } from '/js/components/dialog.js';
 import { assetGrid, viewerItems } from '/js/components/assets.js';
+import { newsBar } from '/js/components/news.js';
+import { cleanupButton } from '/js/components/deleting.js';
 import { handoff, noDrawTool } from '/js/components/handoff.js';
 import { optionsForm } from '/js/components/options.js';
 import { toast } from '/js/components/toast.js';
@@ -323,6 +325,7 @@ export function view(ctx, data) {
 
   const lede = frozen ? t('style.lede_frozen') : t('style.lede_defined');
   const text = h('div', { class: 'stack' },
+    newsBar('style'),
     jobsFor((j) => j.op === 'style.define'),
     h('section', { class: 'panel' },
       tabs(ctx, 'style', [
@@ -345,7 +348,7 @@ export function view(ctx, data) {
       ], { label: t('screen.style') })));
 
   return h('div', { class: 'screen' },
-    screenHead({ title: t('screen.style'), lede }),
+    screenHead({ title: t('screen.style'), lede, actions: [cleanupButton(ctx, 'style')] }),
     bench(ctx, {
       text,
       focus: 'images',

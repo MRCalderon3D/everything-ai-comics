@@ -16,7 +16,9 @@ import { handoff, noDrawTool } from '/js/components/handoff.js';
 import { slotWords } from '/js/components/correction.js';
 import { toast } from '/js/components/toast.js';
 import { pageName, versionName } from '/js/labels.js';
-import { mechanicalBox, drawPages, queueLine } from '/js/screens/pages.js';
+import { mechanicalBox, drawPages, queueLine, planningBox } from '/js/screens/pages.js';
+import { newsMark } from '/js/components/news.js';
+import { deleteButton } from '/js/components/deleting.js';
 import { pageSheet, drawingWait } from '/js/components/artwork.js';
 import { askInConversation } from '/js/components/conversation.js';
 import { blockerText } from '/js/screens/home.js';
@@ -243,7 +245,7 @@ export function view(ctx, data) {
       h('div', { class: 'row' }, approveBtn)),
     assumptionsPanel(ctx, data, name),
     panel(t('mech.title'),
-      mechanicalBox(data.findings),
+      data.planning ? planningBox(ctx, data.planning) : mechanicalBox(data.findings),
       findingsList(data.findings.schema),
       blockers.length ? notice('warn', h('p', null, h('strong', null, t('page.blockers'))),
         h('ul', { class: 'bullets' }, blockers.map((b) => h('li', null, blockerText(b))))) : null),
@@ -281,6 +283,7 @@ export function view(ctx, data) {
   const tiers = data.page.data && data.page.data.layout && Array.isArray(data.page.data.layout.tiers) ? data.page.data.layout.tiers : null;
   const openLarge = () => openViewer(items, shown.id, { title: name });
   const images = h('div', { class: 'stack' },
+    newsMark(`page:${data.id}`),
     drawingWait(ctx, data.id, { tiers, name }),
     jobsFor(mine),
     shown
@@ -288,7 +291,9 @@ export function view(ctx, data) {
         pageSheet(ctx, data.id, shown.lettered || shown.image, { alt: `${name}, ${versionName(shown.id)}`, onOpen: openLarge }),
         h('div', { class: 'row spread' },
           h('span', null, h('strong', null, versionName(shown.id)), shown.current ? ` · ${t('page.current_version')}` : ''),
-          h('span', { class: 'row' }, queueLine(data.id), button(t('page.view_large'), { kind: 'quiet', small: true, icon: 'zoom', onclick: openLarge }))),
+          h('span', { class: 'row' }, queueLine(data.id), button(t('page.view_large'), { kind: 'quiet', small: true, icon: 'zoom', onclick: openLarge }),
+            // This version: the server refuses when an edition ships it or the next page was drawn from it.
+            deleteButton(ctx, { kind: 'render', id: shown.id }, { label: t('page.delete_version') }))),
         shown.review ? h('p', null, verdictChip(Object.assign({}, shown.review)), ' ',
           h('a', { href: `${base}/check/${data.id}` }, t('page.see_evidence'))) : h('p', { class: 'muted' }, t('verdict.none')),
         renders.length > 1 ? versionStrip(items, shown.id, (id) => { ctx.ui.version = id; ctx.refresh(); }) : null)

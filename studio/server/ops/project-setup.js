@@ -46,7 +46,7 @@ module.exports = {
       const bible = S.ws.loadYaml(S.ws.abs(root, story.BIBLE));
       // A template, or the starter bible nobody has written in yet, takes the new description.
       const untouched = bible && (!Array.isArray(bible.facts) || !bible.facts.length) &&
-        [title, project.state().description || ''].includes(String(bible.premise || ''));
+        [title, story.personText(project)].includes(String(bible.premise || ''));
       const template = !bible || untouched || (typeof bible.premise === 'string' && /^TODO/i.test(bible.premise));
       if (template) {
         story.writeStarterStory(project, { title, description: params.description, pages: params.pages });

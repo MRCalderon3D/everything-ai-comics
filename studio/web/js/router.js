@@ -8,6 +8,7 @@ import { t } from '/js/i18n.js';
 import { errorText } from '/js/api.js';
 import { state, bus, openProject, closeProject, setScreen } from '/js/store.js';
 import { motionReduced } from '/js/gl/stage.js';
+import { openScreen } from '/js/unseen.js';
 
 const routes = [];
 let current = null; // { route, ctx, path }
@@ -204,6 +205,8 @@ async function render() {
     if (my !== token) return;
     current = { route: found.route, ctx, path, mod };
     state.screenExamples = null;
+    // What this screen shows in full is seen now; its markers stay until the person leaves.
+    if (ctx.projectId) openScreen(found.route.meta.screen, found.params, state.issue);
     const node = mod.view(ctx, data);
     bus.emit('route', current);
     mount(main, node);

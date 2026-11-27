@@ -7,7 +7,7 @@
  * the person's global git configuration.
  */
 
-const { execFile, spawnSync } = require('child_process');
+const { execFile, spawn, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -122,6 +122,99 @@ async function commitNow(dir, message) {
   if (commit.code !== 0) return null;
   const after = headFromFiles(dir) || await head(dir);
   return after && after !== before ? after : null;
+}
+
+/** Run git with text on its standard input. Resolves { code, stdout, stderr }. */
+function gitInput(dir, args, input, env = {}) {
+  return new Promise((resolve) => {
+    const full = ['--git-dir', gitDir(dir), '--work-tree', dir, ...IDENTITY,
+      '-c', `core.hooksPath=${path.join(gitDir(dir), 'studio-no-hooks')}`, ...args];
+    const child = spawn('git', full, {
+      cwd: dir,
+      windowsHide: true,
+      env: Object.assign({}, process.env, { GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0' }, env),
+    });
+    let stdout = '';
+    let stderr = '';
+    const timer = setTimeout(() => child.kill(), 120000);
+    child.stdout.on('data', (d) => { stdout += d; });
+    child.stderr.on('data', (d) => { stderr += d; });
+    child.on('error', () => { clearTimeout(timer); resolve({ code: 1, stdout, stderr }); });
+    child.on('close', (code) => { clearTimeout(timer); resolve({ code: code === null ? 1 : code, stdout, stderr }); });
+    child.stdin.on('error', () => {});
+    child.stdin.end(input);
+  });
+}
+
+function cleanPaths(paths) {
+  const out = new Set();
+  for (const p of Array.isArray(paths) ? paths : []) {
+    const text = String(p || '').replace(/\\/g, '/').replace(/^\.\/+/, '');
+    if (!text || text.includes('\0') || text.split('/').some((part) => part === '..' || part === '.git' || part === '')) continue;
+    out.add(text);
+  }
+  return [...out].sort();
+}
+
+/**
+ * Commit exactly these paths, as they are now in the working tree, and
+ * nothing else: a path that exists is added or updated, one that is gone is
+ * removed. Other changes in the working tree (files another running job is
+ * writing) stay out of the commit and out of its parent's way.
+ *
+ * It works on a temporary index seeded from HEAD, so whatever else sits in
+ * the real index is never swept in. The real index is then brought up to
+ * date for the same paths, so a later commit does not see them as changed.
+ * @param {string} dir project directory (the repository's work tree)
+ * @param {string} message
+ * @param {string[]} paths relative to dir, forward slashes
+ * @returns {Promise<string|null>} the commit id, or null when nothing changed
+ */
+async function commitPaths(dir, message, paths) {
+  if (!detect().installed || !isRepo(dir)) return null;
+  const list = cleanPaths(paths);
+  if (!list.length) return null;
+  return withLock(dir, () => commitPathsNow(dir, message, list));
+}
+
+async function commitPathsNow(dir, message, list) {
+  // Ignored files stay out, as `git add` would leave them.
+  const ignored = new Set();
+  const present = list.filter((p) => fs.existsSync(path.join(dir, ...p.split('/'))));
+  if (present.length) {
+    const res = await gitInput(dir, ['check-ignore', '--no-index', '-z', '--stdin'], `${present.join('\0')}\0`);
+    for (const p of res.stdout.split('\0').filter(Boolean)) ignored.add(p);
+  }
+  const wanted = list.filter((p) => !ignored.has(p));
+  if (!wanted.length) return null;
+  const input = `${wanted.join('\0')}\0`;
+  const parent = await head(dir);
+  const tmpIndex = path.join(gitDir(dir), `studio-index-${process.pid}-${Date.now().toString(36)}`);
+  const env = { GIT_INDEX_FILE: tmpIndex };
+  try {
+    const seed = await gitInput(dir, parent ? ['read-tree', parent] : ['read-tree', '--empty'], '', env);
+    if (seed.code !== 0) return null;
+    const upd = await gitInput(dir, ['update-index', '--add', '--remove', '-z', '--stdin'], input, env);
+    if (upd.code !== 0) return null;
+    const tree = (await gitInput(dir, ['write-tree'], '', env)).stdout.trim();
+    if (!/^[0-9a-f]{40}$/.test(tree)) return null;
+    if (parent) {
+      const parentTree = (await git(dir, ['rev-parse', `${parent}^{tree}`])).stdout.trim();
+      if (parentTree === tree) return null;
+    }
+    const text = String(message || 'Change').replace(/\r/g, '').slice(0, 2000);
+    const made = await gitInput(dir, ['commit-tree', tree, ...(parent ? ['-p', parent] : []), '-F', '-'], text);
+    const commit = made.stdout.trim();
+    if (made.code !== 0 || !/^[0-9a-f]{40}$/.test(commit)) return null;
+    const ref = await git(dir, parent ? ['update-ref', '-m', 'studio: commit', 'HEAD', commit, parent] : ['update-ref', '-m', 'studio: commit', 'HEAD', commit]);
+    if (ref.code !== 0) return null;
+    // The real index follows for these paths only.
+    await gitInput(dir, ['update-index', '--add', '--remove', '-z', '--stdin'], input);
+    return commit;
+  } finally {
+    try { fs.rmSync(tmpIndex, { force: true }); } catch (err) { /* left for the next run */ }
+    try { fs.rmSync(`${tmpIndex}.lock`, { force: true }); } catch (err) { /* nothing */ }
+  }
 }
 
 /** HEAD read straight from the repository files (no process); null when it cannot be read that way. */
@@ -255,6 +348,6 @@ function fileAt(dir, commit, repoPath, maxBytes = 64 * 1024 * 1024) {
 }
 
 module.exports = {
-  detect, isRepo, init, commitAll, head, log, filesOf, restore, GITIGNORE,
+  detect, isRepo, init, commitAll, commitPaths, head, log, filesOf, restore, GITIGNORE,
   EMPTY_TREE, resolveCommit, parentOf, changedBetween, fileAt,
 };

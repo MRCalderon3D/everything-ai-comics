@@ -14,6 +14,7 @@ import { approveRender, verdictChip } from '/js/components/verdict.js';
 import { pageName, versionName } from '/js/labels.js';
 import { pageStrip } from '/js/screens/check.js';
 import { currentIssue } from '/js/components/issues.js';
+import { newsBar } from '/js/components/news.js';
 
 export async function load(ctx) {
   // A page names its issue; otherwise the issue chosen on the Pages screen.
@@ -76,6 +77,7 @@ export function view(ctx, { issue, page }) {
   });
 
   const text = h('div', { class: 'stack' },
+    newsBar('corrections'),
     jobsFor(mine),
     panel(t('correct.form_title', { name }), box.form),
     asked.length ? panel(tn('correct.requests_title', asked.length),

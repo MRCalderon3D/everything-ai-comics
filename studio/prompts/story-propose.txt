@@ -22,5 +22,5 @@ The current story bible is {{bible}}.
 {{#if suggest}}- The request asks for something new, so what you propose for it is invented: give those facts provenance "addition" and keep them to what the request asks.
 {{/if}}{{#if complete}}- Propose only for what the story bible lacks: an empty premise or tone, no world rules, no facts, characters without an arc, no timeline. Do not repeat what is already there.
 {{/if}}- Where the text leaves something open that the story needs (how a mystery is explained, how it ends, who holds what), ask the person in "questions" instead of deciding. Mark a question blocking when its answer decides who acts, where they stand, who holds an object, or how two characters are told apart. Never resolve an open question with an invented fact.
-- "affects" lists only character, location or prop IDs that exist in the workspace. Characters of an arc use IDs of the form CHAR_<NAME>.
+- "affects" lists only character, location or prop IDs that exist in the workspace. Characters of an arc use IDs of the form CHAR_<NAME>; a character who already has an ID (see IDS THAT ALREADY EXIST) keeps it.
 - Write the story text (premise, statements, events, questions) in the project's language. "summary" says, in the interface language, what the proposal holds and what it asks.

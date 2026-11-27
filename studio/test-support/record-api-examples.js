@@ -330,6 +330,24 @@ async function record() {
     r = await s.api('GET', `${P}/issues/ISS_001/publish`);
     cap('publish', r.body, { maxArray: 2, keys: { formats: { maxArray: 5 }, exports: { maxArray: 3 } } });
 
+    // --- deleting, merging, renaming ----------------------------------------------------------------
+    const extra = done(await s.runOp(id, 'character.sheet', { character: 'CHAR_MARA', sheet: 'expressions' }), 'another expressions sheet');
+    const unused = extra.result.sheet.candidate_id;
+    r = await s.api('POST', `${P}/delete/check`, { items: [{ id: unused }, { id: 'CHAR_MARA_TURN_MASTER_V01' }] });
+    cap('delete-check', r.body, { maxArray: 2, keys: { files: { maxArray: 3 } } });
+    r = await s.api('GET', `${P}/cleanup?scope=character:CHAR_MARA`);
+    cap('cleanup', r.body, { maxArray: 1 });
+    r = await s.api('POST', `${P}/delete`, { items: [{ id: unused }] });
+    cap('delete', r.body, { maxArray: 3 });
+    r = await s.api('POST', `${P}/delete`, { items: [{ id: 'CHAR_MARA' }] });
+    cap('delete-refused', r.body, { maxArray: 1 });
+    done(await s.runOp(id, 'character.create', { name: 'Teo', description: 'A mechanic with a grey beard.', draw: false }), 'character.create Teo');
+    r = await s.api('POST', `${P}/entities/rename`, { from: 'CHAR_TEO', to: 'CHAR_TEODORO' });
+    cap('entities-rename', r.body, { maxArray: 3 });
+    done(await s.runOp(id, 'character.create', { name: 'Teodoro twin', description: 'The same mechanic, made twice.', draw: false }), 'character.create twin');
+    r = await s.api('POST', `${P}/entities/merge`, { from: 'CHAR_TEODORO_TWIN', into: 'CHAR_TEODORO' });
+    cap('entities-merge', r.body, { maxArray: 3 });
+
     // --- the project conversation -------------------------------------------------------------------
     const sendBody = { text: 'EDIT bring the last panel closer', screen: { key: 'page:PG_001_003', label: 'Page 3', route: `/p/${id}/pages/PG_001_003` } };
     r = await s.api('POST', `${P}/conversation`, sendBody);

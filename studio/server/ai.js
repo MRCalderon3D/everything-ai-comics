@@ -16,6 +16,13 @@ const { guard } = require('./bible-guard');
 
 const TOOL_LABELS = { claude: 'Claude Code', codex: 'Codex' };
 
+/**
+ * Prompt kinds that may create a character, place or prop, or name one in a
+ * proposal. They get the IDs that already exist, to reuse them (entities.js).
+ */
+const ENTITY_KINDS = ['story.propose', 'story.update', 'character.write', 'entities.derive', 'pages.breakdown',
+  'pages.plan', 'pages.fix', 'page.revise', 'cover.write', 'chat'];
+
 /** Prompt kinds allowed to write the story bible: a change the person asked for in their own words. */
 const UNGUARDED = ['story.update'];
 
@@ -63,6 +70,13 @@ async function runAi(ctx, handle, call) {
     handle.log(`${TOOL_LABELS[pick.requested] || pick.requested} is not installed: ${TOOL_LABELS[pick.name]} does this step instead`);
   }
   const context = projectContext(project);
+  if (ENTITY_KINDS.includes(call.kind)) {
+    try {
+      context.knownEntities = require('./entities').knownText(project);
+    } catch (err) {
+      context.knownEntities = '';
+    }
+  }
   const allowWrite = call.allowWrite !== false;
   const prompt = prompts.build(call.kind, call.vars || {}, Object.assign({ answers: ctx.answers, readOnly: !allowWrite }, context));
   const started = Date.now();
@@ -163,4 +177,4 @@ async function runAi(ctx, handle, call) {
   });
 }
 
-module.exports = { runAi, projectContext, TOOL_LABELS };
+module.exports = { runAi, projectContext, TOOL_LABELS, ENTITY_KINDS };
