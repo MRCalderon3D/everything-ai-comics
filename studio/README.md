@@ -184,6 +184,12 @@ drawable (who stands where, what someone holds, the background) comes back
 as a list of assumptions per page and panel, shown on the page so the
 person can change any of it.
 
+No AI run writes the story bible, except `story.update`, which applies a
+change the person asked for. Any other run that changes it (a character run
+that adds an invented relative as a fact, for example) has the change undone
+inside its step, and what it wanted to add becomes a story proposal the
+person accepts or rejects (`server/bible-guard.js`).
+
 ## Styles
 
 The Style screen lists the look presets of `templates/looks/`. Each one comes
@@ -333,12 +339,6 @@ layout and uploads the page, which is checked as any page. "Propose a
 staging change" asks the conversation for a change of who stands where, as
 a proposal with the reason. Nothing moves a character off panel to fit the
 tool: who is in a panel is the person's story, and the chat's prompt says so.
-
-No AI run writes the story bible, except `story.update`, which applies a
-change the person asked for. Any other run that changes it (a character run
-that adds an invented relative as a fact, for example) has the change undone
-inside its step, and what it wanted to add becomes a story proposal the
-person accepts or rejects (`server/bible-guard.js`).
 
 ## One face per character
 
@@ -494,17 +494,25 @@ What each screen asks of the person:
   version with text, a marked region and an optional photo. Once the look
   is approved, the Characters screen offers to draw the sheets still
   missing.
+- Places and objects: the place and object files the page plans wrote, each
+  with its description, a place with its map when it has one, and its
+  reference image if one was drawn. "Write places and objects" fills in the
+  files the planned pages still lack (or works from a description of pages
+  not written yet), and can also draw a reference image of each place once
+  the look is approved. Most comics never need this screen.
 - Pages: the plan of each page, what the planner filled in that the text did
   not say (each item can be changed through the conversation), the drawing,
-  the lettering of each panel (add, remove and reorder balloons, captions and
-  sound effects, pick the kind with its plain name and icon, pick who says it
-  from the panel's cast or as a voice from off panel, see where the tail
-  points, and count words and balloons against the lettering rules while
-  typing, with a warning before saving when a panel goes over). Saving runs
-  the page's checks again; on a page already drawn it says the change needs
-  the page drawn again, or lettered again in overlay mode, and offers that,
-  and while a page is drawn, a waiting state that says what is happening and
-  how long a page usually takes in this comic.
+  and the lettering of each panel. The lettering editor adds, removes and
+  reorders balloons, captions and sound effects, picks the kind by its plain
+  name and icon, picks who says it from the panel's cast or as a voice from
+  off panel, shows where the tail points, and counts words and balloons
+  against the lettering rules while typing, with a warning before saving
+  when a panel goes over. Saving runs the page's checks again. On a page
+  already drawn it says the change needs the page drawn again (or lettered
+  again in overlay mode) and offers that. One button draws every page with
+  no passing version, or the pages the person ticked, after saying how many
+  images that is. While a page is drawn, a waiting state says what is
+  happening and how long a page usually takes in this comic.
 - Settings: per kind of work (planning, checking, drawing) the tool, then a
   model from the list the installed tool reports, the default marked, a name
   typed by hand when needed, and the time measured with each model. Without
@@ -591,8 +599,8 @@ The run took about an hour from an empty project to the exported files. In
 it, every page and the cover were repaired twice for minor findings, which
 is where most of the drawing time went. The studio no longer repairs for
 minor findings (they are shown as notes), so a page that draws well costs
-one drawing and one review. The interface should let the person keep working
-on other screens while a job runs: nothing here is quick.
+one drawing and one review. Nothing here is quick, so the person keeps
+working on other screens while a job runs.
 
 ## History
 

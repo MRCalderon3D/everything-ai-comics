@@ -14,7 +14,7 @@ You need Node.js 18 or later. There is nothing to install.
 
 ```bash
 npm test             # every test file under tests/
-npm run validate     # manifests, rosters, file formats, schemas, the example, wrapper drift
+npm run validate     # manifests, rosters, file formats, schemas, the example, wrapper and badge drift
 ```
 
 Both must pass before a change is done. CI runs the same two commands on
@@ -44,9 +44,12 @@ artwork, and a change description should not claim that they do.
 | Edit this | It generates this, which you never edit by hand | Sync |
 |---|---|---|
 | `commands/*.md`, `agents/*.md`, `skills/*/SKILL.md`, `rules/**`, `hooks/hooks.json`, `manifests/harnesses.json` | `.claude/`, `.codex/`, `.cursor/`, `.opencode/`, `.agents/` | `npm run sync:harnesses` |
+| `manifests/*.json`, `schemas/*.schema.json`, `package.json` (license) | `docs/images/badges/*.svg`, the README header badges | `npm run badges` |
 
 Edit the source, run the sync, and commit both. `npm run validate` fails
-when the generated directories differ from what the sync would write.
+when the generated directories or the badges differ from what the scripts
+would write. A roster change moves a count, so it needs `npm run badges`
+too.
 
 ## A roster change touches three places
 

@@ -36,7 +36,8 @@ assert.deepStrictEqual(rosters.profiles, ['full', 'writing-room', 'layout', 'gen
 assert.strictEqual(rosters.schemas.length, 19);
 assert.ok(rosters.schemas.includes('visual-review') && rosters.schemas.includes('edition'));
 assert.ok(rosters.schemas.includes('cover'));
-assert.strictEqual(rosters.scripts.length, 14);
+assert.strictEqual(rosters.scripts.length, 15);
+assert.ok(rosters.scripts.includes('build-badges.js'));
 assert.ok(rosters.scripts.includes('build-edition.js') && rosters.scripts.includes('letter-pages.js'));
 assert.ok(rosters.scripts.includes('approve-asset.js'));
 assert.deepStrictEqual(rosters.hooks, ['validate-after-write.js', 'protect-approved-assets.js',

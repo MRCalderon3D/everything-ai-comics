@@ -24,6 +24,8 @@ separate layer on top of it: a local web app with no dependencies
 - Generated harness wrappers (`.claude/`, `.codex/`, `.cursor/`, `.opencode/`,
   `.agents/`) are never hand-edited. Run `npm run sync:harnesses` after editing
   their sources (`commands/`, `agents/`, `skills/`, `rules/`, `hooks/hooks.json`).
+  The README badges in `docs/images/badges/` are generated too: run
+  `npm run badges` after a roster change.
 - A roster change (add, rename, or remove an agent, command, skill, rule, or
   provider) touches the file, its manifest entry, and `docs/conventions.md`
   together.

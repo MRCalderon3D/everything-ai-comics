@@ -18,6 +18,7 @@
  *  11. hooks       hooks/hooks.json references existing hook files
  *  12. example     examples/the-night-ferry passes validate-workspace.js
  *  13. harnesses   wrappers match what sync-harnesses.js would emit (drift)
+ *  14. badges      README badges match what build-badges.js would write (drift)
  *
  * Sections degrade gracefully (report, not crash) when a directory is
  * missing. Non-zero exit on any failure.
@@ -47,7 +48,7 @@ Options:
   --root <dir>      Scaffold root (default: this repository).
   --section <name>  Run a single section (manifests, files, agents, commands,
                     skills, rules, contexts, schemas, templates, providers,
-                    hooks, example, harnesses).
+                    hooks, example, harnesses, badges).
   --help            Show this help.
 
 Exit code 0 when everything passes, 1 otherwise.
@@ -703,6 +704,31 @@ function sectionHarnesses(report, ctx) {
   }
 }
 
+function sectionBadges(report, ctx) {
+  report.section('README badges (drift vs build-badges.js)');
+  let badges;
+  try {
+    badges = require('./build-badges');
+  } catch (err) {
+    report.fail(`could not load build-badges.js: ${err.message}`);
+    return;
+  }
+  let plan;
+  try {
+    plan = badges.buildBadges(ctx.root);
+  } catch (err) {
+    report.fail(`cannot build the badges: ${err.message}`);
+    return;
+  }
+  const drift = badges.diffBadges(ctx.root, plan);
+  if (drift.length === 0) {
+    report.pass(`all ${Object.keys(plan).length} badges in ${badges.BADGE_DIR}/ match`);
+  } else {
+    report.fail(`${drift.length} badge file(s) drifted — run "npm run badges"`);
+    for (const d of drift) report.info(d);
+  }
+}
+
 // ---------------------------------------------------------------------------
 
 const SECTIONS = {
@@ -719,6 +745,7 @@ const SECTIONS = {
   hooks: sectionHooks,
   example: sectionExample,
   harnesses: sectionHarnesses,
+  badges: sectionBadges,
 };
 
 /** Build the shared context every section reads. Never throws. */

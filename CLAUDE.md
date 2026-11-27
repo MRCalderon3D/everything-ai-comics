@@ -24,6 +24,7 @@ npm test                  # node tests/run-all.js: scaffold self-tests
 npm run validate          # full validation gate (what CI runs)
 npm run doctor            # diagnose an install: env, providers, harness wiring
 npm run sync:harnesses    # regenerate .claude/ .codex/ .cursor/ .opencode/ .agents/
+npm run badges            # regenerate the README badges in docs/images/badges/ from the manifests
 npm run studio            # the web studio at http://127.0.0.1:4310 (STUDIO_FAKE_AI=1 for no real AI)
 ```
 
@@ -49,10 +50,12 @@ node scripts/build-board.js --issue <issue dir>
 | Edit this (source of truth) | Generates this (do NOT hand-edit) | Sync |
 |---|---|---|
 | `commands/*.md`, `agents/*.md`, `skills/*/SKILL.md`, `rules/`, `hooks/hooks.json`, `manifests/harnesses.json` | `.claude/`, `.codex/`, `.cursor/`, `.opencode/`, `.agents/` | `npm run sync:harnesses` |
+| `manifests/*.json`, `schemas/*.schema.json`, `package.json` (license) | `docs/images/badges/*.svg` (the README header badges) | `npm run badges` |
 
 Workflow: edit the source → run the sync → commit both. `npm run validate`
-fails on wrapper drift, roster mismatches, schema violations, broken
-cross-references, and an example workspace that no longer passes its gates.
+fails on wrapper drift, stale badges, roster mismatches, schema violations,
+broken cross-references, and an example workspace that no longer passes its
+gates.
 
 ## Architecture
 

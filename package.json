@@ -16,6 +16,7 @@
     "validate": "node scripts/validate.js",
     "doctor": "node scripts/doctor.js",
     "sync:harnesses": "node scripts/sync-harnesses.js",
+    "badges": "node scripts/build-badges.js",
     "create:project": "node scripts/create-project.js",
     "validate:workspace": "node scripts/validate-workspace.js",
     "check:continuity": "node scripts/check-continuity.js",

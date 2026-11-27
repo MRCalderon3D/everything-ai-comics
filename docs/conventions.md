@@ -37,6 +37,7 @@ Language: **English**, everywhere. Style: imperative, concise, no marketing pros
 | `providers/` | Thin adapters for image generation backends. Common interface. | JS |
 | `hooks/` | Harness hook handlers (validate on write, protect approved assets, etc.). | JS + `hooks.json` |
 | `.claude/ .codex/ .cursor/ .opencode/ .agents/` | **Generated** harness wrappers. Never hand-edit; run `npm run sync:harnesses`. | generated |
+| `docs/images/badges/` | **Generated** README header badges, with the counts read from `manifests/`, `schemas/`, and `package.json`. Never hand-edit; run `npm run badges`. | generated SVG |
 
 ## Rosters (exhaustive; do not add or rename without updating manifests)
 
@@ -92,8 +93,8 @@ rules.json, image-providers.json, harnesses.json.
 
 **Providers (7):** image: fal, replicate, comfyui, gemini, harness-native, codex-cli, manual.
 
-**Scripts (14):** install.js, doctor.js, validate.js, sync-harnesses.js,
-create-project.js, validate-workspace.js, compile-prompts.js,
+**Scripts (15):** install.js, doctor.js, validate.js, sync-harnesses.js,
+build-badges.js, create-project.js, validate-workspace.js, compile-prompts.js,
 build-reference-plan.js, generate-assets.js, approve-asset.js,
 check-continuity.js, letter-pages.js, build-edition.js, build-board.js. Shared
 helpers live in `scripts/lib/`.
