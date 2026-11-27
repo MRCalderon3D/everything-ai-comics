@@ -83,7 +83,7 @@ const ws = require('./lib/workspace');
 const yaml = require('./lib/yaml');
 const {
   bestApproved, entityAssets, findLookMaster, findIdentityMaster, findIdentityChain, identityKindOf, isLikenessSource,
-  identityRefusal, roomierProviders, MASTER_KINDS, ensureReferencePlan,
+  identityRefusal, roomierProviders, MASTER_KINDS,
 } = require('./build-reference-plan');
 const { attachments, providerTag } = require('../providers/lib/common');
 
@@ -156,9 +156,7 @@ Both:
   --help             Show this help.
 
 A page needs style/style-block.txt and a reference-plan.yaml next to
-page.yaml (run build-reference-plan.js first). A plan built for another
-generation.mode, provider, or budget is rebuilt and written over the old one
-before compiling. A sheet needs the style block,
+page.yaml (run build-reference-plan.js first). A sheet needs the style block,
 the entity's bible file, and an approved look master (except the first look).
 
 Output, status "compiled":
@@ -829,21 +827,17 @@ function compilePage(root, page, options = {}) {
       `${page.id}: the frozen style block is missing or empty (${(project.style && project.style.style_block) || 'style/style-block.txt'}). ` +
       'Every prompt starts with it verbatim; write it with /style-bible first.');
   }
-  // The plan on disk is used only while it fits the page's generation mode,
-  // this provider, and its budget; otherwise it is rebuilt and rewritten
-  // first, so switching full_page <-> per_panel never compiles a stale plan.
-  let plan = options.plan || null;
-  if (!plan) {
-    const ensured = ensureReferencePlan(root, page, { providerId, capabilities, project, now: options.now });
-    plan = ensured.doc;
-    if (ensured.rebuilt) warnings.push(`the reference plan was rebuilt: ${ensured.reasons.join('; ')}`);
-  }
+  const planFile = path.join(ws.pageDir(root, page.id), 'reference-plan.yaml');
+  const plan = options.plan || ws.loadYaml(planFile);
   if (!plan) {
     throw pipelineError('plan_missing',
       `${page.id}: no reference-plan.yaml next to page.yaml. Run build-reference-plan.js --page <page.yaml> first.`);
   }
   if (plan.page && plan.page !== page.id) {
     throw pipelineError('plan_mismatch', `reference plan is for ${plan.page}, not ${page.id}`);
+  }
+  if (plan.provider && plan.provider !== providerId) {
+    warnings.push(`the reference plan was built for ${plan.provider}; its budget is re-checked against ${providerId}`);
   }
   if (!Array.isArray(page.panels) || !page.panels.length) {
     throw pipelineError('page_invalid', `${page.id}: the page has no panels to compile`);
