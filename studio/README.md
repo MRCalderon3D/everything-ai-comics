@@ -23,7 +23,11 @@ the browser app (`web/`).
     not there.
 
 With only Claude Code, pages are made by hand: the studio prepares the prompt
-and the reference images, and the person uploads the result. With only Codex,
+and the reference images, and the person uploads the result. Any image can be
+made that way, even with Codex installed: ask the conversation for the prompt
+and the references of a page, download them in their numbered order, and
+attach the finished image to the conversation saying which page it is for.
+With only Codex,
 it does all three jobs, and every review is marked as not independent,
 because the tool that drew a page is the one checking it.
 

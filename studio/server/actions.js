@@ -1221,10 +1221,27 @@ function jobSettled(services, project, job) {
     added: job.status === 'done' ? attempt(() => require('./entities').addedView(project, job), []) : [],
     // Out of quota: which tool, when it may come back, what waits, and that nothing is wrong with the work.
     quota: job.status === 'paused' ? quotaView(services, project, job) : null,
+    // An image to make outside the studio: the references in order and the prompt (page.manual without an upload).
+    handoff: job.status === 'done' && r.handoff ? handoffView(r.handoff) : null,
     reply_to: origin.message || null,
   });
   services.events.emit(project.id, 'chat', { conversation: origin.conversation, message });
   guideAfter(services, project, origin.conversation, job);
+}
+
+/** The part of a page.manual handoff the conversation shows: target, prompt, references in order. */
+function handoffView(ho) {
+  return {
+    target: ho.target || {},
+    mode: ho.mode || 'generate',
+    prompt: ho.prompt || '',
+    negative_prompt: ho.negative_prompt || null,
+    aspect_ratio: ho.aspect_ratio || null,
+    resolution: ho.resolution || null,
+    images: (ho.images || []).filter((img) => img && img.image).map((img) => ({
+      position: img.position, role: img.role, path: img.path, image: img.image,
+    })),
+  };
 }
 
 /**

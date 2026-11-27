@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Web studio, making an image outside the studio from the conversation: asking
+  for "the prompt and the references" of a page, a cover or a sheet runs
+  `page.manual`, and its result in the conversation shows the references
+  numbered in the order to attach them (each downloads with its number
+  first, or all at once) and the prompt with a copy button. Attaching the
+  finished image and saying which page it is stores it as the next version
+  and reviews it (`page.manual` with `"upload": "@attachments"`). The chat
+  no longer answers such a request in words with file paths.
 - Web studio, 3D scenes: the style ring (and the other 3D stages) could show
   its pages squashed or stretched. The stage measured itself with
   `getBoundingClientRect`, which includes the page-turn animation, and kept

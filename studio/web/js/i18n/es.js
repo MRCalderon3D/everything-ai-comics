@@ -527,6 +527,11 @@ export default {
   'handoff.use_image': 'Usar esta imagen',
   'handoff.need_file': 'Elige antes la imagen.',
   'handoff.stored': 'La imagen está guardada y comprobada.',
+  'handoff.download_all': 'Descargar todas',
+  'handoff.target_page': 'la página {n}',
+  'handoff.target_cover': 'la portada',
+  'handoff.chat_return': 'Cuando tengas la imagen, adjúntala aquí y di que es para {target}. Se guarda como versión nueva y se revisa.',
+  'handoff.chat_return_sheet': 'Cuando tengas la imagen, adjúntala aquí y di para qué hoja es. Se guarda como versión nueva.',
 
   // --- aprobaciones
   'approve.look_action': 'Aprobar este estilo',

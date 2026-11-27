@@ -24,7 +24,7 @@ import { t, tn, tv, formatTime, formatDateTime, formatDuration } from '/js/i18n.
 import { api, errorText } from '/js/api.js';
 import { state, bus, rememberJob, ACTIVE } from '/js/store.js';
 import { toolName, jobStatus, jobOutcome, pageName, plainIds } from '/js/labels.js';
-import { button } from '/js/components/ui.js';
+import { button, copyButton, facts } from '/js/components/ui.js';
 import { openDialog, confirmDialog } from '/js/components/dialog.js';
 import { showFile } from '/js/components/editor.js';
 import { changesView } from '/js/components/diff.js';
@@ -401,8 +401,53 @@ function resultNode(m) {
         p.guard ? t('result.guard_proposal') : t('result.review_proposal'))),
       (m.added || []).length ? addedLines(m.added) : null,
       m.quota ? quotaBlock(m) : null,
+      m.handoff ? handoffBlock(m.handoff) : null,
       m.links && m.links.length ? h('div', { class: 'msg-links' }, m.links.map((l) => h('a', { href: l.route }, icon('right'), h('span', null, l.label || l.screen_label), linkNews(l)))) : null,
       m.status === 'needs_decision' && (m.questions || []).length ? questionsForm(m) : null));
+}
+
+/**
+ * An image to make outside the studio: the references numbered in the order
+ * to attach them (each saved with its number first), the prompt to copy, and
+ * how to bring the result back through this conversation.
+ */
+function handoffBlock(ho) {
+  const refs = (ho.images || []).map((img) => {
+    const base = String(img.path || img.image.url).split('/').pop().split('?')[0];
+    return Object.assign({}, img, { file: `${img.position}-${base}` });
+  });
+  const links = refs.map((img) => h('a', { class: 'small', href: img.image.url, download: img.file }, t('action.download')));
+  const viewer = refs.map((img) => ({ id: `h${img.position}`, label: `${img.position}. ${tv('ref_role', img.role, img.role)}`, image: img.image }));
+  const downloadAll = () => {
+    // One click per file, spaced so the browser takes each as its own download.
+    links.forEach((a, i) => setTimeout(() => a.click(), i * 350));
+  };
+  const target = ho.target || {};
+  const returnText = target.page
+    ? t('handoff.chat_return', { target: t('handoff.target_page', { n: Number(String(target.page).slice(-3)) }) })
+    : target.cover ? t('handoff.chat_return', { target: t('handoff.target_cover') }) : t('handoff.chat_return_sheet');
+  return h('div', { class: 'result-handoff stack-s' },
+    h('p', { class: 'small' }, h('strong', null, t('handoff.step_refs'))),
+    refs.length
+      ? h('ol', { class: 'handoff-refs' }, refs.map((img, i) => h('li', null,
+        h('button', {
+          type: 'button', class: 'attach-thumb', title: viewer[i].label,
+          'aria-label': t('convo.attachment_open', { name: viewer[i].label }),
+          onclick: () => openViewer(viewer, viewer[i].id),
+        }, h('img', { src: img.image.url, alt: '' })),
+        h('span', { class: 'small' }, h('strong', null, `${img.position}. `), tv('ref_role', img.role, img.role)),
+        links[i])))
+      : h('p', { class: 'small muted' }, t('handoff.no_refs')),
+    refs.length > 1 ? h('div', { class: 'row' }, button(t('handoff.download_all'), { small: true, icon: 'download', onclick: downloadAll })) : null,
+    h('p', { class: 'small' }, h('strong', null, t('handoff.step_prompt'))),
+    h('pre', { class: 'prompt', tabIndex: 0 }, ho.prompt),
+    h('div', { class: 'row' }, copyButton(() => ho.prompt)),
+    facts([
+      [t('handoff.aspect'), ho.aspect_ratio],
+      [t('handoff.resolution'), ho.resolution],
+      [t('handoff.avoid'), ho.negative_prompt],
+    ]),
+    h('p', { class: 'small muted' }, returnText));
 }
 
 /** A job paused because a tool ran out of its usage quota: the plain words, and Resume while it is still paused. */
