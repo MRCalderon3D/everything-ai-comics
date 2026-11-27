@@ -43,6 +43,14 @@
  *
  * A run fails on its exit code and on the missing output file, never on
  * what the tool writes to stderr: Codex prints unrelated noise there.
+ *
+ * A run that saved no image because Codex (or its image tool) ran out of its
+ * usage quota is recorded with response.error_kind "tool_quota" and, when
+ * Codex said, response.resets. Found in a real run: the image tool answered
+ * "Image generation failed because the usage limit was reached" in the
+ * final JSON notes, after `item.completed: error` events, and the CLI exited
+ * 0. Codex's session files (~/.codex/sessions) carry rate_limits for its text
+ * quota only; they say nothing about images, so they are not read here.
  */
 
 const crypto = require('crypto');
@@ -53,6 +61,7 @@ const {
   resolveModel, attachments, packageParams, aspectRatioOf, isRemote, resolveLocal,
 } = require('../lib/common');
 const { resolveBinary, spawnCli } = require('../lib/cli-spawn');
+const { detectQuota } = require('../lib/quota');
 const { imageInfo } = require('../../scripts/lib/image-info');
 
 const DEFAULT_TIMEOUT_MS = 900000;
@@ -210,9 +219,16 @@ function progressLine(line, state) {
   const item = event.item && typeof event.item === 'object' ? event.item : null;
   if (item && typeof item.text === 'string' && /message/.test(String(item.type))) state.lastMessage = item.text;
   const type = String(event.type || 'event');
+  // What the tool said went wrong: error items, a failed turn, a top-level error.
+  if (state.errors) {
+    if (item && item.type === 'error') state.errors.push(String(item.message || item.text || ''));
+    if (type === 'turn.failed' && event.error) state.errors.push(String(event.error.message || ''));
+    if (type === 'error' && typeof event.message === 'string') state.errors.push(event.message);
+  }
   if (item) {
     const detail = typeof item.text === 'string' ? item.text
-      : typeof item.command === 'string' ? item.command : '';
+      : typeof item.message === 'string' ? item.message
+        : typeof item.command === 'string' ? item.command : '';
     const short = detail.replace(/\s+/g, ' ').trim().slice(0, 160);
     return `codex ${type}: ${item.type || 'item'}${short ? `: ${short}` : ''}`;
   }
@@ -358,7 +374,7 @@ const provider = {
     for (const file of images) args.push('-i', file);
     args.push('-');
 
-    const state = { threadId: null, lastMessage: null };
+    const state = { threadId: null, lastMessage: null, errors: [] };
     const started = Date.now();
     try {
       fs.mkdirSync(dir, { recursive: true });
@@ -395,6 +411,13 @@ const provider = {
       const reply = parseReply(lastMessage);
 
       if (!fs.existsSync(outputFile)) {
+        // Out of quota: not a failed drawing. The request can go again once the limit resets.
+        const quota = detectQuota(reply && typeof reply.notes === 'string' ? reply.notes : '', lastMessage, ...state.errors, run.stderr);
+        if (quota) {
+          return markFailed(record, Object.assign(new Error(
+            `Codex ran out of its usage quota and saved no image: ${quota.said}${quota.resets ? ` (resets ${quota.resets})` : ''}`),
+          { kind: 'tool_quota', resets: quota.resets }));
+        }
         const said = lastLine(lastMessage);
         const hint = said ? ` Codex said: ${said}` : (lastLine(run.stderr) ? ` Last stderr line: ${lastLine(run.stderr)}` : '');
         return markFailed(record, new Error(run.code === 0

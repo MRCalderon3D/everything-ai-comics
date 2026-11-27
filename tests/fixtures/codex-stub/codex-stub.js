@@ -11,6 +11,11 @@
  *   fail          exit 3 without saving anything
  *   nofile        exit 0 without saving anything
  *   notimage      save a text file at the path, exit 0
+ *   quota         what Codex did in a real run when its image tool hit its
+ *                 usage limit: an error item, then a final JSON whose notes
+ *                 say so, exit 0, no image
+ *   quota-cli     the CLI itself out of quota: a failed turn with the
+ *                 CLI's wording and a reset time, exit 1, no image
  *   hang          start a child that writes CODEX_STUB_MARKER after 1.5 s,
  *                 then wait forever (for the timeout and cancel tests)
  *
@@ -90,6 +95,17 @@ async function main() {
   if (mode === 'fail') {
     process.stderr.write('stream error: unexpected status 500\n');
     process.exit(3);
+  }
+  if (mode === 'quota') {
+    emit({ type: 'item.completed', item: { id: 'item_0', type: 'error', message: "The built-in tool's usage limit was reached." } });
+    say(JSON.stringify({ saved_path: null, width: null, height: null, reference_mode: 'none', references_count: 0, model: null,
+      notes: 'Image generation failed because the usage limit was reached. Try again at 6:40 PM.' }));
+    emit({ type: 'turn.completed', usage: { input_tokens: 10, output_tokens: 5 } });
+    process.exit(0);
+  }
+  if (mode === 'quota-cli') {
+    emit({ type: 'turn.failed', error: { message: "You've hit your usage limit. Upgrade to Pro or try again at Nov 30th, 2026 3:15 PM." } });
+    process.exit(1);
   }
   if (mode === 'nofile') {
     say('I could not generate the image.');

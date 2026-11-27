@@ -139,7 +139,7 @@ module.exports = {
       h.note(result.errors ? msg('note.errors', { n: result.errors }) : msg('note.no_errors'));
     };
     let gates = await ctx.step('gates', (h) => {
-      const result = pipeline.mechanical(root, issue);
+      const result = pipeline.mechanical(root, issue, { provider: pipeline.compileProvider(project, ctx.services.drivers) });
       report(h, result);
       return result;
     });
@@ -157,7 +157,7 @@ module.exports = {
       }), { verb: 'plan' });
       fixed = true;
       gates = await ctx.step('recheck', (h) => {
-        const result = pipeline.mechanical(root, issue);
+        const result = pipeline.mechanical(root, issue, { provider: pipeline.compileProvider(project, ctx.services.drivers) });
         report(h, result);
         return result;
       });

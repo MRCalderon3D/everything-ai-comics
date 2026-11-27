@@ -622,6 +622,8 @@ response:
   summary: One image returned.         # required
   provider_job_id: null
   error: null
+  error_kind: null                     # tool_quota when the tool ran out of its usage quota, else absent or null
+  resets: null                         # with tool_quota: when the tool said the limit resets, or null
 media_files: [issues/ISS_001/pages/PG_001_001/renders/PG_001_001_V01.png]
 cost:                                  # required
   currency: USD                        # required
@@ -635,6 +637,13 @@ created_at: "2026-11-26T10:00:00Z"     # required
 ```
 
 Never fill `model`, `cost.amount`, or `seed` with invented values.
+
+A failed record whose tool answered that its usage quota or rate limit was
+reached carries `response.error_kind: tool_quota` and `response.resets`
+(the reset time in the tool's words, or `null`), set by `markFailed` in
+`providers/lib/common.js` from `providers/lib/quota.js`. It is not a failed
+drawing: the same request can run again once the limit resets. The example
+workspace has no failed record, so it shows neither field.
 
 `generate-assets.js` writes a `GEN_*.request.json` next to each record. It is
 the handoff package (prompt, ordered references with their roles, target

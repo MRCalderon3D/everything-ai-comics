@@ -21,6 +21,10 @@
  * assistant message keeps the ids in `actions`; reading the messages puts
  * each card's current state in their place.
  *
+ * A conversation can be in guide mode (studio/server/guide.js): the index
+ * entry keeps { guide: { on, terms } }, where terms are the words the guide
+ * has already explained in it. Leaving the mode only turns the flag off.
+ *
  * The conversations per screen of earlier versions (.studio/chats/) are
  * folded into the first project conversation, in time order and tagged with
  * their screen, the first time the conversation is read. Their files stay
@@ -31,7 +35,9 @@ const fs = require('fs');
 const path = require('path');
 const chats = require('./chats');
 const screens = require('./screens');
-const { msg } = require('./i18n');
+const i18n = require('./i18n');
+
+const { msg } = i18n;
 const { HttpError, appendJsonl, readJsonl, readJson, writeJsonAtomic, newId, nowIso } = require('./util');
 
 const CONV_RE = /^conv_[a-z0-9_]{6,60}$/;
@@ -105,6 +111,11 @@ function ensure(project) {
   return index;
 }
 
+/** True once the project has a conversation index (nothing is created to find out). */
+function exists(project) {
+  return !!readIndex(project);
+}
+
 function entryOf(index, id) {
   const entry = index.conversations.find((c) => c.id === id);
   if (!entry) throw new HttpError(404, 'conversation_not_found', 'There is no conversation with that id in this project.');
@@ -158,6 +169,7 @@ function list(project) {
       messages: all.length,
       last_at: all.length ? all[all.length - 1].at : null,
       folded: c.folded || [],
+      guide: !!(c.guide && c.guide.on),
     };
   });
 }
@@ -176,7 +188,10 @@ function get(project, id) {
 function start(project) {
   const index = ensure(project);
   const id = newId('conv').toLowerCase();
-  index.conversations.push({ id, started_at: nowIso(), session: null, folded: [] });
+  const before = index.conversations.find((c) => c.id === index.current);
+  // A fresh conversation keeps guide mode on when the last one had it; the terms are explained again.
+  const guide = before && before.guide && before.guide.on ? { on: true, terms: [] } : undefined;
+  index.conversations.push(Object.assign({ id, started_at: nowIso(), session: null, folded: [] }, guide ? { guide } : {}));
   index.current = id;
   writeIndex(project, index);
   return entryOf(index, id);
@@ -188,6 +203,23 @@ function append(project, conversationId, message) {
   if (full.screen && !full.key) full.key = full.screen.key;
   appendJsonl(fileOf(project, conversationId), full);
   return full;
+}
+
+/** Guide mode of a conversation: { on, terms }. */
+function guideState(project, conversationId) {
+  const index = ensure(project);
+  const entry = index.conversations.find((c) => c.id === conversationId);
+  const g = entry && entry.guide && typeof entry.guide === 'object' ? entry.guide : {};
+  return { on: !!g.on, terms: Array.isArray(g.terms) ? g.terms.slice() : [] };
+}
+
+/** Change the guide state of a conversation (on, terms). */
+function setGuide(project, conversationId, patch) {
+  const index = ensure(project);
+  const entry = entryOf(index, conversationId);
+  entry.guide = Object.assign({ on: false, terms: [] }, entry.guide || {}, patch || {});
+  writeIndex(project, index);
+  return guideState(project, conversationId);
 }
 
 /** Remember the tool session of a conversation. */
@@ -204,13 +236,13 @@ function setSession(project, conversationId, session) {
  * Plain text for the prompt.
  */
 function summaryFor(project, conversationId, { exceptId } = {}) {
-  const all = messages(project, conversationId).filter((m) => m.role !== 'event' && m.id !== exceptId && (m.text || '').trim());
+  const all = messages(project, conversationId).filter((m) => m.role !== 'event' && m.id !== exceptId && String(i18n.render('en', m.text || '') || '').trim());
   if (!all.length) return '';
   const recent = all.slice(-SUMMARY_MESSAGES);
   const lines = recent.map((m) => {
     const where = m.screen && m.screen.key ? ` (from the ${m.screen.key} screen)` : '';
     const who = m.role === 'user' ? 'The person' : `The assistant${m.tool ? ` (${m.tool})` : ''}`;
-    return `- ${who}${where}: ${String(m.text).replace(/\s+/g, ' ').slice(0, 400)}`;
+    return `- ${who}${where}: ${String(i18n.render('en', m.text)).replace(/\s+/g, ' ').slice(0, 400)}`;
   });
   const skipped = all.length - recent.length;
   return [skipped > 0 ? `${skipped} earlier message(s) left out.` : null, ...lines].filter(Boolean).join('\n');
@@ -239,6 +271,6 @@ function screensUsed(project) {
 }
 
 module.exports = {
-  CONV_RE, ensure, list, current, get, start, append, messages, setSession, summaryFor, byScreen, screensUsed,
+  CONV_RE, exists, ensure, list, current, get, start, append, messages, setSession, summaryFor, byScreen, screensUsed, guideState, setGuide,
   cards, getCard, saveCard,
 };

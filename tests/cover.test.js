@@ -349,6 +349,15 @@ async function main() {
     expectError(() => compileCover({ root, issue: 'ISS_001', repair: Object.assign({}, flagged, { page: 'PG_001_001' }) }), 'review_mismatch');
     expectError(() => compileCover({ root, issue: 'ISS_001', repair: coverReview('CV_001_V01') }), 'nothing_to_repair');
     expectError(() => compileCover({ root, issue: 'ISS_001', repair: Object.assign({}, flagged, { repair_cycle: 2 }) }), 'repair_limit');
+    // A touch-up the person chose passes the limit only with their open change request.
+    expectError(() => compileCover({ root, issue: 'ISS_001', repair: Object.assign({}, flagged, { repair_cycle: 2 }), touchUp: true }), 'repair_limit');
+    const askedCover = Object.assign({}, flagged, {
+      repair_cycle: 2,
+      findings: flagged.findings.concat([{ id: 'F09', panel: null, source: 'user_request', expected: 'The change the person asked for is visible.', visible: 'Not checked yet.', severity: 'minor', repair: 'A warmer sky.', status: 'open' }]),
+    });
+    const touchedCover = compileCover({ root, issue: 'ISS_001', repair: askedCover, touchUp: true });
+    assert.strictEqual(touchedCover.pkg.mode, 'repair');
+    assert.ok(touchedCover.warnings.some((w) => /touch-up past the repair limit/.test(w)));
     expectError(() => compileCover({ root, issue: 'ISS_001', repair: Object.assign({}, flagged, { render: 'CV_001_V09' }) }), 'edit_target_missing');
     expectError(() => compileCover({ root, issue: 'ISS_001', repair: path.join(root, 'missing.review.yaml') }), 'review_missing');
 

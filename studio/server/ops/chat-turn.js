@@ -22,6 +22,12 @@
  * When another job runs, the turn runs in the read-only lane of the queue
  * (studio/server/jobs.js): it answers and proposes, and changes no file.
  *
+ * In guide mode (studio/server/guide.js) the prompt also carries the step the
+ * project is at, read from the same step state as the side navigation, and
+ * the guide's rules: one decision at a time, a term explained the first time,
+ * the story and the approvals are the person's, every action through cards,
+ * and every reply ends with the next step.
+ *
  * The conversation continues through the tool's own session while the same
  * tool answers. When the answering tool changes, the new one starts a
  * session with a summary of the conversation so far, and the transcript
@@ -117,6 +123,14 @@ module.exports = {
     const attached = (params.attachments || []).map((id) => project.upload(id)).filter(Boolean)
       .map((u) => ({ id: u.id, name: u.name, kind: u.kind, file: project.uploadFile(u) }));
     const pendingCards = Object.values(conversation.cards(project, convId)).filter((c) => c.status === 'pending').map((c) => c.id);
+    let guided = null;
+    if (conversation.guideState(project, convId).on) {
+      try {
+        guided = require('../guide').guideBlock(project, services);
+      } catch (err) {
+        ctx.log(`the guide step could not be read: ${err.message}`);
+      }
+    }
     const call = (sessionId, history) => ({
       verb: 'plan',
       kind: 'chat',
@@ -136,6 +150,10 @@ module.exports = {
         attachment_ids: attached.map((a) => a.id),
         pending_cards: pendingCards,
         busy: readOnly,
+        guide: guided ? guided.text : '',
+        // Read by the fake driver only: what an answer to this step becomes.
+        guide_expects: guided && guided.step.expects ? guided.step.expects : null,
+        guide_step: guided ? guided.step.key : null,
       },
       images: attached.filter((a) => a.kind === 'image').map((a) => a.file),
       allowWrite: !readOnly,
@@ -259,7 +277,16 @@ module.exports = {
         }
       }
     }
-    return { conversation: convId, key: screen.key, message, ran, read_only: readOnly };
+    // In guide mode a reply that started nothing still ends with the step; a reply that changed
+    // the state (a file edited, a decision made) brings the guide's next message.
+    if (guided && !ran.length && !proposed.cards.length && (step.changed || []).length) {
+      try {
+        require('../guide').post(services, project, convId, {});
+      } catch (err) {
+        ctx.log(`the guide could not go on: ${err.message}`);
+      }
+    }
+    return { conversation: convId, key: screen.key, message, ran, read_only: readOnly, guide: guided ? guided.step.key : null };
   },
 };
 

@@ -95,7 +95,7 @@ module.exports = {
     if (lookId !== prepared.look_id) project.saveState({ look_id: lookId });
 
     const check = await ctx.step('check', (h) => {
-      const result = pipeline.mechanical(root, null);
+      const result = pipeline.mechanical(root, null, { provider: pipeline.compileProvider(ctx.project, ctx.services.drivers) });
       const block = S.ws.loadStyleBlock(root);
       const problems = result.validation.errors.slice();
       if (!block) problems.push({ file: 'style/style-block.txt', code: 'STYLE_BLOCK_EMPTY', message: 'The style block is empty.' });

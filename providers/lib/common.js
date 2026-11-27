@@ -10,6 +10,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { detectQuota } = require('./quota');
 
 /** Comic pages are portrait; this is the ratio used when a package names none. */
 const DEFAULT_ASPECT_RATIO = '2:3';
@@ -256,14 +257,29 @@ function markSucceeded(record, summary, mediaFiles = [], jobId = null) {
   return record;
 }
 
-/** Flip a record to failed with the error message. */
+/**
+ * Flip a record to failed with the error message. A tool that ran out of its
+ * usage quota (err.kind === 'tool_quota', or an error text that says so, see
+ * providers/lib/quota.js) records response.error_kind "tool_quota" and, when
+ * the tool said when it comes back, response.resets in its words: nothing is
+ * wrong with the request, and it can be sent again later.
+ */
 function markFailed(record, err) {
+  const message = err && err.message ? err.message : String(err);
   record.status = 'failed';
   record.response = {
     summary: 'Request failed.',
     provider_job_id: null,
-    error: err && err.message ? err.message : String(err),
+    error: message,
   };
+  const quota = err && err.kind === 'tool_quota'
+    ? { resets: err.resets || null }
+    : (message === 'cancelled' ? null : detectQuota(message));
+  if (quota) {
+    record.response.summary = 'The tool ran out of its usage quota.';
+    record.response.error_kind = 'tool_quota';
+    record.response.resets = quota.resets || null;
+  }
   return record;
 }
 

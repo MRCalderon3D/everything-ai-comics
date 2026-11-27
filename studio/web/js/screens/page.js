@@ -423,6 +423,51 @@ function assumptionsPanel(ctx, data, name) {
     })));
 }
 
+/**
+ * The page's cast needs more reference images than the drawing tool takes:
+ * the plain sentence, and the two things the person can do. Drawing panel by
+ * panel changes how the page is drawn, not who is in it; a staging change is
+ * asked for in the conversation as a proposal, never made on its own.
+ */
+function budgetPanel(ctx, data, name) {
+  const list = (data.findings && data.findings.budget) || [];
+  if (!list.length) return null;
+  const perPanel = list.some((b) => b.actions.includes('per_panel'));
+  const panels = [...new Set(list.flatMap((b) => b.panels_over || []))];
+  return notice('warn',
+    h('p', null, h('strong', null, t('budget.title'))),
+    list.map((b) => h('p', null, b.message)),
+    h('p', { class: 'small muted' }, t('budget.staging_rule')),
+    h('div', { class: 'row' },
+      perPanel ? actionButton(t('budget.per_panel'), async () => {
+        const res = await api.pageMode(ctx.projectId, data.id, 'per_panel');
+        toast(res.reference_plan && res.reference_plan.error ? res.reference_plan.error.message || t('budget.per_panel_done') : t('budget.per_panel_done'), { kind: res.reference_plan && res.reference_plan.error ? 'warn' : 'ok' });
+        ctx.refresh();
+      }, { kind: 'primary', small: true }) : null,
+      actionButton(t('budget.staging'), async () => {
+        await askInConversation(t('budget.staging_message', { page: name, panels: panels.join(', ') || '-' }), { send: true });
+        toast(t('budget.staging_sent'), { kind: 'ok' });
+      }, { small: true })),
+    perPanel ? h('p', { class: 'small muted' }, t('budget.per_panel_hint')) : null);
+}
+
+/** A page drawn panel by panel: the panel images to put together, then the upload of the page. */
+function panelsToAssemble(ctx, data) {
+  if (data.generation_mode !== 'per_panel') return null;
+  const items = (data.panel_images || []).map((p, i) => ({ id: p.panel, label: t('budget.panel_n', { n: i + 1 }), image: p.image }));
+  return h('section', { class: 'panel stack-s panels-assemble' },
+    h('h2', { class: 'panel-title' }, t('budget.assemble_title')),
+    h('p', { class: 'small' }, items.length ? t('budget.assemble_body') : t('budget.per_panel_mode')),
+    items.length ? h('div', { class: 'result-images' }, items.map((it) => h('a', {
+      class: 'attach-thumb large', href: it.image.url, download: '', title: it.label, 'aria-label': t('budget.download_panel', { name: it.label }),
+    }, h('img', { src: it.image.url, alt: '' })))) : null,
+    h('div', { class: 'row' },
+      actionButton(t('budget.whole_page'), async () => {
+        await api.pageMode(ctx.projectId, data.id, 'full_page');
+        ctx.refresh();
+      }, { kind: 'quiet', small: true })));
+}
+
 export function view(ctx, data) {
   const name = pageName(data.id);
   ctx.title = name;
@@ -472,6 +517,7 @@ export function view(ctx, data) {
           : (approval.stale ? t('page.plan_stale') : t('pages.plan_not_approved')))),
       h('p', { class: 'muted small' }, t('page.approval_meaning')),
       h('div', { class: 'row' }, approveBtn)),
+    budgetPanel(ctx, data, name),
     assumptionsPanel(ctx, data, name),
     panel(t('mech.title'),
       data.planning ? planningBox(ctx, data.planning) : mechanicalBox(data.findings),
@@ -515,6 +561,7 @@ export function view(ctx, data) {
     newsMark(`page:${data.id}`),
     drawingWait(ctx, data.id, { tiers, name }),
     jobsFor(mine),
+    panelsToAssemble(ctx, data),
     shown
       ? h('div', { class: 'stack-s' },
         pageSheet(ctx, data.id, shown.lettered || shown.image, { alt: `${name}, ${versionName(shown.id)}`, onOpen: openLarge }),
@@ -530,7 +577,7 @@ export function view(ctx, data) {
         h('p', null, approval.approved && !approval.stale ? t('page.ready_to_draw') : t('page.approve_then_draw')),
         queueLine(data.id)),
     drawBlock,
-    !data.draw.available || ctx.ui.manual
+    !data.draw.available || ctx.ui.manual || (data.panel_images || []).length
       ? panel(t('handoff.title'), handoff(ctx, `page:${data.id}`, { page: data.id }))
       : h('button', { type: 'button', class: 'link small', onclick: () => { ctx.ui.manual = true; ctx.refresh(); } }, t('handoff.offer')));
 

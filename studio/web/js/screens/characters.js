@@ -13,6 +13,7 @@ import { frame } from '/js/components/viewer.js';
 import { toast } from '/js/components/toast.js';
 import { newsBar, newsMark } from '/js/components/news.js';
 import { cleanupButton } from '/js/components/deleting.js';
+import { confirmDialog } from '/js/components/dialog.js';
 
 export async function load(ctx) {
   const [cast, story] = await Promise.all([api.characters(ctx.projectId), api.story(ctx.projectId).catch(() => null)]);
@@ -89,6 +90,12 @@ export function view(ctx, data) {
   const offer = data.cast.look_approved && draw.available && unsheeted.length
     ? notice('next', h('p', null, tn('characters.missing_sheets', unsheeted.length, { names: unsheeted.map((c) => c.name).join(', ') })),
       h('div', { class: 'row' }, actionButton(t('characters.draw_missing'), async () => {
+        const ok = await confirmDialog({
+          title: t('characters.draw_missing'),
+          body: tn('characters.draw_missing_count', unsheeted.length, { names: unsheeted.map((c) => c.name).join(', ') }),
+          confirm: tn('characters.draw_missing_confirm', unsheeted.length),
+        });
+        if (!ok) return;
         for (const c of unsheeted) await queueOp('character.sheet', { character: c.id, sheet: 'turnaround' });
       }, { kind: 'primary' }), h('span', { class: 'small muted' }, t('characters.draw_missing_time'))))
     : null;

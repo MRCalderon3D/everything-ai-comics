@@ -448,6 +448,14 @@ cancelled run, and a saved file that is not an image each give a `failed`
 record with a plain message; text on stderr alone never does. The image model
 is `unreported` unless Codex names it, and the cost is `null`.
 
+A tool that answers that its usage quota or rate limit is reached gives a
+`failed` record with `response.error_kind: "tool_quota"` and
+`response.resets` (the reset time in the tool's words, or `null`).
+`markFailed(record, err)` in `providers/lib/common.js` sets both, from
+`err.kind` or from the error text through `detectQuota()` in
+`providers/lib/quota.js`. Callers treat it as "try again later", never as a
+failed drawing.
+
 `signal` and `onProgress` are optional. `generate-assets.js` hands them
 through from `generateAssets({ signal, onProgress })`. Aborting the signal
 stops a provider that runs a local tool, process tree included, and its

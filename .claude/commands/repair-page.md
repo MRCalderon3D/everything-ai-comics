@@ -160,9 +160,11 @@ references, where the cause usually is.
   person's change request), a `fixed` finding without recheck evidence,
   and a `fixed` verdict with an open blocking finding or an open change
   request. Changing either limit is a project decision for the user.
-- `compile-prompts.js --repair` on the command line stops at `max_cycles`
-  for every request. A person's touch-up past it runs from the web studio,
-  which passes their choice for that one edit.
+- `compile-prompts.js --repair` stops at `max_cycles` for every request.
+  A touch-up the person chose past it is compiled with `--touch-up`, which
+  lifts the refusal only when the review holds their open change request
+  (`source: user_request`). The web studio passes the same flag for that one
+  edit; the automatic repairs after it keep the limit.
 - Change requests are recorded by `addUserRequest()` in
   `scripts/lib/review-requests.js`. Nobody writes them by hand. A request on a
   render with no review opens one whose checks and gates are

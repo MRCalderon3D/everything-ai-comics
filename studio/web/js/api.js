@@ -117,6 +117,10 @@ export const api = {
   jobLog: (id, job, tail) => request('GET', `${project(id)}/jobs/${enc(job)}/log${q({ tail })}`),
   cancelJob: (id, job) => request('POST', `${project(id)}/jobs/${enc(job)}/cancel`, { body: {} }),
   answerJob: (id, job, answers) => request('POST', `${project(id)}/jobs/${enc(job)}/answer`, { body: { answers } }),
+  /** A job paused because a tool ran out of its usage quota: back to the queue, with the jobs paused behind it. */
+  resumeJob: (id, job) => request('POST', `${project(id)}/jobs/${enc(job)}/resume`, { body: {} }),
+  /** Draw a page panel by panel (per_panel) or as one image (full_page); the reference plan is rebuilt at once. */
+  pageMode: (id, page, mode) => request('POST', `${project(id)}/pages/${enc(page)}/mode`, { body: { mode } }),
 
   /** The project conversation: one per project, every message tagged with its screen. */
   conversation: (id) => request('GET', `${project(id)}/conversation`),
@@ -125,6 +129,9 @@ export const api = {
   runAction: (id, conv, card, choice) => request('POST', `${project(id)}/conversation/${enc(conv)}/actions/${enc(card)}/run`, { body: choice ? { choice } : {} }),
   dismissAction: (id, conv, card) => request('POST', `${project(id)}/conversation/${enc(conv)}/actions/${enc(card)}/dismiss`, { body: {} }),
   newConversation: (id) => request('POST', `${project(id)}/conversation/new`, { body: {} }),
+  /** Guide mode of the conversation, and a choice of one of its messages. */
+  guide: (id, on) => request('POST', `${project(id)}/conversation/guide`, { body: { on: !!on } }),
+  guideChoose: (id, step, choice, screen) => request('POST', `${project(id)}/conversation/guide/choose`, { body: { step, choice, screen } }),
   conversations: (id) => request('GET', `${project(id)}/conversations`),
   conversationById: (id, conv) => request('GET', `${project(id)}/conversations/${enc(conv)}`),
   /** Deprecated per-screen chats; the server keeps them for older clients. Not used by the screens. */

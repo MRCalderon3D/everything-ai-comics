@@ -9,9 +9,20 @@
  * real provider, generate-assets.js and the naming of renders all run as
  * they do with the real tool. It never draws anything worth looking at.
  *
+ * It answers the way the real provider now expects: reference_mode
+ * "referenced_image_paths" and references_count, the number of images
+ * attached with -i.
+ *
  * Words in the prompt change what it does, for tests:
  *   FAILDRAW   exit with code 1 and save no image
  *   SLOWDRAW   wait before drawing (STUDIO_FAKE_SLOW_MS, default 4000 ms)
+ *   QUOTADRAW  answer the way Codex does when its image tool is out of
+ *              quota: error events, then a final JSON whose notes say the
+ *              usage limit was reached, exit 0, no image
+ * The same quota answer comes for every drawing while the file named by
+ * STUDIO_FAKE_QUOTA_FILE exists (fake mode sets it to <home>/.fake-quota):
+ * create the file to run out, delete it to get the quota back. A number in
+ * the file lets that many drawings through first.
  */
 
 const fs = require('fs');
@@ -30,6 +41,26 @@ function readStdin() {
 function argAfter(flag) {
   const i = process.argv.indexOf(flag);
   return i !== -1 ? process.argv[i + 1] : null;
+}
+
+/**
+ * Whether the quota is out: the file named by STUDIO_FAKE_QUOTA_FILE exists.
+ * A file that holds a number N lets N more drawings through first (each one
+ * writes N - 1), so a test can run out in the middle of a job.
+ */
+function quotaOut() {
+  const file = process.env.STUDIO_FAKE_QUOTA_FILE;
+  if (!file || !fs.existsSync(file)) return false;
+  let left = null;
+  try {
+    const text = fs.readFileSync(file, 'utf8').trim();
+    left = /^\d+$/.test(text) ? parseInt(text, 10) : null;
+  } catch (err) {
+    left = null;
+  }
+  if (left === null || left <= 0) return true;
+  fs.writeFileSync(file, String(left - 1));
+  return false;
 }
 
 function emit(event) {
@@ -84,6 +115,18 @@ async function main() {
     return 1;
   }
   const outputFile = out[1].trim();
+  if (/\bQUOTADRAW\b/.test(input) || quotaOut()) {
+    emit({ type: 'item.started', item: { id: 'item_0', type: 'command_execution', command: 'image_gen (fake)', status: 'in_progress' } });
+    emit({ type: 'item.completed', item: { id: 'item_1', type: 'error', message: "The built-in tool's usage limit was reached." } });
+    const said = JSON.stringify({
+      saved_path: null, width: null, height: null, reference_mode: 'none', references_count: 0, model: null,
+      notes: 'Image generation failed because the usage limit was reached. Try again at 6:40 PM.',
+    });
+    emit({ type: 'item.completed', item: { id: 'item_2', type: 'agent_message', text: said } });
+    emit({ type: 'turn.completed', usage: { input_tokens: 0, output_tokens: 0 } });
+    if (messageFile) fs.writeFileSync(messageFile, said);
+    return 0;
+  }
   if (/\bFAILDRAW\b/.test(input)) {
     emit({ type: 'turn.failed', error: { message: 'the fake codex was told to fail (FAILDRAW)' } });
     return 1;
@@ -107,8 +150,11 @@ async function main() {
     tiers: target.tiers,
     tag: repair ? 'REPAIR' : '',
   }));
+  let attached = 0;
+  for (let i = 0; i < process.argv.length; i++) if (process.argv[i] === '-i') attached += 1;
   const reply = JSON.stringify({
-    saved_path: outputFile, width: size.width, height: size.height, references_passed: true, model: null,
+    saved_path: outputFile, width: size.width, height: size.height,
+    reference_mode: attached ? 'referenced_image_paths' : 'none', references_count: attached, model: null,
     notes: 'Placeholder from the fake drawing tool. Not art.',
   });
   emit({ type: 'item.completed', item: { id: 'item_1', type: 'agent_message', text: reply } });

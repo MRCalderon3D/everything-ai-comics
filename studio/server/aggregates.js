@@ -360,6 +360,61 @@ function pageSummary(project, entry, provider) {
   };
 }
 
+/**
+ * The REFERENCE_BUDGET warnings of a page (check-continuity.js, run against
+ * the provider that will draw), in plain words: how many reference images
+ * the page or a panel needs, how many the drawing tool takes, who they are,
+ * and what the person can do. Changing who is in a panel is a story change:
+ * it is only ever offered as a proposal, never made to fit a tool.
+ * @returns {{scope: 'page'|'panel', panel: string|null, number: number|null, count: number, capacity: number,
+ *            names: string[], fits_per_panel: boolean, per_panel: boolean, message: object, actions: string[]}[]}
+ */
+function budgetOf(project, pageId, continuity, provider) {
+  const root = project.root;
+  const found = (continuity || []).filter((f) => f && f.code === 'REFERENCE_BUDGET' && f.page === pageId);
+  if (!found.length) return [];
+  const page = safe(() => S.ws.loadPage(root, pageId), null);
+  if (!page) return [];
+  const demand = safe(() => S.referencePlan.referenceDemand(root, page), null);
+  let capacity = null;
+  try {
+    const caps = S.providers.loadImageProvider(found[0].entity || provider).capabilities || {};
+    capacity = typeof caps.referenceImages === 'number' ? caps.referenceImages : null;
+  } catch (err) {
+    capacity = null;
+  }
+  if (!demand || capacity === null) return [];
+  const cache = new Map();
+  const nameList = (items) => items.map((i) => (i === 'look master' ? msg('budget.look') : /^CHAR_/.test(i) ? nameOf(project, cache, i) : i));
+  const order = new Map((page.panels || []).filter(Boolean).slice().sort((a, b) => (a.order || 0) - (b.order || 0)).map((p, i) => [p.id, i + 1]));
+  const over = demand.panels.filter((p) => p.count > capacity);
+  const perPanel = !!(page.generation && page.generation.mode === 'per_panel');
+  const out = [];
+  if (found.some((f) => !f.panel) && !perPanel) {
+    const names = nameList(demand.page.items);
+    out.push({
+      scope: 'page', panel: null, number: null, count: demand.page.count, capacity, names,
+      fits_per_panel: !over.length, per_panel: perPanel,
+      panels_over: over.map((p) => order.get(p.id) || null).filter(Boolean),
+      message: msg(over.length ? 'budget.page.no_fit' : 'budget.page.fits', {
+        n: demand.page.count, capacity, names,
+        panels: over.map((p) => order.get(p.id)).filter(Boolean).join(', '),
+      }),
+      actions: over.length ? ['staging'] : ['per_panel', 'staging'],
+    });
+  }
+  for (const p of over) {
+    const names = nameList(p.items);
+    out.push({
+      scope: 'panel', panel: p.id, number: order.get(p.id) || null, count: p.count, capacity, names,
+      fits_per_panel: false, per_panel: perPanel, panels_over: [order.get(p.id) || null].filter(Boolean),
+      message: msg('budget.panel', { panel: order.get(p.id) || p.id, n: p.count, capacity, names }),
+      actions: ['staging'],
+    });
+  }
+  return out;
+}
+
 // --- screens ----------------------------------------------------------------------------
 
 function projectCard(project, jobs) {
@@ -720,10 +775,14 @@ function issue(project, issueId, drivers, jobs) {
   const pages = S.ws.listPages(root, issueId).map((entry) => pageSummary(project, entry, provider));
   const planning = planningState(project, jobs, issueId);
   const gates = S.ws.listIssues(root).includes(issueId) && !planning
-    ? pipeline.mechanical(root, issueId)
+    ? pipeline.mechanical(root, issueId, { provider })
     : { continuity: [], validation: { errors: [], warnings: [] }, errors: 0 };
   const plan = loadYamlSafe(S.ws.abs(root, 'story/series-plan.yaml'));
   const planned = plan && Array.isArray(plan.issues) ? plan.issues.find((i) => i && i.id === issueId) : null;
+  for (const p of pages) {
+    const budget = budgetOf(project, p.id, gates.continuity, provider);
+    if (budget.length) p.budget = budget;
+  }
   return {
     id: issueId,
     issue: files.readDoc(project, `issues/${issueId}/issue.yaml`),
@@ -774,7 +833,7 @@ function page(project, pageId, drivers, jobs) {
   const data = doc.data && typeof doc.data === 'object' ? doc.data : null;
   const provider = pipeline.compileProvider(project, drivers);
   const planning = planningState(project, jobs, issueId);
-  const gates = planning ? { continuity: [], validation: { errors: [], warnings: [] }, errors: 0 } : pipeline.mechanical(root, issueId);
+  const gates = planning ? { continuity: [], validation: { errors: [], warnings: [] }, errors: 0 } : pipeline.mechanical(root, issueId, { provider });
   const planDoc = files.readDoc(project, `${base}/reference-plan.yaml`);
   const assets = S.ws.loadReferenceAssets(root);
   const planEntries = [];
@@ -821,7 +880,14 @@ function page(project, pageId, drivers, jobs) {
       },
       schema: doc.findings,
       blockers: data && !['reviewed', 'approved'].includes(data.status) ? pipeline.pageBlockers(root, pageId, provider) : [],
+      // REFERENCE_BUDGET in plain words, with what the person can do about it.
+      budget: budgetOf(project, pageId, gates.continuity, provider),
     },
+    generation_mode: data && data.generation && data.generation.mode === 'per_panel' ? 'per_panel' : 'full_page',
+    // Drawn panel by panel: the panel images waiting to be put together and uploaded as the page.
+    panel_images: data && data.generation && data.generation.mode === 'per_panel'
+      ? pipeline.panelImages(root, pageId).map((p) => Object.assign({}, p, { image: files.image(project, p.file) }))
+      : [],
     lettering: {
       mode: overlayMode ? 'overlay' : 'in_image',
       geometry: files.readDoc(project, `${base}/lettering.yaml`),
@@ -1121,5 +1187,5 @@ function overview(project, services) {
 module.exports = {
   entityAssets, reviewView, renderList, readablePlan, planApproval, pageSummary, coverSummary,
   projectCard, overview, story, style, characters, character, entities, entity,
-  issues, issue, page, cover, publishScreen, issueIds, requireIssueId, planningState,
+  issues, issue, page, cover, publishScreen, issueIds, requireIssueId, planningState, budgetOf,
 };

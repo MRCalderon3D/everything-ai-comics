@@ -43,7 +43,12 @@ panel (the `lettering` list of the panel script in section 6: kind,
 speaker, words and reading order, with the budgets of
 `rules/lettering/balloons-and-captions.md` counted while you type), and
 its corrections ask you to choose once an image reaches
-`repair_policy.touch_up_warning` (section 10).
+`repair_policy.touch_up_warning` (section 10). Its "Guide me" mode lets the
+conversation lead you through these sections one decision at a time, from
+your story to the published files. When the drawing tool runs out of quota,
+the studio pauses the work at the page that met the limit and resumes it
+with one button (section 9), and a page whose cast needs more reference
+images than the tool takes can be drawn panel by panel (section 8).
 
 ## 1. Get set up
 
@@ -566,7 +571,12 @@ page file and compile again.
 
 Other options: `--provider <id>`, `--model <id>` to pin a model, and
 `--panel <PN_ID>` to compile one panel as its own image for pages set to
-`generation.mode: per_panel`.
+`generation.mode: per_panel`. That mode is the way out when the page's cast
+needs more reference images than the provider takes: `check-continuity.js`
+warns about it at plan time (`REFERENCE_BUDGET`, with `--provider <id>` to
+check against the provider that will draw) and says whether each panel
+fits on its own. Changing who is in a panel to fit the tool is a story
+change, so it is the writer's call, never the tool's.
 
 ## 9. Generate the pages
 
@@ -651,6 +661,12 @@ unless Codex names its image model, and the cost stays `null`. If the binary
 is missing, the run times out, or Codex saves nothing, the record is
 `failed` and says why. Codex's image tool draws 1:1, 2:3 and 3:2; a page in
 another ratio comes back in the nearest of those and has to be cropped.
+
+When Codex answers that its usage limit was reached, the record is `failed`
+with `response.error_kind: tool_quota` and, when Codex said it,
+`response.resets`. Nothing is wrong with the page: stop there and draw the
+remaining pages once the quota is back. Every provider records the same kind
+for a quota or rate-limit answer.
 
 When a file comes back, open it. A successful call means an image exists.
 Check that it is the right page with the planned number of panels, then set
@@ -763,8 +779,11 @@ Repairs are counted. When `repair_cycle` reaches
 page goes back to its plan or its references. Your own touch-ups count too,
 and they follow `repair_policy.touch_up_warning`: past it you are told that
 more edits may degrade the image and offered a redraw, and you choose. The
-web studio carries that choice through; a touch-up past `max_cycles` is
-valid because the render it edited holds your request. The policy is
+web studio carries that choice through, and from the command line
+`compile-prompts.js --repair <review.yaml> --touch-up` compiles it: past
+`max_cycles` only when the review holds your open change request. A
+touch-up past `max_cycles` is valid because the render it edited holds your
+request. The policy is
 [rules/common/repair-limits.md](../rules/common/repair-limits.md).
 
 ## 11. Letter the pages

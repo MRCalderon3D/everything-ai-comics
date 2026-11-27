@@ -27,7 +27,10 @@
  * the edit target, the open blocking findings (or, when none is blocking,
  * every open finding) and every open change request from a person become
  * the exact changes, and everything else is locked. It refuses once the review's repair_cycle has reached the
- * project's repair_policy.max_cycles.
+ * project's repair_policy.max_cycles. --touch-up (touchUp: true) lifts that
+ * refusal for one edit, and only when the review holds an open finding with
+ * source: user_request: a touch-up the person chose past the limit, which
+ * stops only the automatic repairs (rules/common/repair-limits.md).
  *
  * --asset <ENTITY_ID> --sheet <kind> compiles a reference sheet instead of a
  * page: a character turnaround, expression or wardrobe sheet, a location
@@ -92,8 +95,8 @@ compile-prompts.js: compile a page or a reference sheet into a prompt package
 for an image provider.
 
 Usage:
-  node scripts/compile-prompts.js --page <page.yaml> [--provider <id>] [--repair <review.yaml>]
-  node scripts/compile-prompts.js --cover <ISS_ID> [--root <workspace>] [--provider <id>] [--repair <review.yaml>]
+  node scripts/compile-prompts.js --page <page.yaml> [--provider <id>] [--repair <review.yaml> [--touch-up]]
+  node scripts/compile-prompts.js --cover <ISS_ID> [--root <workspace>] [--provider <id>] [--repair <review.yaml> [--touch-up]]
   node scripts/compile-prompts.js --asset <ENTITY_ID> --sheet <kind> [--root <workspace>] [--provider <id>]
 
 Cover options:
@@ -104,6 +107,8 @@ Cover options:
                      and the cover's own title and issue text.
   --repair <file>    A visual review of one of the cover's renders. Compiles
                      a repair package, under the same limit as a page.
+  --touch-up         With --repair: the person chose this touch-up, as for a
+                     page.
   --root <dir>       Workspace root. Default: the workspace found from the
                      current directory.
 
@@ -112,6 +117,10 @@ Page options:
   --repair <file>    A visual review of one of this page's renders. Compiles
                      a repair package: edit target, exact changes, locked
                      elements. Refused once the repair limit is reached.
+  --touch-up         With --repair: the person chose this touch-up. Past the
+                     repair limit it compiles anyway, but only when the
+                     review holds an open change request (a finding with
+                     source: user_request). Automatic repairs keep the limit.
   --panel <PN_ID>    Per-panel mode: compile one panel as its own image
                      (written to prompts/<provider>.<PN_ID>.yaml).
 
@@ -629,6 +638,17 @@ function endpointText(spec) {
  * person (source: user_request) whatever its severity. The rule lives in
  * lib/review-requests.js, next to the code that records those requests.
  */
+/**
+ * A touch-up the person chose (options.touchUp): it may go past
+ * repair_policy.max_cycles, but only when the review holds an open change
+ * request of theirs (source: user_request). Every other repair keeps the limit.
+ */
+function touchUpAllowed(review, options) {
+  if (!options || options.touchUp !== true || !review) return false;
+  return (Array.isArray(review.findings) ? review.findings : [])
+    .some((f) => f && f.status === 'open' && f.source === 'user_request');
+}
+
 function selectFindings(review) {
   return selectRepairFindings(review);
 }
@@ -868,10 +888,13 @@ function compilePage(root, page, options = {}) {
     const maxCycles = project.repair_policy && Number.isInteger(project.repair_policy.max_cycles)
       ? project.repair_policy.max_cycles : DEFAULT_MAX_REPAIR_CYCLES;
     const cycle = Number.isInteger(review.repair_cycle) ? review.repair_cycle : 0;
-    if (cycle >= maxCycles) {
+    if (cycle >= maxCycles && !touchUpAllowed(review, options)) {
       throw pipelineError('repair_limit',
         `${review.render}: repair limit reached (repair_cycle ${cycle}, repair_policy.max_cycles ${maxCycles}). ` +
         'No further repair is compiled. Fix the page plan or the references first (an ambiguous identity sheet, a missing ledger row, an unclear panel), then compile a fresh generate package.');
+    }
+    if (cycle >= maxCycles) {
+      warnings.push(`touch-up past the repair limit (repair_cycle ${cycle}, max_cycles ${maxCycles}): the person chose it for their open change request`);
     }
     findings = selectFindings(review);
     if (!findings.length) {
@@ -1698,10 +1721,13 @@ function compileCover(options = {}) {
     const maxCycles = project.repair_policy && Number.isInteger(project.repair_policy.max_cycles)
       ? project.repair_policy.max_cycles : DEFAULT_MAX_REPAIR_CYCLES;
     const cycle = Number.isInteger(review.repair_cycle) ? review.repair_cycle : 0;
-    if (cycle >= maxCycles) {
+    if (cycle >= maxCycles && !touchUpAllowed(review, options)) {
       throw pipelineError('repair_limit',
         `${review.render}: repair limit reached (repair_cycle ${cycle}, repair_policy.max_cycles ${maxCycles}). ` +
         'No further repair is compiled. Fix cover.yaml or the references first, then compile a fresh generate package.');
+    }
+    if (cycle >= maxCycles) {
+      warnings.push(`touch-up past the repair limit (repair_cycle ${cycle}, max_cycles ${maxCycles}): the person chose it for their open change request`);
     }
     findings = selectFindings(review);
     if (!findings.length) {
@@ -1817,6 +1843,7 @@ function mainCover(flags) {
   let result;
   try {
     if (flags.cover === true) throw pipelineError('bad_arguments', '--cover needs an issue ID such as ISS_001');
+    if (flags['touch-up'] !== undefined && flags.repair === undefined) throw pipelineError('bad_arguments', '--touch-up goes with --repair <review.yaml>');
     for (const other of ['page', 'asset', 'panel', 'sheet']) {
       if (flags[other] !== undefined) throw pipelineError('bad_arguments', `--cover and --${other} cannot be combined`);
     }
@@ -1832,6 +1859,7 @@ function mainCover(flags) {
       provider: flags.provider,
       model: flags.model && flags.model !== true ? flags.model : undefined,
       repair: flags.repair,
+      touchUp: flags['touch-up'] === true,
     });
     const check = assertValid('prompt-package', result.pkg, `prompt package ${result.pkg.id}`);
     if (check.skipped) console.warn('warning: schemas/prompt-package.schema.json not found, schema validation skipped');
@@ -1857,7 +1885,7 @@ function mainAsset(flags) {
   let result;
   try {
     if (flags.asset === true) throw pipelineError('bad_arguments', '--asset needs an entity ID');
-    for (const other of ['page', 'repair', 'panel']) {
+    for (const other of ['page', 'repair', 'panel', 'touch-up']) {
       if (flags[other] !== undefined) throw pipelineError('bad_arguments', `--asset and --${other} cannot be combined`);
     }
     const start = flags.root && flags.root !== true ? path.resolve(String(flags.root)) : process.cwd();
@@ -1916,6 +1944,7 @@ function main() {
   let ctx;
   let result;
   try {
+    if (flags['touch-up'] !== undefined && flags.repair === undefined) throw pipelineError('bad_arguments', '--touch-up goes with --repair <review.yaml>');
     ctx = loadPageContext(flags.page);
     let repairReview = null;
     if (flags.repair !== undefined) {
@@ -1930,6 +1959,7 @@ function main() {
       model: flags.model && flags.model !== true ? flags.model : undefined,
       panel: flags.panel && flags.panel !== true ? String(flags.panel) : undefined,
       repairReview,
+      touchUp: flags['touch-up'] === true,
     });
     const check = assertValid('prompt-package', result.pkg, `prompt package ${result.pkg.id}`);
     if (check.skipped) console.warn('warning: schemas/prompt-package.schema.json not found, schema validation skipped');
@@ -1956,6 +1986,7 @@ module.exports = {
   composeRepairPrompt,
   composePanelPrompt,
   selectFindings,
+  touchUpAllowed,
   buildRepair,
   resolveReferences,
   letteringElements,

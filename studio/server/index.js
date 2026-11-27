@@ -81,6 +81,8 @@ function createServer(options = {}) {
   services.inspectStep = (project, job, step, changes, before) => require('./entities').inspectStep(project, job, step, changes, before);
   // A job started from a card of the conversation posts its result back there.
   services.onJobSettled = (project, job) => require('./actions').jobSettled(services, project, job);
+  // The tools a job needs: the queued work that pauses when one runs out of quota.
+  services.toolsOf = (project, job) => require('./actions').toolsOf(services, project, job);
   const webDir = options.webDir || path.join(STUDIO_ROOT, 'web');
   let port = options.port === undefined ? DEFAULT_PORT : options.port;
 
@@ -88,6 +90,9 @@ function createServer(options = {}) {
   // so drawing goes through the real provider and generate-assets.js.
   const previousCodexBin = process.env.CODEX_BIN;
   if (fake) process.env.CODEX_BIN = path.join(__dirname, 'fake', 'codex-stub.js');
+  // Fake mode: the drawing tool runs out of quota while this file exists (fake/codex-stub.js).
+  const previousQuotaFile = process.env.STUDIO_FAKE_QUOTA_FILE;
+  if (fake && !previousQuotaFile) process.env.STUDIO_FAKE_QUOTA_FILE = path.join(registry.home, '.fake-quota');
 
   const router = createApi(services);
 
@@ -196,6 +201,7 @@ function createServer(options = {}) {
     if (fake) {
       if (previousCodexBin === undefined) delete process.env.CODEX_BIN;
       else process.env.CODEX_BIN = previousCodexBin;
+      if (previousQuotaFile === undefined) delete process.env.STUDIO_FAKE_QUOTA_FILE;
     }
     await new Promise((resolve) => {
       server.close(() => resolve());

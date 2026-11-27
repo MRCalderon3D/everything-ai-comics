@@ -126,7 +126,9 @@ export function jobOutcome(job) {
   if (job.status !== 'done' || !r) return '';
   switch (job.op) {
     case 'pages.generate': {
-      const parts = [tn('outcome.pages.passed', r.passed || 0)];
+      const assemble = Array.isArray(r.to_assemble) ? r.to_assemble.length : 0;
+      const parts = assemble && !r.passed && !r.flagged ? [] : [tn('outcome.pages.passed', r.passed || 0)];
+      if (assemble) parts.push(tn('outcome.pages.assemble', assemble));
       if (r.with_notes) parts.push(tn('outcome.pages.with_notes', r.with_notes));
       if (r.flagged) parts.push(tn('outcome.pages.flagged', r.flagged));
       if (r.failed) parts.push(tn('outcome.pages.failed', r.failed));

@@ -140,13 +140,21 @@ function repairLimit(project) {
 
 /**
  * The two mechanical gates for an issue (or the whole workspace).
+ * @param {string} root
+ * @param {string|null} issue
+ * @param {{provider?: string}} [options] provider: the image provider whose
+ *   reference budget the plan is checked against (compileProvider()), so the
+ *   REFERENCE_BUDGET warnings speak of the tool that will draw
  * @returns {{continuity: object[], validation: {errors: object[], warnings: object[]}, errors: number}}
  */
-function mechanical(root, issue) {
+function mechanical(root, issue, options = {}) {
   let continuity = [];
   let validation = { errors: [], warnings: [] };
+  const opts = {};
+  if (issue) opts.issue = issue;
+  if (options.provider) opts.provider = options.provider;
   try {
-    continuity = S.checkContinuity(root, issue ? { issue } : {}).findings.map((f) => {
+    continuity = S.checkContinuity(root, opts).findings.map((f) => {
       let hint = null;
       try {
         hint = S.hintFor(f) || null;
@@ -251,27 +259,11 @@ function blockerOf(code, detail, pageId) {
 }
 
 /**
- * The project as compile-prompts.js should read it for a repair. A touch-up
- * the person chose (options.touchUp, with an open change request on the
- * review) is theirs to make past repair_policy.max_cycles, which stops only
- * the automatic repairs (rules/common/repair-limits.md). For that one
- * compile the limit is read as covering this edit; project.yaml is not
- * changed, and the automatic repairs that follow read the real limit.
- * Every other compile reads project.yaml as it is.
+ * Compile and write the prompt package of a page (a repair when
+ * repairReview is given). options.touchUp: the person chose this touch-up;
+ * compile-prompts.js lets it past repair_policy.max_cycles when the review
+ * holds their open change request, and the automatic repairs keep the limit.
  */
-function projectForRepair(root, review, options) {
-  if (!options.touchUp || !review) return undefined;
-  const asked = (Array.isArray(review.findings) ? review.findings : [])
-    .some((f) => f && f.status === 'open' && f.source === 'user_request');
-  if (!asked) return undefined;
-  const doc = S.ws.loadProject(root) || {};
-  const max = doc.repair_policy && Number.isInteger(doc.repair_policy.max_cycles) ? doc.repair_policy.max_cycles : 2;
-  const cycle = Number.isInteger(review.repair_cycle) ? review.repair_cycle : 0;
-  if (cycle < max) return undefined;
-  return Object.assign({}, doc, { repair_policy: Object.assign({}, doc.repair_policy, { max_cycles: cycle + 1 }) });
-}
-
-/** Compile and write the prompt package of a page (a repair when repairReview is given). */
 function compilePage(root, pageId, provider, options = {}) {
   const page = S.ws.loadPage(root, pageId);
   if (!page) throw new OpError('page_missing', `${pageId} has no page.yaml.`);
@@ -281,7 +273,9 @@ function compilePage(root, pageId, provider, options = {}) {
       providerId: provider,
       model: options.model || undefined,
       repairReview: options.repairReview || undefined,
-      project: projectForRepair(root, options.repairReview, options),
+      touchUp: options.touchUp === true,
+      panel: options.panel || undefined,
+      provider: options.providerModule || undefined,
     });
     S.pipeline.assertValid('prompt-package', result.pkg, `prompt package ${result.pkg.id}`);
   } catch (err) {
@@ -314,7 +308,7 @@ function compileCover(root, issueId, provider, options = {}) {
   try {
     result = S.compileCover({
       root, issue: issueId, provider, model: options.model || undefined, repair: options.repair || undefined, write: true,
-      project: projectForRepair(root, options.repair && typeof options.repair === 'object' ? options.repair : null, options),
+      touchUp: options.touchUp === true,
     });
   } catch (err) {
     throw new OpError(err.code || 'compile_failed', pipelineMessage(err));
@@ -329,6 +323,19 @@ function compileCover(root, issueId, provider, options = {}) {
 }
 
 // --- draw ------------------------------------------------------------------------------
+
+/**
+ * The error of a tool that ran out of its usage quota: code tool_quota, the
+ * tool, and when it said the limit resets. The job that meets it pauses
+ * instead of failing, and so do the queued jobs that need the same tool.
+ */
+function quotaError(tool, resets, detail) {
+  const label = TOOL_LABELS[tool] || tool;
+  const err = new OpError('tool_quota',
+    msg(resets ? 'error.tool_quota.reset' : 'error.tool_quota', { tool: label, resets: resets || '' }),
+    { tool, resets: resets || null, said: detail ? String(detail).slice(0, 400) : null });
+  return err;
+}
 
 /**
  * Run one compiled package live through generate-assets.js.
@@ -396,6 +403,10 @@ async function draw(ctx, handle, packageFile, options = {}) {
   const error = record.response && record.response.error;
   if (record.status !== 'succeeded') {
     if (error === 'cancelled' || ctx.signal.aborted) throw abortError();
+    // Out of quota is not a failed drawing: the job pauses and the page waits (jobs.js).
+    if (record.response && record.response.error_kind === 'tool_quota') {
+      throw quotaError('codex', record.response.resets || null, error);
+    }
     throw new OpError('draw_failed', msg('error.draw_failed', { detail: error || `the record ended as ${record.status}` }));
   }
   const media = (record.media_files || [])[0] || null;
@@ -418,6 +429,42 @@ async function draw(ctx, handle, packageFile, options = {}) {
 }
 
 // --- review ------------------------------------------------------------------------------
+
+/**
+ * The panel images of a page drawn panel by panel (generation.mode
+ * per_panel): the newest succeeded image of each panel, kept beside its
+ * generation record. The scaffold has no compositor: the person puts them
+ * together in the layout and uploads the page (page.manual).
+ * @returns {{panel: string, record: string, file: string, at: string|null}[]}
+ */
+function panelImages(root, pageId) {
+  const page = S.ws.loadPage(root, pageId);
+  if (!page || !Array.isArray(page.panels)) return [];
+  const byOrder = new Map(page.panels.filter((p) => p && p.id).map((p) => [String(p.order || 0).padStart(2, '0'), p.id]));
+  const dir = path.join(root, 'generations', pageId);
+  let names = [];
+  try {
+    names = fs.readdirSync(dir).filter((n) => /^GEN_.+\.ya?ml$/i.test(n)).sort();
+  } catch (err) {
+    return [];
+  }
+  const out = new Map();
+  for (const name of names) {
+    let doc = null;
+    try {
+      doc = S.ws.loadYaml(path.join(dir, name));
+    } catch (err) {
+      doc = null;
+    }
+    if (!doc || doc.status !== 'succeeded' || doc.output_render) continue;
+    const m = /-P(\d{2})$/.exec(String(doc.prompt_package || ''));
+    const media = (doc.media_files || [])[0];
+    if (!m || !media || !fs.existsSync(S.ws.abs(root, media))) continue;
+    const panel = byOrder.get(m[1]);
+    if (panel) out.set(panel, { panel, record: doc.id, file: toPosix(media), at: doc.created_at || null });
+  }
+  return page.panels.map((p) => out.get(p && p.id)).filter(Boolean);
+}
 
 /** Which tool drew a render: 'codex', 'person', or null when the record does not say. */
 function drawerOf(root, renderId) {
@@ -829,6 +876,8 @@ module.exports = {
   compileSheet,
   compileCover,
   draw,
+  quotaError,
+  panelImages,
   drawerOf,
   composeReview,
   reviewRender,

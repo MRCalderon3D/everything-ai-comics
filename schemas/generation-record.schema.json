@@ -69,7 +69,15 @@
       "properties": {
         "summary": { "type": "string", "minLength": 1, "description": "What came back, in one line." },
         "provider_job_id": { "type": ["string", "null"], "description": "Provider-side job ID, or null." },
-        "error": { "type": ["string", "null"], "description": "Provider error message, or null." }
+        "error": { "type": ["string", "null"], "description": "Provider error message, or null." },
+        "error_kind": {
+          "enum": ["tool_quota", null],
+          "description": "What kind of failure, when it is not a failed drawing: tool_quota means the tool ran out of its usage quota or rate limit, so the request can be sent again once it comes back. Absent or null for any other outcome."
+        },
+        "resets": {
+          "type": ["string", "null"],
+          "description": "With error_kind tool_quota: when the tool said the limit resets, in its own words or as an ISO timestamp, or null when it did not say."
+        }
       }
     },
     "media_files": {

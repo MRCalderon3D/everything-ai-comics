@@ -198,7 +198,8 @@ function lookState(project) {
 // --- draw, review, repair -----------------------------------------------------------
 
 function fatalDrawError(err) {
-  return ['no_tool', 'no_draw_tool'].includes(err && err.code) ||
+  // A tool out of quota stops the job's remaining pages at once: the next ones would meet the same refusal.
+  return ['no_tool', 'no_draw_tool', 'tool_quota'].includes(err && err.code) ||
     /binary not found|could not be started/i.test(String(err && err.message));
 }
 

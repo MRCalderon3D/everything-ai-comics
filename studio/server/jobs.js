@@ -23,8 +23,19 @@
  * the main lane is idle the turn runs there, as before, and may write.
  *
  * A job can carry an `origin` (the conversation card that started it). When
- * such a job settles (done, failed, cancelled, needs_decision) the manager
- * calls services.onJobSettled(project, job), which posts the result back.
+ * such a job settles (done, failed, cancelled, needs_decision, paused) the
+ * manager calls services.onJobSettled(project, job), which posts the result
+ * back.
+ *
+ * A tool that runs out of its usage quota (an error with code tool_quota,
+ * see providers/lib/quota.js and pipeline.quotaError) does not fail the job.
+ * The job pauses where it stopped (status paused, job.paused = { reason:
+ * 'tool_quota', tool, resets }): the step that met the quota is marked
+ * paused, the steps after it stay pending, and the jobs queued behind it that
+ * need the same tool (services.toolsOf) pause too, untouched. Resuming
+ * (resume()) puts them back at the front of the queue in their order;
+ * finished steps are not run again, exactly as after an answer, so nothing
+ * that was drawn is drawn twice and no attempt counts toward a repair limit.
  */
 
 const fs = require('fs');
@@ -38,7 +49,7 @@ const {
 const { msg } = i18n;
 
 const IMAGE_RE = /\.(png|jpe?g|webp)$/i;
-const ACTIVE = ['queued', 'running', 'needs_decision'];
+const ACTIVE = ['queued', 'running', 'needs_decision', 'paused'];
 const FINISHED = ['done', 'failed', 'cancelled'];
 
 /** Thrown inside a step when the AI needs an answer only the person can give. */
@@ -76,7 +87,7 @@ function view(job) {
   const out = {};
   for (const key of ['id', 'project', 'op', 'title', 'params', 'status', 'created_at', 'started_at', 'ended_at',
     'current_step', 'steps', 'questions', 'answers', 'result', 'error', 'tools', 'commits', 'position', 'cost_usd',
-    'read_only', 'origin', 'story_proposals', 'added_entities']) {
+    'read_only', 'origin', 'story_proposals', 'added_entities', 'paused']) {
     out[key] = job[key] === undefined ? null : job[key];
   }
   return out;
@@ -282,7 +293,7 @@ class JobManager {
     job.status = 'cancelled';
     job.ended_at = nowIso();
     job.position = null;
-    for (const step of job.steps) if (step.status === 'waiting') step.status = 'cancelled';
+    for (const step of job.steps) if (step.status === 'waiting' || step.status === 'paused') step.status = 'cancelled';
     this.positions(project);
     this.save(project, job);
     this.emit(project, job);
@@ -292,7 +303,7 @@ class JobManager {
 
   /** Tell whoever started a job (a conversation card) that it settled. Never throws. */
   settledHook(project, job) {
-    if (!job.origin || typeof this.services.onJobSettled !== 'function') return;
+    if (typeof this.services.onJobSettled !== 'function' || job.op === 'chat.turn') return;
     try {
       this.services.onJobSettled(project, job);
     } catch (err) {
@@ -330,6 +341,92 @@ class JobManager {
     this.emit(project, job);
     setImmediate(() => this.pump(project));
     return view(job);
+  }
+
+  // --- out of quota ------------------------------------------------------------
+
+  /**
+   * The jobs queued behind one that met a tool's quota and need the same
+   * tool: they pause without starting (job.paused.by names the job that met
+   * it). Returns the views of the jobs paused.
+   */
+  pauseQueuedFor(project, tool, byJob) {
+    const q = this.queue(project);
+    const jobs = this.jobs(project);
+    const toolsOf = typeof this.services.toolsOf === 'function' ? this.services.toolsOf : () => [];
+    const paused = [];
+    for (const list of [q.queued, q.lane.queued]) {
+      for (const id of list.slice()) {
+        const job = jobs.get(id);
+        if (!job || job.status !== 'queued') continue;
+        let needs = [];
+        try {
+          needs = toolsOf(project, job) || [];
+        } catch (err) {
+          needs = [];
+        }
+        if (!needs.includes(tool)) continue;
+        list.splice(list.indexOf(id), 1);
+        job.status = 'paused';
+        job.position = null;
+        job.paused = { reason: 'tool_quota', tool, resets: byJob.paused ? byJob.paused.resets : null, by: byJob.id, at: nowIso() };
+        this.log(project, job, `paused before it started: ${tool} is out of its usage quota (${byJob.id} met it)`, '-');
+        this.save(project, job);
+        this.emit(project, job);
+        this.settledHook(project, job);
+        paused.push(view(job));
+      }
+    }
+    this.positions(project);
+    return paused;
+  }
+
+  /**
+   * Resume a paused job: back to the front of the queue, its finished steps
+   * kept. With siblings (the default), the jobs that paused because of it,
+   * or for the same tool, follow it in the order they were created.
+   * @returns {{job: object, resumed: object[]}} the job and every job resumed with it
+   */
+  resume(project, id, { siblings = true } = {}) {
+    const job = this.getRaw(project, id);
+    if (job.status !== 'paused') {
+      throw new HttpError(409, 'job_not_paused', 'This job is not paused.', undefined, { status: job.status });
+    }
+    const all = [job];
+    if (siblings && job.paused) {
+      for (const other of [...this.jobs(project).values()].sort((a, b) => (a.id < b.id ? -1 : 1))) {
+        if (other === job || other.status !== 'paused' || !other.paused) continue;
+        if (other.paused.by === job.id || (other.paused.tool && other.paused.tool === job.paused.tool)) all.push(other);
+      }
+    }
+    const q = this.queue(project);
+    for (const item of all.slice().reverse()) {
+      item.status = 'queued';
+      item.error = null;
+      item.resumed = { at: nowIso(), from: item.paused };
+      item.paused = null;
+      for (const step of item.steps) {
+        if (step.status === 'paused') {
+          step.status = 'pending';
+          step.note = null;
+        }
+      }
+      (item.read_only ? q.lane.queued : q.queued).unshift(item.id);
+    }
+    this.positions(project);
+    for (const item of all) {
+      this.log(project, item, 'resumed by the person', '-');
+      this.save(project, item);
+      this.emit(project, item);
+      this.settledHook(project, item);
+    }
+    setImmediate(() => this.pump(project));
+    return { job: view(job), resumed: all.map(view) };
+  }
+
+  /** The paused jobs of a project, oldest first. */
+  pausedJobs(project) {
+    return [...this.jobs(project).values()].filter((j) => j.status === 'paused').sort((a, b) => (a.id < b.id ? -1 : 1)).map(view);
   }
 
   // --- who wrote what ---------------------------------------------------------
@@ -509,6 +606,13 @@ class JobManager {
         }));
         job.error = null;
         this.log(project, job, `waiting for a decision: ${job.questions.map((q) => q.question).join(' / ')}`, '-');
+      } else if (err && err.code === 'tool_quota' && !controller.signal.aborted) {
+        // Not a failure: the tool ran out of quota. The job waits where it stopped.
+        const details = err.details && typeof err.details === 'object' ? err.details : {};
+        job.status = 'paused';
+        job.paused = { reason: 'tool_quota', tool: details.tool || null, resets: details.resets || null, by: null, at: nowIso() };
+        job.error = { code: 'tool_quota', message: errorText({ code: 'tool_quota', message: err.message, params: err.params, text: err.text }), details };
+        this.log(project, job, `paused: ${details.tool || 'the tool'} is out of its usage quota${details.resets ? ` (resets ${details.resets})` : ''}`, '-');
       } else if (isCancel(err) || controller.signal.aborted) {
         job.status = 'cancelled';
         job.error = null;
@@ -525,7 +629,7 @@ class JobManager {
       }
     }
     job.current_step = null;
-    if (job.status !== 'needs_decision') job.ended_at = nowIso();
+    if (job.status !== 'needs_decision' && job.status !== 'paused') job.ended_at = nowIso();
     try {
       this.save(project, job);
     } catch (err) {
@@ -533,6 +637,8 @@ class JobManager {
     }
     this.emit(project, job);
     this.settledHook(project, job);
+    // The work queued behind it that needs the same tool would meet the same refusal.
+    if (job.status === 'paused' && job.paused && job.paused.tool) this.pauseQueuedFor(project, job.paused.tool, job);
   }
 
   /**
@@ -603,7 +709,7 @@ class JobManager {
     }
     if (changes.length) {
       const suffix = failure
-        ? (failure instanceof NeedsDecision ? '.paused' : isCancel(failure) ? '.cancelled' : '.unfinished')
+        ? (failure instanceof NeedsDecision ? '.paused' : failure && failure.code === 'tool_quota' ? '.quota' : isCancel(failure) ? '.cancelled' : '.unfinished')
         : '';
       const title = msg(`activity.step${suffix}`, { title: job.title, label: step.label });
       let commit = null;
@@ -635,7 +741,8 @@ class JobManager {
 
     step.ended_at = nowIso();
     if (failure) {
-      step.status = failure instanceof NeedsDecision ? 'waiting' : isCancel(failure) ? 'cancelled' : 'failed';
+      step.status = failure instanceof NeedsDecision ? 'waiting' : isCancel(failure) ? 'cancelled'
+        : failure && failure.code === 'tool_quota' ? 'paused' : 'failed';
       if (!(failure instanceof NeedsDecision) && !isCancel(failure) && !step.note) {
         step.note = errorText({ code: typeof failure.code === 'string' ? failure.code : 'failed', message: failure.message || String(failure), params: failure.params, text: failure.text });
       }

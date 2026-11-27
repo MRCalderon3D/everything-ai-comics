@@ -9,7 +9,16 @@
  * Pages are drawn one at a time. A page whose review passed is attached to
  * the next page as a continuity reference, by the scaffold's own rule in
  * build-reference-plan.js. A page that still fails is left flagged with its
- * evidence and the queue goes on; only a missing drawing tool stops it.
+ * evidence and the queue goes on; only a missing drawing tool stops it, or
+ * a tool out of its usage quota, which pauses the job where it stopped
+ * (jobs.js) with the pages not drawn yet left for later.
+ *
+ * A page set to be drawn panel by panel (generation.mode per_panel, chosen
+ * when its cast needs more reference images than the drawing tool takes)
+ * draws each panel as its own working image, one step per panel, each
+ * carrying only that panel's references. The scaffold has no compositor, so
+ * the page then waits for the person to put the panels together in the
+ * layout and upload the page (page.manual), which is reviewed as any page.
  */
 
 const S = require('../scaffold');
@@ -23,6 +32,46 @@ const {
 
 function numberOf(pageId) {
   return parseInt(String(pageId).slice(-3), 10);
+}
+
+/**
+ * Draw a per_panel page: the reference plan built for panels, one package
+ * and one drawing step per panel. A step already done (the job resumed after
+ * the tool's quota came back) is not drawn again.
+ */
+async function drawPanels(ctx, target, pageId, n) {
+  const root = ctx.project.root;
+  const prepared = await ctx.step(`${pageId}:prepare`, (h) => {
+    const plan = pipeline.buildPlan(root, pageId, target.provider);
+    if (plan.doc.notes) h.log(String(plan.doc.notes));
+    const page = S.ws.loadPage(root, pageId);
+    const panels = (page.panels || []).filter((p) => p && p.id).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+    const out = panels.map((p, i) => {
+      const compiled = pipeline.compilePage(root, pageId, target.provider, { model: target.model || undefined, panel: p.id });
+      for (const warning of compiled.warnings) h.log(`warning: ${p.id}: ${warning}`);
+      return { panel: p.id, number: i + 1, file: compiled.file, references: compiled.pkg.references.length };
+    });
+    if (['planned', 'scripted'].includes(page.status)) pipeline.setPageState(root, pageId, { status: 'prompted' });
+    h.note(msg('note.per_panel', { n: out.length }));
+    return { panels: out };
+  });
+  let after = `${pageId}:prepare`;
+  const drawn = [];
+  for (const item of prepared.panels) {
+    const id = `${pageId}:panel-${item.panel}`;
+    ctx.addStep({ id, label: msg('step.page.panel', { n, panel: item.number }) }, { after });
+    after = id;
+    const result = await ctx.step(id, async (h) => {
+      h.setTool('codex');
+      const out = await pipeline.draw(ctx, h, item.file);
+      h.note(msg('note.panel_drawn', { panel: item.number }));
+      return { panel: item.panel, file: out.file, record: out.record };
+    }, { verb: 'draw' });
+    drawn.push(result);
+  }
+  ctx.skipStep(`${pageId}:draw`, msg('skip.per_panel'));
+  ctx.skipStep(`${pageId}:review`, msg('skip.assemble'));
+  return { page: pageId, per_panel: true, panels: drawn, assemble: true };
 }
 
 module.exports = {
@@ -121,6 +170,10 @@ module.exports = {
         continue;
       }
       try {
+        if (before.generation && before.generation.mode === 'per_panel') {
+          results.push(await drawPanels(ctx, target, pageId, n));
+          continue;
+        }
         const prepared = await ctx.step(`${pageId}:prepare`, (h) => {
           const plan = pipeline.buildPlan(root, pageId, target.provider);
           if (plan.doc.notes) h.log(String(plan.doc.notes));
@@ -150,7 +203,8 @@ module.exports = {
 
     const failed = results.filter((r) => r.error);
     const drawn = results.filter((r) => r.render && !r.skipped);
-    if (failed.length && !drawn.length && !results.some((r) => r.skipped)) {
+    const panelPages = results.filter((r) => r.per_panel);
+    if (failed.length && !drawn.length && !panelPages.length && !results.some((r) => r.skipped)) {
       // The job fails with the reason of the first page that could not be drawn.
       throw new OpError(failed[0].error.code, failed[0].error.message, { pages: failed });
     }
@@ -160,6 +214,7 @@ module.exports = {
       with_notes: drawn.filter((r) => r.outcome === 'notes').length,
       flagged: drawn.filter((r) => r.flagged).length,
       failed: failed.length,
+      to_assemble: panelPages.map((r) => r.page),
       tools: { draw: 'codex', look: ctx.job.tools.look || null },
     };
   },

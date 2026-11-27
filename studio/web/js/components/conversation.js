@@ -11,19 +11,26 @@
 // person confirms in words). A running card shows its job live; when it ends,
 // the result comes back as a message with its images, links to the screens
 // where it is approved, and the questions of a job that stopped to ask.
+//
+// "Guide me" turns the conversation into a guide (studio/server/guide.js):
+// its messages carry the step the project is at, the images to look at, and
+// choices to click (the style gallery among them). A click goes to the
+// server as the person's answer, which makes the cards and runs them; after
+// each result the guide's next message arrives by itself. Only the newest
+// guide message keeps its choices live.
 
 import { h, icon, mount, nextId } from '/js/dom.js';
 import { t, tn, tv, formatTime, formatDateTime, formatDuration } from '/js/i18n.js';
 import { api, errorText } from '/js/api.js';
 import { state, bus, rememberJob, ACTIVE } from '/js/store.js';
-import { toolName, jobStatus, jobOutcome } from '/js/labels.js';
+import { toolName, jobStatus, jobOutcome, pageName } from '/js/labels.js';
 import { button } from '/js/components/ui.js';
 import { openDialog, confirmDialog } from '/js/components/dialog.js';
 import { showFile } from '/js/components/editor.js';
 import { changesView } from '/js/components/diff.js';
 import { toast } from '/js/components/toast.js';
 import { dockFloats, dockExpanded, setLayout, setTransient, resizeHandle } from '/js/layout.js';
-import { jobCard, liveNode } from '/js/components/jobs.js';
+import { jobCard, liveNode, resumeJob } from '/js/components/jobs.js';
 import { openViewer } from '/js/components/viewer.js';
 import { newsFor } from '/js/unseen.js';
 
@@ -47,6 +54,14 @@ let attachEl = null;
 let fileInput = null;
 // Files attached to the next message: { name, kind, pending, id, url }.
 let attached = [];
+let choosing = false;
+// Open the dock once the next project loads (a comic just created in guide mode).
+let openOnLoad = false;
+
+/** Open the conversation as soon as the project it belongs to is loaded. */
+export function openDockSoon() {
+  openOnLoad = true;
+}
 
 /** The collapsed conversation: one button, with a marker when a reply arrived. */
 function paintMini() {
@@ -271,6 +286,7 @@ function actionCard(card) {
     card.photo_rights ? h('p', { class: 'notice warn small' }, t('characters.photo_rights')) : null,
     h('p', { class: 'action-meta small' }, cardTools(card), card.tools && card.tools.length ? ' · ' : '', cardTime(card)),
     pending && card.draws && !card.choice ? h('p', { class: 'small action-warn' }, icon('alert'), ' ', t('card.draws')) : null,
+    pending && card.images ? h('p', { class: 'small action-images' }, tn('card.images', card.images)) : null,
     pending && card.decision ? h('p', { class: 'small action-warn' }, icon('alert'), ' ', t('card.decision')) : null,
     pending && card.always_confirm ? h('p', { class: 'small action-warn' }, icon('alert'), ' ', t('card.always_confirm')) : null,
     card.status === 'waiting' ? h('p', { class: 'small muted' }, t('card.waiting_for', { n: card.after ? card.after.n : '?' })) : null,
@@ -283,6 +299,7 @@ function actionCard(card) {
       : null,
     card.run_by === 'text' && !pending ? h('p', { class: 'small muted' }, t('card.by_text')) : null,
     card.run_by === 'request' && !pending ? h('p', { class: 'small muted' }, t('card.by_request')) : null,
+    card.run_by === 'guide' && !pending ? h('p', { class: 'small muted' }, t('card.by_guide')) : null,
     card.run_by === 'auto' && !pending ? h('p', { class: 'small muted' }, t('card.by_auto')) : null,
     card.status === 'dismissed' ? h('p', { class: 'small muted' }, t('card.dismissed')) : null,
     card.status === 'done' && card.kind === 'direct' ? h('p', { class: 'small state-ok' }, t('card.done')) : null,
@@ -363,6 +380,7 @@ function resultNode(m) {
       h('p', null, h('strong', null, m.text || '')),
       outcome ? h('p', { class: 'small' }, outcome) : (m.summary ? h('p', { class: 'small' }, m.summary) : null),
       m.status === 'failed' && m.error && !outcome ? h('p', { class: 'small bad' }, m.error.message || '') : null,
+      m.status === 'paused' && !m.quota && m.error ? h('p', { class: 'small action-warn' }, m.error.message || '') : null,
       images.length
         ? h('div', { class: 'result-images', 'aria-label': t('result.images') }, images.map((img) => h('button', {
           type: 'button', class: 'attach-thumb', title: img.label, 'aria-label': t('convo.attachment_open', { name: img.label.split('/').pop() }),
@@ -372,13 +390,90 @@ function resultNode(m) {
       (m.proposals || []).map((p) => h('a', { class: 'btn small primary', href: `${base}/story?proposal=${encodeURIComponent(p.id)}` },
         p.guard ? t('result.guard_proposal') : t('result.review_proposal'))),
       (m.added || []).length ? addedLines(m.added) : null,
+      m.quota ? quotaBlock(m) : null,
       m.links && m.links.length ? h('div', { class: 'msg-links' }, m.links.map((l) => h('a', { href: l.route }, icon('right'), h('span', null, l.label || l.screen_label), linkNews(l)))) : null,
       m.status === 'needs_decision' && (m.questions || []).length ? questionsForm(m) : null));
+}
+
+/** A job paused because a tool ran out of its usage quota: the plain words, and Resume while it is still paused. */
+function quotaBlock(m) {
+  const q = m.quota;
+  return h('div', { class: 'result-quota stack-s' },
+    (q.lines || []).map((line, i) => h('p', { class: i ? 'small' : '' }, line)),
+    (q.pages || []).length ? h('p', { class: 'small muted' }, t('result.quota_pages', { pages: q.pages.map(pageName).join(', ') })) : null,
+    liveNode(() => {
+      const job = state.jobs.get(m.job);
+      if (!job || job.status !== 'paused') return null;
+      return h('div', { class: 'row' }, button(t('result.quota_resume'), { kind: 'primary', small: true, icon: 'right', onclick: () => resumeJob(job) }),
+        h('span', { class: 'small muted' }, t('result.quota_later')));
+    }, 'div'));
+}
+
+/** Send a click on one of the guide's choices; the server makes and runs its cards. */
+async function chooseGuide(g, choiceId) {
+  if (choosing) return;
+  choosing = true;
+  paintList();
+  try {
+    const res = await api.guideChoose(state.projectId, g.sig, choiceId, state.screen || undefined);
+    for (const card of res.cards || []) if (card.job) rememberJob({ id: card.job, project: state.projectId, op: card.action, status: 'queued', steps: [] });
+  } catch (err) {
+    toast(errorText(err), { kind: err.code === 'guide_moved' ? 'warn' : 'bad' });
+    if (err.code === 'guide_moved') await load(true);
+  } finally {
+    choosing = false;
+    paintList();
+  }
+}
+
+/** The style gallery inside the chat: every preset with its sample page, one click to pick it. */
+function presetPicker(g, live) {
+  const items = (g.presets || []).filter((p) => p.preview);
+  if (!items.length) return null;
+  return h('ul', { class: 'guide-presets', 'aria-label': t('guide.presets') }, items.map((p) => h('li', null,
+    h('button', {
+      type: 'button', class: 'guide-preset', disabled: !live || choosing,
+      'aria-label': t('guide.pick_preset', { name: p.name }),
+      onclick: () => chooseGuide(g, `preset-${p.key}`),
+    },
+    h('img', { src: p.preview.url, alt: '', loading: 'lazy', width: p.preview.width || null, height: p.preview.height || null }),
+    h('span', { class: 'guide-preset-name' }, p.name),
+    p.intent ? h('span', { class: 'guide-preset-intent small muted' }, p.intent) : null))));
+}
+
+/** A message of the guide: where the project is, the one decision, images, choices. */
+function guideNode(m) {
+  const g = m.guide;
+  const step = conv && conv.guide && conv.guide.on ? conv.guide.step : null;
+  const live = !viewing && !!step && step.sig === g.sig && g.key !== 'started';
+  const images = (g.images || []).map((img, i) => ({ id: `g${i}`, label: img.label || img.path, image: img }));
+  const lines = g.lines && g.lines.length ? g.lines : [m.text];
+  const choices = (g.choices || []).filter((c) => !c.preset);
+  return h('li', { class: `msg assistant guide${live ? ' live' : ''}`, dataset: { step: g.key } },
+    h('div', { class: 'msg-meta' }, h('strong', null, icon('spark'), ' ', t('guide.name')), h('span', null, formatTime(m.at))),
+    h('div', { class: 'guide-lines' }, lines.map((line, i) => h('p', { class: i === lines.length - 1 && g.key !== 'started' ? 'guide-decide' : '' }, line))),
+    images.length
+      ? h('div', { class: 'result-images guide-images', 'aria-label': t('result.images') }, images.map((img) => h('button', {
+        type: 'button', class: 'attach-thumb large', title: img.label, 'aria-label': t('convo.attachment_open', { name: img.label }),
+        onclick: () => openViewer(images, img.id),
+      }, h('img', { src: img.image.url, alt: '' }))))
+      : null,
+    live ? presetPicker(g, live) : null,
+    live && choices.length
+      ? h('div', { class: 'guide-choices row' }, choices.map((c, i) => button(c.label, {
+        kind: i === 0 ? (c.draws ? 'accent' : 'primary') : '', small: true, disabled: choosing,
+        onclick: () => chooseGuide(g, c.id),
+      })))
+      : null,
+    live && choices.some((c) => c.draws) ? h('p', { class: 'small action-warn' }, icon('alert'), ' ', t('guide.draws_note')) : null,
+    (m.links || []).length ? h('div', { class: 'msg-links' }, m.links.map((l) => h('a', { href: l.route }, icon('right'), h('span', null, l.label || l.screen_label), linkNews(l)))) : null,
+    (m.actions || []).length ? h('div', { class: 'msg-actions' }, m.actions.map(actionCard)) : null);
 }
 
 function messageNode(m) {
   const base = `/p/${encodeURIComponent(state.projectId)}`;
   if (m.role === 'event' && m.event === 'action_result') return resultNode(m);
+  if (m.guide) return guideNode(m);
   if (m.role === 'event') {
     return h('li', { class: 'msg event' }, h('p', { class: 'msg-text' }, m.text || ''));
   }
@@ -435,6 +530,10 @@ function emptyNode() {
   return h('li', { class: 'convo-empty' },
     h('h3', null, t('convo.empty_title')),
     h('p', null, t('convo.empty_body')),
+    conv && !(conv.guide && conv.guide.on)
+      ? h('div', { class: 'guide-offer stack-s' }, h('p', { class: 'small' }, t('guide.offer')),
+        button(t('guide.turn_on'), { kind: 'primary', small: true, icon: 'spark', onclick: () => setGuide(true) }))
+      : null,
     examples.length ? h('div', { class: 'chat-examples' }, examples.map((ex) => h('button', {
       type: 'button',
       onclick: () => { input.value = ex; input.dispatchEvent(new Event('input')); input.focus(); },
@@ -492,8 +591,14 @@ function paintContext() {
 function paintHead() {
   if (!headEl) return;
   const session = conv && conv.session && conv.session.tool;
+  const guided = !!(conv && conv.guide && conv.guide.on);
   mount(headEl,
     h('h2', { id: 'convo-title' }, t('convo.title'), session ? h('span', { class: 'tool-tag' }, toolName(session)) : null),
+    h('button', {
+      type: 'button', class: `btn small ${guided ? 'accent' : 'quiet'} guide-toggle`, 'aria-pressed': String(guided),
+      title: guided ? t('guide.toggle_off_hint') : t('guide.toggle_on_hint'), disabled: !conv || !!viewing,
+      onclick: () => setGuide(!guided),
+    }, icon('spark'), h('span', null, t('guide.toggle'))),
     button(t('convo.new'), { kind: 'quiet', small: true, icon: 'plus', onclick: newConversation }),
     h('button', { type: 'button', class: 'btn icon-only quiet small', 'aria-label': t('convo.earlier'), title: t('convo.earlier'), onclick: earlier }, icon('clock')),
     h('button', { type: 'button', class: 'btn icon-only quiet small', 'aria-label': t('convo.hide'), title: t('convo.hide'), onclick: () => { setDock(false); const b = root.querySelector('.dock-mini button') || document.querySelector('.dock-toggle'); if (b && b.offsetParent) b.focus(); else if (document.querySelector('.dock-toggle')) document.querySelector('.dock-toggle').focus(); } }, icon(narrow() ? 'close' : 'right')));
@@ -551,6 +656,22 @@ async function sendNow() {
   } finally {
     sending = false;
     paintContext();
+  }
+}
+
+/** Turn guide mode on or off. On, the guide's first message comes at once; off keeps everything. */
+async function setGuide(on) {
+  try {
+    const res = await api.guide(state.projectId, on);
+    conv = res.conversation;
+    pending = (conv.pending || []).slice();
+    viewing = null;
+    paintHead();
+    paintContext();
+    paintList();
+    toast(on ? t('guide.on_toast') : t('guide.off_toast'), { kind: 'ok' });
+  } catch (err) {
+    toast(errorText(err), { kind: 'bad' });
   }
 }
 
@@ -745,7 +866,12 @@ export function startConversation() {
     }
     root.hidden = false;
     build();
-    load(true);
+    load(true).then(() => {
+      if (openOnLoad) {
+        openOnLoad = false;
+        setDock(true);
+      }
+    });
     bus.emit('dock', dockOpen());
   });
   bus.on('layout', () => {
@@ -765,6 +891,11 @@ export function startConversation() {
     if (!data.message || !conv || data.conversation !== conv.id) return;
     if (!conv.messages.some((m) => m.id === data.message.id)) {
       conv.messages.push(data.message);
+      // A new step of the guide: its choices are the live ones now.
+      if (data.message.guide && data.message.guide.key && data.message.guide.key !== 'started') {
+        conv.guide = Object.assign({}, conv.guide || {}, { on: true, step: data.message.guide });
+      }
+      if (data.message.event === 'guide_off' && conv.guide) conv.guide = Object.assign({}, conv.guide, { on: false, step: null });
       if (data.message.role === 'assistant' && !dockOpen()) {
         unread += 1;
         paintMini();

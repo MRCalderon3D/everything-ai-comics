@@ -2,7 +2,7 @@
 // each page, start the drawing for some or all of them, and watch the queue.
 // The findings of the mechanical checks are always on screen.
 
-import { h, nextId } from '/js/dom.js';
+import { h, nextId, icon } from '/js/dom.js';
 import { t, tn } from '/js/i18n.js';
 import { api } from '/js/api.js';
 import { state, findJob } from '/js/store.js';
@@ -63,10 +63,21 @@ export function queueLine(pageId) {
 /** Ask for the approvals a drawing needs, then start it. */
 export async function drawPages(ctx, pages, { unapproved = [], passing = [] } = {}) {
   const params = { pages };
+  // Batch drawing says how many images it draws, so the person can weigh it against their plan.
+  const asked = passing.length || unapproved.length;
+  if (pages.length > 1 && !asked) {
+    const ok = await confirmDialog({
+      title: t('pages.batch_title'),
+      body: h('div', { class: 'stack-s' }, h('p', null, tn('pages.batch_body', pages.length)), h('p', { class: 'muted' }, t('pages.draw_time', { n: pages.length }))),
+      confirm: tn('pages.batch_confirm', pages.length),
+    });
+    if (!ok) return null;
+  }
   if (passing.length) {
     const ok = await confirmDialog({
       title: t('pages.redraw_title'),
-      body: tn('pages.redraw_body', passing.length, { pages: passing.map(pageName).join(', ') }),
+      body: h('div', { class: 'stack-s' }, h('p', null, tn('pages.redraw_body', passing.length, { pages: passing.map(pageName).join(', ') })),
+        pages.length > 1 ? h('p', null, tn('pages.batch_body', pages.length)) : null),
       confirm: t('pages.redraw_confirm'),
     });
     if (!ok) return null;
@@ -77,6 +88,7 @@ export async function drawPages(ctx, pages, { unapproved = [], passing = [] } = 
       title: t('pages.approve_and_draw_title'),
       body: h('div', { class: 'stack-s' },
         h('p', null, tn('pages.approve_and_draw_body', unapproved.length, { pages: unapproved.map(pageName).join(', ') })),
+        pages.length > 1 ? h('p', null, tn('pages.batch_body', pages.length)) : null,
         h('p', { class: 'muted' }, t('pages.draw_time', { n: pages.length }))),
       confirm: t('pages.approve_and_draw_confirm'),
     });
@@ -243,6 +255,10 @@ export function view(ctx, data) {
         p.current_render ? h('p', null, verdictChip(p)) : null,
         p.blockers && p.blockers.length
           ? h('ul', { class: 'blockers small' }, p.blockers.map((b) => h('li', null, blockerText(b))))
+          : null,
+        // More reference images than the drawing tool takes: what to do is on the page itself.
+        p.budget && p.budget.length
+          ? h('p', { class: 'small action-warn' }, icon('alert'), ' ', h('a', { href: `${base}/pages/${p.id}` }, t('budget.on_page')))
           : null,
         h('div', { class: 'row page-links' },
           h('a', { href: `${base}/pages/${p.id}` }, t('pages.link_plan')),

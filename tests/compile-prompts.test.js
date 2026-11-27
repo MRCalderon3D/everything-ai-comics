@@ -485,6 +485,22 @@ function testRepairCycleLimit() {
     fx.editYaml(root, 'project.yaml', (project) => { delete project.repair_policy; });
     assert.strictEqual(compile(root, fx.PAGE_2, { repairReview: Object.assign({}, review, { repair_cycle: 1 }) }).pkg.mode, 'repair');
     expectError(() => compile(root, fx.PAGE_2, { repairReview: Object.assign({}, review, { repair_cycle: 2 }) }), 'repair_limit');
+
+    // touchUp: a touch-up the person chose goes past the limit, only with their open change request.
+    const atLimit = Object.assign({}, review, { repair_cycle: 2 });
+    expectError(() => compile(root, fx.PAGE_2, { repairReview: atLimit, touchUp: true }), 'repair_limit',
+      /repair limit reached/);
+    const asked = Object.assign({}, atLimit, {
+      findings: review.findings.concat([{ id: 'F09', panel: null, source: 'user_request', expected: 'The change the person asked for is visible.', visible: 'Not checked yet.', severity: 'minor', repair: 'Make the sky darker.', status: 'open' }]),
+    });
+    expectError(() => compile(root, fx.PAGE_2, { repairReview: asked }), 'repair_limit', /repair limit reached/);
+    const touched = compile(root, fx.PAGE_2, { repairReview: asked, touchUp: true });
+    assert.strictEqual(touched.pkg.mode, 'repair');
+    assert.ok(touched.pkg.repair.findings.includes('F09'), 'the change request is in the repair');
+    assert.ok(touched.warnings.some((w) => /touch-up past the repair limit \(repair_cycle 2, max_cycles 2\)/.test(w)), touched.warnings.join('; '));
+    // A request already fixed does not count.
+    const fixed = Object.assign({}, asked, { findings: asked.findings.map((x) => (x.id === 'F09' ? Object.assign({}, x, { status: 'fixed', recheck: { render: FLAGGED, evidence: 'Seen.' } }) : x)) });
+    expectError(() => compile(root, fx.PAGE_2, { repairReview: fixed, touchUp: true }), 'repair_limit');
   });
 }
 
@@ -539,6 +555,21 @@ function testCli() {
     assert.ok(/repair limit reached/.test(refused.stderr) && /Fix the page plan or the references first/.test(refused.stderr),
       refused.stderr);
     assert.strictEqual(fs.readFileSync(out, 'utf8'), before);
+    // --touch-up lifts it only for a review that holds the person's open change request.
+    const stillRefused = spawnSync(process.execPath, [SCRIPT, '--page', pageFile, '--repair', reviewFile, '--touch-up'], { encoding: 'utf8' });
+    assert.strictEqual(stillRefused.status, 1, 'no change request: the limit holds');
+    assert.ok(/repair limit reached/.test(stillRefused.stderr), stillRefused.stderr);
+    fx.editYaml(root, `issues/ISS_001/pages/${fx.PAGE_2}/reviews/${FLAGGED}.review.yaml`, (r) => {
+      r.findings.push({ id: 'F09', panel: null, source: 'user_request', expected: 'The change the person asked for is visible.', visible: 'Not checked yet.', severity: 'minor', repair: 'Make the sky darker.', status: 'open' });
+    });
+    const touchUp = spawnSync(process.execPath, [SCRIPT, '--page', pageFile, '--repair', reviewFile, '--touch-up'], { encoding: 'utf8' });
+    assert.strictEqual(touchUp.status, 0, touchUp.stderr);
+    assert.ok(/warning: touch-up past the repair limit/.test(touchUp.stdout), touchUp.stdout);
+    assert.ok(yaml.parse(fs.readFileSync(out, 'utf8')).repair.findings.includes('F09'));
+    const alone = spawnSync(process.execPath, [SCRIPT, '--page', pageFile, '--touch-up'], { encoding: 'utf8' });
+    assert.strictEqual(alone.status, 1);
+    assert.ok(/--touch-up goes with --repair/.test(alone.stderr), alone.stderr);
+    fs.writeFileSync(out, before);
 
     // --provider picks another adapter and file.
     const other = spawnSync(process.execPath, [SCRIPT, '--page', pageFile, '--provider', 'gemini'], { encoding: 'utf8' });

@@ -6,7 +6,8 @@ import { h, nextId, icon } from '/js/dom.js';
 import { t, tv, getLang } from '/js/i18n.js';
 import { api, errorText } from '/js/api.js';
 import { screenHead } from '/js/components/bench.js';
-import { textField, selectField, actionButton, notice, disclosure } from '/js/components/ui.js';
+import { textField, selectField, actionButton, notice, disclosure, checkField } from '/js/components/ui.js';
+import { openDockSoon } from '/js/components/conversation.js';
 
 const COMIC_LANGUAGES = ['en', 'es', 'fr', 'de', 'it', 'pt', 'ca', 'ja'];
 
@@ -67,6 +68,8 @@ export function view(ctx, { choices }) {
     rating: opt('rating', 'rating', choices.rating, 'teen'),
   } : null;
 
+  const guided = checkField({ label: t('new.guide'), hint: t('new.guide_hint'), checked: true, draft: ctx.draft('guide') });
+
   const create = async () => {
     problem.replaceChildren();
     const name = title.value.trim();
@@ -93,11 +96,14 @@ export function view(ctx, { choices }) {
         pages: count,
         interface_language: getLang(),
         options: Object.keys(options).length ? options : undefined,
+        guide: guided.value ? true : undefined,
       });
       title.clear();
       about.clear();
       pages.clear();
-      ctx.navigate(`/p/${encodeURIComponent(res.project.id)}/story`);
+      // In guide mode the conversation opens on the project's home with the guide's first question.
+      if (res.guide) openDockSoon();
+      ctx.navigate(`/p/${encodeURIComponent(res.project.id)}${res.guide ? '' : '/story'}`);
     } catch (err) {
       problem.append(notice('bad', errorText(err)));
     }
@@ -115,6 +121,7 @@ export function view(ctx, { choices }) {
       title.el, about.el, format.el,
       h('div', { class: 'field-pair' }, language.el, pages.el),
       moreBox,
+      guided.el,
       h('p', { class: 'new-promise' }, icon('pen'), h('span', null, t('new.what_happens'))),
       problem,
       h('div', { class: 'row' },

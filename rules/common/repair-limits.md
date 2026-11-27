@@ -121,6 +121,9 @@ Further requirements:
   it edited holds a change request from the person, a `fixed` finding without a
   `recheck` and its evidence, a `fixed` verdict with an open blocking
   finding, and a blocking finding marked `accepted`.
+- `compile-prompts.js --repair` refuses at `max_cycles`; `--touch-up` lifts the
+  refusal for one compile only when the review holds an open change request
+  from the person (`source: user_request`).
 - `prompt-package.schema.json` defines the `repair` block and `edit_target`
   for packages in `mode: repair`.
 - Whether the earlier render and its prompt are still on disk is checked by

@@ -2,6 +2,50 @@
 
 ## Unreleased
 
+- Web studio, "Guide me": a mode of the project conversation that leads
+  from an empty project to a published comic, one decision at a time. It is
+  offered on the new-comic form and switched from the conversation header.
+  The step comes from the same step state as the side navigation
+  (`studio/server/guide.js`): the story in the person's words (new action
+  `story.text`), a style picked from the preset gallery shown in the chat,
+  the look page, the characters and their sheets, the page count and plans,
+  the drawing, each page, the cover, publishing. The guide explains a term
+  the first time, shows what is to be approved, and after each job or
+  decision posts the result and the next question from a template, with no
+  AI call. Choices clicked go through cards
+  (`POST .../conversation/guide/choose`); answers in words go to the AI with
+  the step and the guide's rules in `chat.txt`. Mode on and off:
+  `POST .../conversation/guide`; `POST /api/projects` takes `guide`.
+- A tool out of its usage quota is its own error kind. Generation records
+  get `response.error_kind: tool_quota` and `response.resets` (schema,
+  `docs/data-model.md`), set by `markFailed` from the new
+  `providers/lib/quota.js`, which matches the wording Codex and Claude Code
+  use. `codex-cli` reads it from the final message and the error events. In
+  the studio the job pauses where it stopped (status `paused`, `job.paused`),
+  the pages after it are not tried, the queued jobs that need the same tool
+  pause untouched, and `POST .../jobs/:job/resume` (or the action
+  `job.resume`) picks them all up without drawing anything twice or
+  counting an attempt toward a repair or touch-up limit. The conversation,
+  the guide, the job drawer and the top bar say it in plain words with the
+  reset time. Cards that draw say how many images (`images`), and batch
+  drawing on the Pages and Characters screens confirms the count first.
+- Web studio, reference budget (TODO item 15): the plan checks run against
+  the provider that will draw (`mechanical(root, issue, { provider })`). A
+  `REFERENCE_BUDGET` warning shows on the page in plain words with the
+  characters' names (`findings.budget`) and two choices: draw the page panel
+  by panel (`POST .../pages/:page/mode`, action `page.mode`, which rebuilds
+  the reference plan in the same step), or ask for a staging change as a
+  proposal. `pages.generate` draws a per-panel page as one image per panel
+  and leaves it for the person to assemble and upload; `page.manual` takes
+  the assembled page with every reference of the page for its review. The
+  chat never changes who is in a panel to fit a tool without a proposal
+  (`chat.txt`). The fake codex answers with `reference_mode` and
+  `references_count`.
+- `compile-prompts.js --touch-up` (`touchUp: true`): a repair compile that
+  goes past `repair_policy.max_cycles`, only when the review holds an open
+  change request of the person. The studio uses it instead of reading the
+  project with a raised limit in memory.
+
 - Web studio: the plan review of a page edits its lettering. Per panel,
   balloons, captions and sound effects can be added, removed and reordered,
   each with its kind by plain name and icon (speech, thought, shout,

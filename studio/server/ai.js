@@ -13,6 +13,7 @@ const { NeedsDecision, OpError } = require('./jobs');
 const { SCAFFOLD_ROOT, abortError } = require('./util');
 
 const { guard } = require('./bible-guard');
+const { detectQuota } = require(require('path').join(SCAFFOLD_ROOT, 'providers', 'lib', 'quota.js'));
 
 const TOOL_LABELS = { claude: 'Claude Code', codex: 'Codex' };
 
@@ -144,6 +145,12 @@ async function runAi(ctx, handle, call) {
     ctx.job.cost_usd = Math.round(((ctx.job.cost_usd || 0) + result.costUsd) * 10000) / 10000;
   }
   if (!result.ok) {
+    // A tool out of its usage quota: the job pauses, and so does the queued work that needs it.
+    const quota = detectQuota(result.error, result.text);
+    if (quota) {
+      handle.log(`${TOOL_LABELS[pick.name]} is out of its usage quota: ${quota.said}`);
+      throw require('./pipeline').quotaError(pick.name, quota.resets, result.error);
+    }
     throw new OpError('ai_failed', msg('error.ai_failed', { tool: TOOL_LABELS[pick.name], detail: result.error || 'no reason given' }));
   }
   const out = result.structured;

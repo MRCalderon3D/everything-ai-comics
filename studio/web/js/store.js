@@ -76,7 +76,7 @@ export const bus = {
   },
 };
 
-export const ACTIVE = ['queued', 'running', 'needs_decision'];
+export const ACTIVE = ['queued', 'running', 'needs_decision', 'paused'];
 export const ENDED = ['done', 'failed', 'cancelled'];
 
 export function jobList() {
@@ -122,6 +122,10 @@ function putJob(job) {
   }
   if (job.status === 'needs_decision' && (!before || before.status !== 'needs_decision')) {
     bus.emit('job-waiting', job);
+  }
+  // A tool ran out of its usage quota: the job waits where it stopped (only the one that met it is announced).
+  if (job.status === 'paused' && before && before.status !== 'paused' && job.paused && !job.paused.by) {
+    bus.emit('job-paused', job);
   }
 }
 
@@ -291,7 +295,7 @@ export function whenJobSettles(jobId) {
   return new Promise((resolve) => {
     const check = () => {
       const job = state.jobs.get(jobId);
-      if (job && (ENDED.includes(job.status) || job.status === 'needs_decision')) {
+      if (job && (ENDED.includes(job.status) || job.status === 'needs_decision' || job.status === 'paused')) {
         off();
         resolve(job);
         return true;

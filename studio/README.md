@@ -262,6 +262,78 @@ they are approved, and the questions, which can be answered right there. A
 photo used for a character shows the same rights notice as the Characters
 screen.
 
+## Guide me
+
+Someone who does not know the steps, or would rather not use the screens,
+can let the conversation lead. "Guide me" is a switch at the top of the
+conversation, and a box ticked by default on the new-comic form. It is a
+mode of the project conversation, not a second chat: turning it off keeps
+everything, and a fresh conversation keeps it on.
+
+The guide reads where the project stands from the same step state the side
+navigation paints, and narrows it to the one decision of now
+(`server/guide.js`): tell the story in your words, pick a style from the
+gallery (the preset sample pages, shown as a pickable list in the chat),
+draw the look page and approve it, name the characters and approve their
+sheets, say what happens and how many pages, read and approve the plans,
+draw the pages (the button says how many images), look at each page and
+approve it or say what should change, a cover or not, and the files to
+publish. A job waiting for an answer, or paused because a tool ran out of
+quota, comes first. Each message says what the step is, why it comes now
+and what the person decides, and explains a term (look page, sheet, plan,
+check, touch-up, edition) the first time it comes up.
+
+Every action still goes through cards. A click on one of the guide's
+choices makes the cards and runs them as the person's request; drawing says
+how long it usually takes. Answers in words go to the AI with the step and
+the guide's rules in its prompt: answer the question first, one decision at
+a time, the story and the approvals are the person's, and end with the next
+step. When a job or a decision settles (from a card, a chat reply, or a
+screen), the guide posts the result and the next question on its own, from
+a template, with no AI call. Nobody has to type "next". Detours are free: a
+question gets its answer and the step stays; an approval made on a screen
+moves the guide on.
+
+## When a tool runs out of quota
+
+Found in a real run: Codex's image tool hit its usage limit in the middle of
+a twelve-page drawing, and the job went on failing page after page. Now a
+usage-limit answer is its own kind of error. The scaffold's providers
+recognise it (`providers/lib/quota.js`, matched on the tools' own wording
+and broadly on "usage limit", "rate limit" and "quota") and record
+`response.error_kind: tool_quota` on the generation record, with the reset
+time when the tool gives one. Codex keeps rate limits for its text quota in
+its session files; nothing there is about images, so the studio does not
+show it as the image reset.
+
+The job that meets it pauses where it stopped instead of failing. The pages
+after it are not tried. The jobs queued behind it that need the same tool
+pause too, untouched; the rest run. The person is told which tool ran out,
+that nothing is wrong with the pages, which pages wait, and when the tool
+says the limit resets. One button resumes the job and the ones behind it:
+what was drawn is not drawn again, a change request is not recorded twice,
+and none of the failed attempts counts toward a repair or touch-up limit.
+The conversation and the guide say the same and offer to resume later.
+
+Before batch drawing (all pages of an issue, every missing sheet) the
+confirmation says how many images it will draw, and a card that draws says
+it too.
+
+## More characters than the drawing tool takes
+
+Codex takes five reference images per drawing. A page whose cast needs more
+(the look page plus five characters, say) is caught when it is planned: the
+continuity check runs against the provider that will draw, and the page
+says, in plain words and with the characters' names, how many images it
+needs and how many the tool takes. Two ways out are offered. "Draw it panel
+by panel" sets the page's `generation.mode` to `per_panel` and rebuilds its
+reference plan in the same step; each panel is then drawn as its own image
+with only its own cast, and the person puts the panels together in the
+layout and uploads the page, which is checked as any page. "Propose a
+staging change" asks the conversation for a change of who stands where, as
+a proposal with the reason. Nothing moves a character off panel to fit the
+tool: who is in a panel is the person's story, and the chat's prompt says so.
+
 No AI run writes the story bible, except `story.update`, which applies a
 change the person asked for. Any other run that changes it (a character run
 that adds an invented relative as a fact, for example) has the change undone
@@ -383,7 +455,8 @@ The screen sits in the middle, with the artwork given the larger share. The
 conversation is docked on the right and keeps its messages while the person
 moves between screens; each message shows the screen it came from, links in
 replies open the screen they name, and "New" starts a fresh conversation
-while the earlier ones stay readable. Below 1240 px the conversation floats
+while the earlier ones stay readable. "Guide me" in its header turns
+[guide mode](#guide-me) on and off. Below 1240 px the conversation floats
 over the screen and opens only when asked.
 
 The person can arrange the frame. A handle between each side and the
@@ -399,7 +472,9 @@ What each screen asks of the person:
 
 - Projects: the comics as covers, a new comic, the tools found on this
   machine. Creating a comic asks for a title, a description and a few
-  options, and starts no AI job.
+  options, and starts no AI job. "Guide me through it in the chat" is ticked
+  by default: the comic then opens with the conversation and its first
+  question.
 - Story: the person's own text and the story bible to fill in. The AI writes
   only through four explicit actions (draft from my text, complete what is
   missing, suggest something, apply my change) or the conversation, and what
@@ -585,8 +660,14 @@ tools. Two of them make a whole comic: one only through the conversation
 endpoints (messages, cards, answers), one mixing screens and conversation.
 Others cover a commit made while another writer is busy in the same
 workspace, possible duplicates with merge and rename, deletes and their
-refusals, and chat cards that run in order on an explicit request. No test
-starts a real CLI.
+refusals, and chat cards that run in order on an explicit request. Guide
+mode has its own: a whole comic made only by answering the guide (clicks on
+its choices and answers in words, never "next"), and a job result that
+brings the next guide message with no message from the person. The quota
+tests run the drawing tool out in the middle of a job, check the pause, the
+untouched queue and the resume, and do the same for a correction and for
+the writing tool. A page whose cast is over the reference budget is drawn
+panel by panel and uploaded. No test starts a real CLI.
 `studio/test-support/record-api-examples.js` refreshes the examples in the
 API reference from such a run.
 
@@ -600,7 +681,13 @@ API reference from such a run.
 - The check that compares a sheet with the approved one looks at identity
   only (face, hair, build, sided marks). It does not judge the layout or
   the labels of a full character sheet: the person does.
-- Pages are drawn whole. The scaffold's per-panel mode is not used.
+- A page drawn panel by panel comes back as one image per panel. The studio
+  does not put them together (the scaffold has no compositor): the person
+  does, in the layout of the plan, and uploads the page.
+- The quota recognition matches the wording Codex and Claude Code used in
+  the runs and binaries looked at on 2026-11-27, and broadly "usage limit",
+  "rate limit" and "quota". A tool that changes its wording may need a new
+  pattern in `providers/lib/quota.js`.
 - Lettering is one mode per project. In overlay mode the browser flattens
   each page; the server cannot. So the conversation can place overlay
   lettering but not flatten it: that last step is on the Publish screen.

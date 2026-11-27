@@ -13,6 +13,7 @@ const files = require('./files');
 const letteringPlan = require('./lettering-plan');
 const chats = require('./chats');
 const conversation = require('./conversation');
+const guide = require('./guide');
 const screens = require('./screens');
 const story = require('./story');
 const looks = require('./looks');
@@ -211,8 +212,14 @@ function createApi(services) {
     // Deprecated: "setup": true still asks for a first draft of the story bible, as a proposal.
     let job = null;
     if (description && body.setup === true) job = jobs.enqueue(proj, 'project.setup', { description, pages });
+    // "guide": true: the project conversation starts in guide mode, with its first message.
+    let guided = false;
+    if (body.guide === true) {
+      guide.setMode(services, proj, true);
+      guided = true;
+    }
     res.statusCode = 201;
-    return { project: aggregates.projectCard(proj, jobs), job, written };
+    return { project: aggregates.projectCard(proj, jobs), job, written, guide: guided };
   });
 
   get(P, (req, res, ctx) => {
@@ -612,6 +619,23 @@ function createApi(services) {
     return actions.DIRECT['job.cancel'].run(services, proj, { job: ctx.params.job });
   });
 
+  // A job paused because a tool ran out of its usage quota: back to the queue where it stopped,
+  // with the jobs that paused behind it.
+  post(`${P}/jobs/:job/resume`, async (req, res, ctx) => {
+    const proj = project(ctx);
+    await readJsonBody(req, JSON_LIMIT);
+    actions.DIRECT['job.resume'].validate({ job: ctx.params.job }, { project: proj, services });
+    return actions.DIRECT['job.resume'].run(services, proj, { job: ctx.params.job });
+  });
+
+  // A page whose cast needs more reference images than the drawing tool takes: draw it panel by panel, or as one image again.
+  post(`${P}/pages/:page/mode`, async (req, res, ctx) => {
+    const proj = project(ctx);
+    const body = await readJsonBody(req, JSON_LIMIT);
+    const clean = actions.DIRECT['page.mode'].validate({ page: ctx.params.page, mode: body.mode }, { project: proj, services });
+    return actions.DIRECT['page.mode'].run(services, proj, clean);
+  });
+
   post(`${P}/jobs/:job/answer`, async (req, res, ctx) => {
     const proj = project(ctx);
     const body = await readJsonBody(req, JSON_LIMIT);
@@ -640,7 +664,21 @@ function createApi(services) {
       folded: entry.folded || [],
       messages: conversation.messages(proj, entry.id),
       pending: pending.map((j) => j.id),
+      guide: guideView(proj, entry),
     };
+  };
+
+  /** Guide mode of a conversation, with the step the project is at when it is on. */
+  const guideView = (proj, entry) => {
+    const g = conversation.guideState(proj, entry.id);
+    if (!g.on) return { on: false, step: null, terms: g.terms };
+    let current = null;
+    try {
+      current = guide.publicStep(guide.step(proj, services));
+    } catch (err) {
+      current = null;
+    }
+    return { on: true, step: current, terms: g.terms };
   };
 
   /** Store the person's message and queue the reply. */
@@ -697,11 +735,30 @@ function createApi(services) {
     return { card: actions.dismissCard(services, proj, entry.id, ctx.params.card) };
   });
 
+  // Guide mode: { "on": true | false }. On posts the guide's first message at once.
+  post(`${P}/conversation/guide`, async (req, res, ctx) => {
+    const proj = project(ctx);
+    const body = await readJsonBody(req, JSON_LIMIT);
+    if (typeof body.on !== 'boolean') throw new HttpError(400, 'bad_params', 'Send { "on": true } or { "on": false }.');
+    proj.ensureStudioDirs();
+    const out = guide.setMode(services, proj, body.on);
+    return { conversation: conversationView(proj, conversation.current(proj)), on: out.on, message: out.message };
+  });
+
+  // A choice of the guide's message, clicked: { "step": "<sig>", "choice": "<id>", "screen": { key } }.
+  post(`${P}/conversation/guide/choose`, async (req, res, ctx) => {
+    const proj = project(ctx);
+    const body = await readJsonBody(req, JSON_LIMIT);
+    proj.ensureStudioDirs();
+    return guide.choose(services, proj, body);
+  });
+
   post(`${P}/conversation/new`, async (req, res, ctx) => {
     const proj = project(ctx);
     await readJsonBody(req, JSON_LIMIT);
     proj.ensureStudioDirs();
     const entry = conversation.start(proj);
+    if (conversation.guideState(proj, entry.id).on) guide.post(services, proj, entry.id, { force: true, intro: true });
     res.statusCode = 201;
     return { conversation: conversationView(proj, entry), conversations: conversation.list(proj) };
   });
@@ -809,25 +866,37 @@ function createApi(services) {
   post(`${P}/approve/asset`, async (req, res, ctx) => {
     const proj = project(ctx);
     const body = await readJsonBody(req, JSON_LIMIT);
-    return actions.DIRECT['approve.asset'].run(services, proj, body);
+    const out = await actions.DIRECT['approve.asset'].run(services, proj, body);
+    // An approval made on a screen: in guide mode the conversation goes on from the new state.
+    guide.afterSettled(services, proj, null, null);
+    return out;
   });
 
   post(`${P}/approve/plan`, async (req, res, ctx) => {
     const proj = project(ctx);
     const body = await readJsonBody(req, JSON_LIMIT);
-    return actions.DIRECT['approve.plan'].run(services, proj, body);
+    const out = await actions.DIRECT['approve.plan'].run(services, proj, body);
+    // An approval made on a screen: in guide mode the conversation goes on from the new state.
+    guide.afterSettled(services, proj, null, null);
+    return out;
   });
 
   post(`${P}/approve/page`, async (req, res, ctx) => {
     const proj = project(ctx);
     const body = await readJsonBody(req, JSON_LIMIT);
-    return actions.DIRECT['approve.page'].run(services, proj, body);
+    const out = await actions.DIRECT['approve.page'].run(services, proj, body);
+    // An approval made on a screen: in guide mode the conversation goes on from the new state.
+    guide.afterSettled(services, proj, null, null);
+    return out;
   });
 
   post(`${P}/approve/cover`, async (req, res, ctx) => {
     const proj = project(ctx);
     const body = await readJsonBody(req, JSON_LIMIT);
-    return actions.DIRECT['approve.cover'].run(services, proj, body);
+    const out = await actions.DIRECT['approve.cover'].run(services, proj, body);
+    // An approval made on a screen: in guide mode the conversation goes on from the new state.
+    guide.afterSettled(services, proj, null, null);
+    return out;
   });
 
   // --- overlay lettering ---------------------------------------------------------------------------

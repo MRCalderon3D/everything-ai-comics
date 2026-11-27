@@ -186,9 +186,10 @@ function waitingAlerts() {
   const out = [];
   const base = `/p/${encodeURIComponent(state.projectId || '')}`;
   for (const job of state.jobs.values()) {
-    if (job.status !== 'needs_decision') continue;
+    // A job paused for a tool's quota is an alert too, until it is resumed or cancelled.
+    if (job.status !== 'needs_decision' && !(job.status === 'paused' && job.paused && !job.paused.by)) continue;
     const target = targetOf(job, base, (job.params && job.params.issue) || 'ISS_001') || { screen: 'pages', item: `job:${job.id}`, link: null };
-    out.push({ id: `wait|${job.id}`, screen: target.screen, also: target.also || [], item: target.item, text: 'unseen.waiting', params: { title: job.title || job.op }, tone: 'alert', link: target.link, job: job.id, live: true });
+    out.push({ id: `wait|${job.id}`, screen: target.screen, also: target.also || [], item: target.item, text: job.status === 'paused' ? 'unseen.paused' : 'unseen.waiting', params: { title: job.title || job.op }, tone: 'alert', link: target.link, job: job.id, live: true });
   }
   return out;
 }
@@ -299,6 +300,6 @@ export function startUnseen() {
   bus.on('job', ({ job }) => {
     if (state.projectId && projectId !== state.projectId) load(state.projectId);
     take(job);
-    if (job.status === 'needs_decision' || (job && ENDED.includes(job.status))) emit();
+    if (job.status === 'needs_decision' || job.status === 'paused' || (job && ENDED.includes(job.status))) emit();
   });
 }

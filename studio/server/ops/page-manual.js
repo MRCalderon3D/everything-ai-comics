@@ -12,6 +12,11 @@
  *   candidate version, through the same naming functions as a generated
  *   one, with a generation record that says a person supplied it. A page or
  *   a cover is then reviewed.
+ *
+ * A page drawn panel by panel (generation.mode per_panel) ends here: the
+ * person puts the panel images together in the page's layout and uploads
+ * the page. Its package then lists every reference of the page with no
+ * budget, since no tool receives them, so the review compares against all.
  */
 
 const fs = require('fs');
@@ -26,9 +31,23 @@ const { bad, bool, requirePage, requireIssue, lookState, ISSUE_RE, PAGE_RE, ENTI
 
 const SHEETS = ['turnaround', 'expressions', 'wardrobe', 'plate', 'prop', 'look'];
 
-/** The manual provider with a generate() that returns the uploaded image. */
-function uploadProvider(buffer, format, uploadName, lang) {
+/**
+ * The manual provider for a page the person put together from panels drawn
+ * one by one (generation.mode per_panel): the image is theirs, no tool
+ * receives the references, so the package carries every reference of the
+ * page with no budget, for the review to compare against.
+ */
+function assembledProvider() {
   const manual = S.providers.loadImageProvider('manual');
+  const { compileHandoff } = require(path.join(SCAFFOLD_ROOT, 'providers', 'lib', 'handoff.js'));
+  const wide = Object.assign({}, manual, { capabilities: Object.assign({}, manual.capabilities, { referenceImages: Infinity }) });
+  wide.compile = (pkg, options = {}) => compileHandoff(wide, pkg, options, 'The person put the panels together in the layout of page.yaml and supplied the page.');
+  return wide;
+}
+
+/** The manual provider (or `base`) with a generate() that returns the uploaded image. */
+function uploadProvider(buffer, format, uploadName, lang, base) {
+  const manual = base || S.providers.loadImageProvider('manual');
   const common = require(path.join(SCAFFOLD_ROOT, 'providers', 'lib', 'common.js'));
   return Object.assign({}, manual, {
     async generate(requestSpec) {
@@ -120,6 +139,9 @@ module.exports = {
       return S.ws.listCoverRenders(root, params.cover).pop() || null;
     };
 
+    // A page drawn panel by panel and put together by the person: no reference budget applies to the upload.
+    const pageDoc = params.page ? S.ws.loadPage(root, params.page) : null;
+    const assembled = !!(params.upload && pageDoc && pageDoc.generation && pageDoc.generation.mode === 'per_panel' && !params.repair);
     const prepared = await ctx.step('prepare', (h) => {
       let compiled;
       const from = supersedes();
@@ -127,7 +149,9 @@ module.exports = {
       if (params.repair && !review) throw new OpError('nothing_to_repair', 'There is no reviewed render to repair.');
       if (params.page) {
         pipeline.buildPlan(root, params.page, provider);
-        compiled = pipeline.compilePage(root, params.page, provider, { repairReview: review || undefined });
+        compiled = pipeline.compilePage(root, params.page, provider, {
+          repairReview: review || undefined, providerModule: assembled ? assembledProvider() : undefined,
+        });
       } else if (params.cover) {
         compiled = pipeline.compileCover(root, params.cover, provider, { repair: review || undefined });
       } else {
@@ -176,7 +200,9 @@ module.exports = {
       if (!upload) throw new OpError('upload_missing', 'The uploaded image is no longer there. Upload it again.');
       const buffer = fs.readFileSync(project.uploadFile(upload));
       const info = S.imageInfo(buffer);
-      const result = await pipeline.draw(ctx, h, prepared.file, { providerModule: uploadProvider(buffer, info.format, upload.name, project.settings().language) });
+      const result = await pipeline.draw(ctx, h, prepared.file, {
+        providerModule: uploadProvider(buffer, info.format, upload.name, project.settings().language, assembled ? assembledProvider() : null),
+      });
       if (params.page) pipeline.setPageState(root, params.page, { status: 'rendered', current_render: result.render });
       h.note(result.file);
       return result;

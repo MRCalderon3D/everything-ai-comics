@@ -224,6 +224,17 @@ A failed run gives a `failed` record with a plain message in
 | Saved file is not an image | `not an image`; the bytes are discarded |
 | Fewer references reached the tool than were sent | `Codex passed N of the M reference images`; the image is discarded |
 | No reference reached the tool (`reference_mode: none`) | `received none of the M reference images`; the image is discarded |
+| Codex or its image tool out of its usage quota | `ran out of its usage quota`, with `response.error_kind: tool_quota` and `response.resets` |
+
+The quota case was found in a real run: the image tool answered "Image
+generation failed because the usage limit was reached" in the final JSON
+notes, after `item.completed: error` events, and `codex exec` exited 0.
+`providers/lib/quota.js` recognises that wording, the CLI's own ("You've hit
+your usage limit ... try again at <time>"), Claude Code's, HTTP 429, and
+broadly "usage limit", "rate limit" and "quota". `markFailed` in
+`providers/lib/common.js` uses it for every provider, so an API provider's
+429 is recorded the same way. Codex's session files carry `rate_limits` for
+its text quota only, so the reset time recorded is the one in the answer.
 
 Text on stderr alone is never a failure. Codex prints unrelated noise there,
 such as MCP servers that are not running. A non-zero exit after the image

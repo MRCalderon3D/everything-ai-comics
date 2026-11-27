@@ -14,6 +14,8 @@
  * the interface:
  *   DECIDE      the step stops with a question, until an answer is given
  *   FAILAI      the step reports a failure
+ *   QUOTAAI     the tool answers that its usage limit was reached (with a
+ *               reset time), as Claude Code does: the job pauses
  *   SLOW        the step takes STUDIO_FAKE_SLOW_MS (default 3000 ms)
  *   FLAG        the first review of a page or cover whose text has the word
  *               is flagged with one blocking finding; the repair passes
@@ -30,12 +32,21 @@
  *               run: true and starts in the same turn
  *   MYTEXT      (chat) the reply saves the message as the person's own text,
  *               story/source/description.md
+ *   CROWD       (pages plan) panel 1 draws three characters, panel 2 the
+ *               next two, panel 3 the first two: with five characters the
+ *               page needs more reference images than codex-cli takes,
+ *               while each panel fits (REFERENCE_BUDGET)
  *   NEWCHAR     (pages breakdown) the text names someone with no file: the
  *               breakdown writes CHAR_ORANGE_GREY, a grey-haired man in an
  *               orange jumpsuit; (story proposal) the proposal gives an arc
  *               to CHAR_GREY_HAIRED_MAN, the same man under another ID
  *   RUN         (chat) the reply runs every card waiting in the conversation
  *   STATE       (chat) the reply repeats the project state it was given
+ *   (guide mode) a chat message with no ACTION or DO words, and not a
+ *               question ending in "?", answers the
+ *               guide's step: the reply proposes the action the step
+ *               expects, with the message as its text, and runs it;
+ *               NOGUIDE in the message turns that off
  *   WRITEBIBLE  (chat, character) the run writes the story bible directly,
  *               which the studio undoes
  *   SHEETFLAG   (character description) the identity check of a sheet drawn
@@ -349,6 +360,10 @@ const handlers = {
     const project = ws.loadProject(root) || {};
     const paged = project.comic_format !== 'webtoon';
     const cast = characterIds(root).slice(0, 2);
+    // CROWD: panel 1 draws the first three characters, panel 2 the next two, panel 3 the first two again:
+    // a page whose cast needs more reference images than the drawing tool takes, while each panel fits.
+    const crowd = has(task.text, 'CROWD') ? characterIds(root) : null;
+    const castOf = (n) => (!crowd ? cast : n === 1 ? crowd.slice(0, 3) : n === 2 ? crowd.slice(3, 5) : crowd.slice(0, 2));
     const scene = ws.listScenes(root, issue).reverse().find((s) => s.doc && Array.isArray(s.doc.pages) && s.doc.pages.includes(pageIds[0]));
     const sceneId = scene ? scene.id : `SC_${issue.slice(4)}_01`;
     const location = (scene && scene.doc.location) || ws.listEntityIds(root, 'locations')[0];
@@ -358,6 +373,7 @@ const handlers = {
     const spots = [
       { level, side: 'left', landmark: (landmarks.find((l) => l.side === 'left') || {}).id || null },
       { level, side: 'right', landmark: (landmarks.find((l) => l.side === 'right') || {}).id || null },
+      { level, side: 'center', landmark: (landmarks.find((l) => l.side === 'center') || {}).id || null },
     ];
     const parts = splitText(vars.text, pageIds.length);
     const existingIds = ws.listPageIds(root, issue).filter((id) => !pageIds.includes(id)).sort();
@@ -378,7 +394,7 @@ const handlers = {
         return {
           character: charId,
           off_panel: false,
-          position: spots[i],
+          position: spots[i % spots.length],
           facing: i === 0 ? 'right' : 'left',
           action,
           acting: 'Shoulders loose, eyes on the other side of the room.',
@@ -391,7 +407,6 @@ const handlers = {
           wardrobe_change: null,
         };
       };
-      const speaker = cast[0] || null;
       const panel = (n, tier, size, shot, moment, lettering) => ({
         id: pn(n),
         order: n,
@@ -403,7 +418,7 @@ const handlers = {
         transition_in: index === 0 && n === 1 ? null : 'action',
         ellipsis: null,
         background: 'The room, plainly drawn.',
-        cast: cast.map((id, i) => row(id, i, i === 0 ? 'Stands and looks across the room.' : 'Waits by the far side.')),
+        cast: castOf(n).map((id, i) => row(id, i, i === 0 ? 'Stands and looks across the room.' : 'Waits by the far side.')),
         props: [],
         transfers: [],
         lettering,
@@ -421,7 +436,7 @@ const handlers = {
           panel(1, 1, 'wide', 'wide', `The place where this happens: ${firstSentence(text, 120)}`,
             [{ id: 'L01', type: 'caption', speaker: null, text: words(text, 20), order: 1 }]),
           panel(2, 2, 'medium', 'medium', 'The first figure turns toward the other.',
-            speaker ? [{ id: 'L02', type: 'balloon', speaker, text: 'We start here.', order: 2 }] : []),
+            castOf(2)[0] ? [{ id: 'L02', type: 'balloon', speaker: castOf(2)[0], text: 'We start here.', order: 2 }] : []),
           panel(3, 2, 'medium', 'medium_close_up', 'A closer view as the moment lands.', []),
         ],
         references: { required: [], optional: [] },
@@ -690,6 +705,16 @@ const handlers = {
       const now = proposed.filter((a) => a.run).length;
       out.summary += ` I propose ${proposed.length} action(s): ${proposed.map((a) => a.action).join(', ')}.${now ? ` ${now} of them start now, as you asked.` : ' Each waits for your click.'}`;
     }
+    // Guide mode: an answer in words to the guide's step becomes the action the step expects, as a request.
+    // A question (the message ends with "?") is a detour: it gets an answer and the guide's step again.
+    if (vars.guide_step && /\?\s*$/.test(message)) out.summary += ` (guide) We are still at the step "${vars.guide_step}".`;
+    if (!proposed.length && vars.guide_expects && vars.guide_expects.action && !has(message, 'NOGUIDE') && !/\?\s*$/.test(message)) {
+      const action = guideAnswer(vars.guide_expects, message);
+      if (action) {
+        out.data.actions = [action];
+        out.summary += ` As your guide, I take that as your answer: ${action.action} starts now. Next, the studio shows you the result and the next step.`;
+      }
+    }
     if (has(message, 'RUN') && Array.isArray(vars.pending_cards) && vars.pending_cards.length) {
       out.data.run_actions = vars.pending_cards.slice();
       out.summary += ` Running ${vars.pending_cards.length} waiting card(s), as you confirmed.`;
@@ -786,6 +811,27 @@ function parseActions(text) {
     out.push({ action: m[2], params, run: m[1] === 'DO', from: m.index, to: re.lastIndex > m.index ? re.lastIndex : m.index + m[0].length });
   }
   return out;
+}
+
+/**
+ * What an answer in words to the guide's step becomes (guide.js `expects`):
+ * the step's action with the person's words in the named param, run at once.
+ * A character's name is the words before the first comma or colon.
+ */
+function guideAnswer(expects, message) {
+  const text = String(message || '').replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+  const params = Object.assign({}, expects.params || {});
+  if (expects.answer_of) {
+    params.answers = { [expects.answer_of]: text };
+  } else if (expects.param) {
+    params[expects.param] = text;
+  }
+  if (expects.name_from === 'text') {
+    const m = /^([^:,.]{1,40}?)\s*[:,.]/.exec(text);
+    params.name = (m ? m[1] : text.split(' ')[0]).trim();
+  }
+  return { action: expects.action, params, run: true, why: 'The person answered the guide.' };
 }
 
 /** The text without its ACTION:... parts, so the words inside an action's params do not steer the chat turn itself. */
@@ -908,6 +954,13 @@ async function run(options) {
       const ms = Number.parseInt(process.env.STUDIO_FAKE_SLOW_MS || '', 10);
       emit('working slowly, as asked');
       await sleep(Number.isFinite(ms) && ms > 0 ? ms : 3000, options.signal);
+    }
+    if (has(text, 'QUOTAAI')) {
+      // What Claude Code answers when the account's usage limit is reached (older wording, with the reset time).
+      return {
+        ok: false, structured: null, text: '', sessionId, costUsd: null, durationMs: Date.now() - started,
+        error: 'Claude AI usage limit reached|1764264000',
+      };
     }
     if (has(text, 'FAILAI')) {
       return finish({ status: 'failed', summary: 'The fake assistant was told to fail (FAILAI).', files_written: [] });

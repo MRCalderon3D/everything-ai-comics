@@ -24,7 +24,12 @@
  * When a job started from a card settles, the card takes its outcome and an
  * event message goes into the conversation that started it: the outcome, the
  * images it made, links to the screens where they can be approved, the
- * questions of a paused job, the story proposal it left.
+ * questions of a paused job, the story proposal it left. A job that paused
+ * because a tool ran out of its usage quota says so in plain words, with
+ * when it may come back and what waits (job.resume picks it up again).
+ *
+ * In guide mode (studio/server/guide.js) every settled card is followed by
+ * the guide's next message, without the person having to ask.
  */
 
 const S = require('./scaffold');
@@ -259,6 +264,32 @@ const DIRECT = {
     },
   },
 
+  'story.text': {
+    params: [
+      { name: 'text', type: 'string', required: true, description: 'The person\'s own story, in their words, saved as their text (story/source/description.md). Nothing is invented or rewritten: it is what they wrote.' },
+      { name: 'append', type: 'boolean', required: false, description: 'true adds the text after what is there (default false: the text replaces it).' },
+    ],
+    validate(p) {
+      return { text: text(p, 'text', { required: true, max: 20000 }), append: flag(p, 'append') };
+    },
+    async run(services, project, params) {
+      const path = require('path');
+      const fs = require('fs');
+      const root = project.root;
+      const file = S.ws.abs(root, story.SOURCE);
+      const title = (attempt(() => S.ws.loadProject(root), {}) || {}).title || '';
+      const before = params.append ? (attempt(() => story.personText(project), '') || '').trim() : '';
+      const body = [before, params.text.trim()].filter(Boolean).join('\n\n');
+      const saved = await history.record(services, project, {
+        kind: 'save', title: msg('activity.story_text'), scope: [story.SOURCE],
+      }, () => {
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, `# ${title || 'Story'}\n\n${body}\n`);
+      });
+      return { file: story.SOURCE, words: body.split(/\s+/).filter(Boolean).length, commit: saved.commit };
+    },
+  },
+
   'proposal.decide': {
     params: [
       { name: 'proposal', type: 'string', required: true, description: 'Proposal id (prop_...).' },
@@ -366,6 +397,65 @@ const DIRECT = {
         }
       }
       return { job };
+    },
+  },
+
+  'job.resume': {
+    params: [{ name: 'job', type: 'string', required: true, description: 'A job paused because a tool ran out of its usage quota (job_...). It goes back to the queue where it stopped, with the jobs that paused behind it; what was drawn is not drawn again. Only when the person asks: the quota may still be out.' }],
+    validate(p, { project, services }) {
+      const id = checkJob(services, project, p);
+      const job = services.jobs.getRaw(project, id);
+      if (job.status !== 'paused') throw new HttpError(409, 'job_not_paused', 'This job is not paused.', undefined, { status: job.status });
+      return { job: id };
+    },
+    async run(services, project, params) {
+      return services.jobs.resume(project, params.job);
+    },
+  },
+
+  'page.mode': {
+    params: [
+      { name: 'page', type: 'string', required: true, description: 'Page ID (PG_001_003).' },
+      { name: 'mode', type: 'string', required: true, description: 'per_panel: draw the page panel by panel, each panel with only its own cast as references (for a page whose cast needs more reference images than the drawing tool takes; the panels are then put together and uploaded as the page). full_page: draw it as one image again. The reference plan is rebuilt for the new mode at once. Never change who is in a panel to fit the tool instead.' },
+    ],
+    validate(p, { project }) {
+      const pageId = text(p, 'page', { required: true, max: 40 });
+      if (!S.ws.ID.page.test(pageId)) throw new HttpError(400, 'bad_params', '"page" must be a page ID.');
+      if (!S.ws.loadPage(project.root, pageId)) throw new HttpError(404, 'page_not_found', `${pageId} does not exist in this project.`);
+      if (!['per_panel', 'full_page'].includes(p.mode)) throw new HttpError(400, 'bad_params', '"mode" must be per_panel or full_page.');
+      return { page: pageId, mode: p.mode };
+    },
+    async run(services, project, params) {
+      const pipeline = require('./pipeline');
+      const root = project.root;
+      const dir = S.ws.rel(root, S.ws.pageDir(root, params.page));
+      let rebuilt = null;
+      const saved = await history.record(services, project, {
+        kind: 'save', title: msg(`activity.page_mode.${params.mode}`, { page: params.page }), scope: [dir],
+      }, () => {
+        const file = require('path').join(S.ws.pageDir(root, params.page), 'page.yaml');
+        S.yamlEdit.rewriteYamlFile(file, (doc) => {
+          if (!doc.generation || typeof doc.generation !== 'object') doc.generation = {};
+          doc.generation.mode = params.mode;
+        }, (lines) => {
+          const gen = S.yamlEdit.findKey(lines, 'generation', 0);
+          if (!gen) return false;
+          const indent = S.yamlEdit.childIndent(lines, gen);
+          if (indent === null) return false;
+          const range = S.yamlEdit.findKey(lines, 'mode', indent, gen.line + 1, gen.end);
+          if (!range) return false;
+          return S.yamlEdit.setValue(lines, range, params.mode);
+        });
+        // Changing the mode rebuilds the reference plan in the same step, so the next drawing never meets a stale one.
+        const provider = pipeline.compileProvider(project, services.drivers);
+        try {
+          const plan = pipeline.buildPlan(root, params.page, provider);
+          rebuilt = { file: plan.file, mode: plan.doc.mode || params.mode, budget: plan.doc.budget === undefined ? null : plan.doc.budget };
+        } catch (err) {
+          rebuilt = { error: errorText(err) };
+        }
+      });
+      return { page: params.page, mode: params.mode, reference_plan: rebuilt, commit: saved.commit };
     },
   },
 
@@ -511,6 +601,60 @@ const DIRECT = {
     },
   },
 };
+
+/**
+ * The tools a job needs (claude, codex), from the verbs of its operation and
+ * the project's settings: the jobs that pause when one of them runs out of
+ * quota (jobs.pauseQueuedFor).
+ */
+function toolsOf(services, project, job) {
+  let verbs = [];
+  if (job.op === 'chat.turn') verbs = ['plan'];
+  else if (OP_TRAITS[job.op]) {
+    try {
+      verbs = OP_TRAITS[job.op].verbs(job.params || {});
+    } catch (err) {
+      verbs = [];
+    }
+  }
+  const settings = project.settings();
+  return [...new Set(verbs.map((verb) => {
+    const pick = services.drivers.pick(verb, settings);
+    return pick && pick.available ? pick.name : null;
+  }).filter(Boolean))];
+}
+
+/**
+ * How many images an action will draw before any automatic repair: one per
+ * page (one per panel for a page drawn panel by panel), one per sheet. Null
+ * for an action that draws nothing. Batch drawing says it before it runs.
+ */
+function imagesOf(project, name, params) {
+  const root = project.root;
+  const perPage = (id) => {
+    const page = attempt(() => S.ws.loadPage(root, id), null);
+    return page && page.generation && page.generation.mode === 'per_panel' && Array.isArray(page.panels) ? page.panels.length : 1;
+  };
+  switch (name) {
+    case 'pages.generate': {
+      let ids = Array.isArray(params.pages) ? params.pages : null;
+      if (!ids) {
+        ids = attempt(() => S.ws.listPages(root, params.issue || 'ISS_001')
+          .filter((p) => p.doc && (params.regenerate || !['reviewed', 'approved'].includes(p.doc.status))).map((p) => p.id), []) || [];
+      }
+      return ids.reduce((sum, id) => sum + perPage(id), 0);
+    }
+    case 'style.look':
+    case 'character.sheet':
+    case 'cover.correct':
+    case 'page.correct': return 1;
+    case 'character.create':
+    case 'cover.create': return params.draw === false ? null : 1;
+    case 'character.update': return params.draw === true ? 1 : null;
+    case 'entities.derive': return params.plates === true ? null : null;
+    default: return null;
+  }
+}
 
 // --- the catalog ------------------------------------------------------------------------
 
@@ -672,6 +816,8 @@ function makeCard(project, services, item, { conversation: convId, message, job,
     details: Object.entries(params).filter(([name, v]) => v !== undefined && v !== null && v !== '' && !(found.name === 'page.lettering' && name === 'panels'))
       .map(([name, value]) => ({ name, value: plainValue(project, name, value) })),
     draws: traits ? !!traits.draws(clean) : false,
+    // How many images it draws (before automatic repairs), so the person can weigh it against their plan.
+    images: traits && traits.draws(clean) && !deferred ? imagesOf(project, found.name, clean) : null,
     auto: traits ? !!traits.text(clean) && !traits.draws(clean) : false,
     decision: found.kind === 'direct',
     tools,
@@ -912,6 +1058,16 @@ async function runCard(services, project, convId, cardId, { by = 'click', chaine
   conversation.saveCard(project, convId, card);
   emitCard(services, project, card);
   afterSettled(services, project, convId, card);
+  // A decision made from a card (an approval, a proposal accepted): the guide goes on from the new state.
+  if (found && found.kind === 'direct' && card.status === 'done') guideAfter(services, project, convId, null);
+  // A job started from a card: the guide says what is happening and what comes after.
+  if (job) {
+    try {
+      require('./guide').afterStarted(services, project, convId, card, job);
+    } catch (err) {
+      if (process.env.STUDIO_DEBUG) console.error(err);
+    }
+  }
   return { card, job };
 }
 
@@ -1019,21 +1175,28 @@ function resultImages(project, job) {
  */
 function jobSettled(services, project, job) {
   const origin = job.origin || {};
-  if (!origin.conversation || !origin.card) return;
+  if (!origin.conversation || !origin.card) {
+    // A job started on a screen: the guide still picks up from the new state.
+    guideAfter(services, project, null, job);
+    return;
+  }
   let card;
   try {
     card = conversation.getCard(project, origin.conversation, origin.card);
   } catch (err) {
     return;
   }
-  card.status = job.status === 'needs_decision' ? 'needs_decision' : job.status;
+  // A resumed job is running again (jobs.resume): its card follows.
+  card.status = job.status === 'queued' ? 'started' : job.status;
   card.updated_at = nowIso();
   card.error = job.error || null;
   if (job.status === 'done') card.result = compact(job.result);
   conversation.saveCard(project, origin.conversation, card);
   emitCard(services, project, card);
   afterSettled(services, project, origin.conversation, card);
-  if (!['done', 'failed', 'cancelled', 'needs_decision'].includes(job.status)) return;
+  if (!['done', 'failed', 'cancelled', 'needs_decision', 'paused'].includes(job.status)) return;
+  // A job paused behind the one that met the quota: its card says paused, the first job's message tells the rest.
+  if (job.status === 'paused' && job.paused && job.paused.by) return;
 
   const { links } = screens.checkLinks(project, resultScreens(job).map((key) => ({ screen: key })));
   const r = job.result || {};
@@ -1056,9 +1219,50 @@ function jobSettled(services, project, job) {
     questions: job.status === 'needs_decision' ? job.questions : [],
     // The characters, places and objects the job added, with possible duplicates (entities.js).
     added: job.status === 'done' ? attempt(() => require('./entities').addedView(project, job), []) : [],
+    // Out of quota: which tool, when it may come back, what waits, and that nothing is wrong with the work.
+    quota: job.status === 'paused' ? quotaView(services, project, job) : null,
     reply_to: origin.message || null,
   });
   services.events.emit(project.id, 'chat', { conversation: origin.conversation, message });
+  guideAfter(services, project, origin.conversation, job);
+}
+
+/**
+ * What a job paused for a tool's quota tells the person: the tool, when it
+ * said it comes back (null when it did not), the pages not drawn yet, and
+ * the other jobs that paused with it.
+ */
+function quotaView(services, project, job) {
+  const paused = job.paused || {};
+  const { TOOL_LABELS } = require('./ai');
+  const steps = job.steps || [];
+  const waiting = new Set();
+  for (const step of steps) {
+    const m = /^(PG_\d{3}_\d{3}):/.exec(String(step.id));
+    if (m && ['pending', 'paused'].includes(step.status)) waiting.add(m[1]);
+  }
+  const others = attempt(() => services.jobs.pausedJobs(project), []).filter((j) => j.id !== job.id && j.paused && j.paused.by === job.id);
+  return {
+    tool: paused.tool || null,
+    tool_label: TOOL_LABELS[paused.tool] || paused.tool || null,
+    resets: paused.resets || null,
+    pages: [...waiting],
+    jobs: others.map((j) => ({ id: j.id, op: j.op, title: j.title })),
+    lines: [
+      msg(waiting.size ? 'quota.message' : 'quota.message.none', { tool: TOOL_LABELS[paused.tool] || paused.tool || '', n: waiting.size }),
+      paused.resets ? msg('quota.reset', { resets: paused.resets }) : msg('quota.no_reset'),
+      ...(others.length ? [msg('quota.others', { n: others.length })] : []),
+    ],
+  };
+}
+
+/** In guide mode, the guide's next message after a job or a decision (guide.js). Never throws. */
+function guideAfter(services, project, convId, job) {
+  try {
+    require('./guide').afterSettled(services, project, convId, job);
+  } catch (err) {
+    if (process.env.STUDIO_DEBUG) console.error(err);
+  }
 }
 
 // --- the project state, for every chat prompt ----------------------------------------------------
@@ -1168,6 +1372,11 @@ function stateBlock(project, services, convId) {
       return `${j.op} ${j.id} ${j.status}${label ? ` (${clip(label, 60)})` : ''}`;
     }).join('; ')}.`);
   }
+  const pausedNow = jobs.filter((j) => j.status === 'paused');
+  if (pausedNow.length) {
+    const { TOOL_LABELS } = require('./ai');
+    lines.push(`- Paused because a tool ran out of its usage quota (nothing is wrong with the work; job.resume picks it up when the person asks): ${pausedNow.map((j) => `${j.op} ${j.id} (${TOOL_LABELS[(j.paused || {}).tool] || (j.paused || {}).tool || 'a tool'}${(j.paused || {}).resets ? `, resets ${j.paused.resets}` : ''})`).join('; ')}.`);
+  }
   const waiting = jobs.filter((j) => j.status === 'needs_decision');
   for (const j of waiting.slice(0, 3)) {
     lines.push(`- Waiting for the person's answer: ${j.op} ${j.id} asks ${(j.questions || []).map((q) => `[${q.id}] "${clip(q.question, 120)}"${q.options && q.options.length ? ` (options: ${q.options.map((o) => clip(o, 40)).join(' / ')})` : ''}`).join('; ')}.`);
@@ -1191,4 +1400,5 @@ function stateBlock(project, services, convId) {
 module.exports = {
   OP_TRAITS, DIRECT, REFERENCE_MS, MAX_CARDS, ALWAYS_CONFIRM, CHOICE_ACTIONS,
   catalog, find, promptText, makeCard, propose, runCard, dismissCard, jobSettled, stateBlock, typical, resultScreens, withAttachments,
+  toolsOf, imagesOf, quotaView,
 };

@@ -62,7 +62,7 @@ module.exports = {
       fakeText: params.instruction,
     }), { verb: 'plan' });
     const check = await ctx.step('check', (h) => {
-      const result = pipeline.mechanical(root, null);
+      const result = pipeline.mechanical(root, null, { provider: pipeline.compileProvider(ctx.project, ctx.services.drivers) });
       h.note(result.errors ? msg('note.problems', { n: result.errors }) : msg('note.no_problems'));
       return { errors: result.validation.errors, continuity: result.continuity.filter((f) => f.severity === 'error') };
     });

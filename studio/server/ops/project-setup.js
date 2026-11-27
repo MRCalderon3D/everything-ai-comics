@@ -62,7 +62,7 @@ module.exports = {
     const drafted = await propose(ctx, 'story', { mode: 'draft' });
 
     const check = await ctx.step('check', (h) => {
-      const result = pipeline.mechanical(root, null);
+      const result = pipeline.mechanical(root, null, { provider: pipeline.compileProvider(ctx.project, ctx.services.drivers) });
       for (const e of result.validation.errors.slice(0, 20)) h.log(`error ${e.file}: ${e.message}`);
       h.note(result.errors ? msg('note.problems', { n: result.errors }) : msg('note.no_problems'));
       return { errors: result.validation.errors, warnings: result.validation.warnings.length };

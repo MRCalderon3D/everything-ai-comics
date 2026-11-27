@@ -397,6 +397,28 @@ async function testProvider() {
     assert.strictEqual(seen.argv.filter((a) => a === '-i').length, 3);
   });
 
+  // The image tool out of its usage quota (a real run's wording): not a failed drawing but tool_quota, with the reset time.
+  await withEnv({ CODEX_STUB_MODE: 'quota' }, async () => {
+    const record = await provider.generate(pageSpec(root), { dryRun: false, outDir, root });
+    assert.strictEqual(record.status, 'failed');
+    assert.strictEqual(record.response.error_kind, 'tool_quota');
+    assert.strictEqual(record.response.resets, '6:40 PM');
+    assert.ok(/^Codex ran out of its usage quota and saved no image: Image generation failed because the usage limit was reached./.test(record.response.error), record.response.error);
+    assert.ok(validateDoc('generation-record', record).valid, 'a quota record is a valid generation record');
+    assert.deepStrictEqual(leftovers(outDir), []);
+  });
+  // The CLI itself out of quota: its own wording, exit 1.
+  await withEnv({ CODEX_STUB_MODE: 'quota-cli' }, async () => {
+    const record = await provider.generate(pageSpec(root), { dryRun: false, outDir, root });
+    assert.strictEqual(record.response.error_kind, 'tool_quota');
+    assert.strictEqual(record.response.resets, 'Nov 30th, 2026 3:15 PM');
+  });
+  // A plain failure is not a quota.
+  await withEnv({ CODEX_STUB_MODE: 'nofile' }, async () => {
+    const record = await provider.generate(pageSpec(root), { dryRun: false, outDir, root });
+    assert.strictEqual(record.response.error_kind, undefined);
+  });
+
   // Fewer references reached the image tool than were sent: a failed run, the image discarded.
   await withEnv({ CODEX_STUB_COUNT: '1' }, async () => {
     const record = await provider.generate(pageSpec(root), { dryRun: false, outDir, root });

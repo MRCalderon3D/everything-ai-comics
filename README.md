@@ -182,6 +182,22 @@ the screen where you approve it. A question asked while a drawing runs is
 answered at once, without waiting for it. A whole comic can be made from the
 conversation alone, from the screens alone, or mixing both.
 
+If you would rather be led, turn on "Guide me" (it is ticked when you create
+a comic). The conversation then asks one thing at a time: your story in
+your words, a style from a gallery of sample pages, the look page, the
+characters, how many pages, and so on to the published files. It shows the
+sheet, the plan or the page and asks you to approve it or say what should
+change, explains a term the first time it uses it, and comes back with the
+next question by itself when a drawing ends. You can ask anything along the
+way, use the screens, or switch it off; nothing is lost.
+
+When the drawing tool runs out of its usage quota, the job pauses at the
+page that met the limit instead of failing page after page. The studio says
+which tool ran out and when it says it comes back, keeps the pages not drawn
+yet waiting, pauses the queued work that needs the same tool, and resumes
+all of it with one button. Batch drawing says how many images it will draw
+before it starts.
+
 While you work on one screen, the others mark what changed there: a dot
 with a count beside the step in the side navigation, and a short line on
 the character, page or plan that is new, in red when a job failed or waits
@@ -284,6 +300,7 @@ row, because leaving the frame resets nothing.
 | `LAYOUT_MISMATCH` | A reading order, tier count, or lettering order that does not add up. |
 | `PAGE_CHAIN` | `enters_from` and `exits_to` that do not form one chain through the issue. |
 | `UNKNOWN_REFERENCE` | A character, prop, location, wardrobe, level, or landmark the workspace does not define. |
+| `REFERENCE_BUDGET` | A warning: a page or a panel whose drawn cast needs more reference images than the image provider takes. It says whether drawing the page panel by panel would fit. |
 
 The script exits 1 on any error. `validate-workspace.js` includes its
 findings, and in Claude Code the `detect-continuity-drift` hook runs it after
@@ -331,7 +348,10 @@ generated. Touch-ups a person asks for follow `repair_policy.touch_up_warning`
 instead: at that count they are warned that more edits may degrade the
 image and offered a redraw, and they choose. In the web studio that choice
 is two buttons on the correction form and on the chat's card, and the
-number is in Settings.
+number is in Settings. From the command line,
+`compile-prompts.js --repair <review> --touch-up` compiles the touch-up a
+person chose past `max_cycles`, and only when the review holds their open
+change request.
 
 ### Nothing is overwritten
 

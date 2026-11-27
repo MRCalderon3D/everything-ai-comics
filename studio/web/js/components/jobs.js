@@ -14,7 +14,7 @@ import { toast } from '/js/components/toast.js';
 
 // A note that is only an ID (a render name) says nothing to the person.
 const ID_ONLY = /^[A-Z]{2,}(_[A-Z0-9]+)+$/;
-const DRAW_STEP = /(^|:)(draw|sheet-draw|repair-\d+)$/;
+const DRAW_STEP = /(^|:)(draw|sheet-draw|repair-\d+|panel-PN_[A-Z0-9_]+)$/;
 const REVIEW_STEP = /(^|:)review(-\d+)?$/;
 const openLogs = new Set();
 const openJobs = new Set();
@@ -82,6 +82,28 @@ function stepRow(job, step) {
         h('span', { class: 'step-state' }, stepStatus(step.status), step.tool ? ` · ${toolName(step.tool)}` : '')),
       step.note && !ID_ONLY.test(step.note) ? h('div', { class: 'step-note' }, step.note) : null),
     time ? h('span', { class: 'step-time', dataset: running ? { since: step.started_at } : null }, time) : null);
+}
+
+/** Resume a job paused for a tool's quota, with the jobs that paused behind it. */
+export async function resumeJob(job) {
+  try {
+    const res = await api.resumeJob(job.project, job.id);
+    for (const j of res.resumed || [res.job]) rememberJob(j);
+    toast(tn('jobs.resumed', (res.resumed || []).length || 1), { kind: 'ok' });
+  } catch (err) {
+    toast(errorText(err), { kind: 'bad' });
+  }
+}
+
+/** Why a job is paused, in plain words: the tool, the reset time it gave, and the job that met it. */
+export function pausedNotice(job) {
+  const p = job.paused || {};
+  const tool = toolName(p.tool) || p.tool || '';
+  return notice('warn',
+    h('p', null, h('strong', null, t('jobs.paused_quota', { tool }))),
+    h('p', { class: 'small' }, p.resets ? t('jobs.paused_resets', { resets: p.resets }) : t('jobs.paused_no_reset')),
+    p.by ? h('p', { class: 'small muted' }, t('jobs.paused_behind')) : null,
+    h('div', { class: 'row' }, button(t('jobs.resume'), { kind: 'primary', small: true, icon: 'right', onclick: () => resumeJob(job) })));
 }
 
 async function cancelJob(job) {
@@ -163,6 +185,7 @@ export function jobCard(job, { compact = false, open } = {}) {
         ? notice('next', h('strong', null, t('jobs.needs_decision')), ' ',
           h('a', { href: `/p/${encodeURIComponent(job.project)}/decisions` }, t('jobs.answer_link')))
         : null,
+      job.status === 'paused' ? pausedNotice(job) : null,
       ENDED.includes(job.status) && outcome
         ? h('p', { class: `job-outcome ${job.status === 'failed' ? 'bad' : ''}` }, outcome)
         : null,
@@ -266,6 +289,11 @@ export function jobsIndicator() {
       nodes.push(h('a', { class: 'decision-chip', href: `/p/${encodeURIComponent(state.projectId)}/decisions` },
         icon('alert'), h('span', null, t('jobs.decision_chip'))));
     }
+    const paused = active.filter((j) => j.status === 'paused');
+    if (paused.length && state.projectId) {
+      nodes.push(h('button', { type: 'button', class: 'decision-chip paused-chip', onclick: toggleDrawer, 'aria-expanded': String(!!drawerEl) },
+        icon('clock'), h('span', null, tn('jobs.paused_chip', paused.length))));
+    }
     if (running) {
       const step = currentStep(running);
       nodes.push(h('button', { type: 'button', class: 'job-chip running', onclick: toggleDrawer, 'aria-expanded': String(!!drawerEl), title: t('jobs.open') },
@@ -317,6 +345,11 @@ export function startJobs() {
       kind: job.status === 'failed' ? 'bad' : (job.status === 'cancelled' ? 'warn' : 'ok'),
       link: link && !here ? { href: link, label: t('jobs.see_result') } : null,
     });
+  });
+  bus.on('job-paused', (job) => {
+    if (job.op === 'chat.turn' || job.origin) return;
+    const p = job.paused || {};
+    toast(`${t('jobs.paused_quota', { tool: toolName(p.tool) || p.tool || '' })} ${p.resets ? t('jobs.paused_resets', { resets: p.resets }) : ''}`.trim(), { kind: 'warn' });
   });
   bus.on('job-waiting', (job) => {
     toast(t('jobs.needs_decision'), { kind: 'warn', link: { href: `/p/${encodeURIComponent(job.project)}/decisions`, label: t('jobs.answer_link') } });
@@ -388,12 +421,12 @@ export function pageQueueState(pageId) {
     if (!single && !steps.length) continue;
     if (!single && steps.every((s) => ['done', 'skipped', 'failed', 'cancelled'].includes(s.status))) continue;
     const running = steps.find((s) => s.status === 'running');
-    if (!running) return { state: 'waiting', job, step: null };
+    if (!running) return { state: job.status === 'paused' ? 'paused' : 'waiting', job, step: null };
     const id = String(running.id).split(':').pop();
     let kind = 'preparing';
     if (/^repair/.test(id)) kind = 'repairing';
     else if (/^review/.test(id)) kind = 'checking';
-    else if (id === 'draw') kind = 'drawing';
+    else if (id === 'draw' || /^panel-/.test(id)) kind = 'drawing';
     return { state: kind, job, step: running };
   }
   return null;

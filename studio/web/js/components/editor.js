@@ -37,9 +37,18 @@ export function continuityList(items) {
   if (!items || !items.length) return null;
   return h('ul', { class: 'findings' }, items.map((f) => h('li', { dataset: { severity: f.severity || 'error' } },
     h('strong', null, f.severity === 'warning' ? t('mech.warning') : t('mech.error')), ' ',
-    [f.page, f.panel, f.entity].filter(Boolean).length ? h('code', null, [f.page, f.panel, f.entity].filter(Boolean).join(' · ')) : null, ' ',
-    f.message,
-    f.hint ? h('span', { class: 'muted' }, ` ${f.hint}`) : null)));
+    !plainWarning(f) && [f.page, f.panel, f.entity].filter(Boolean).length ? h('code', null, [f.page, f.panel, f.entity].filter(Boolean).join(' · ')) : null, ' ',
+    plainWarning(f) || f.message,
+    plainWarning(f) ? h('details', { class: 'small muted' }, h('summary', null, t('mech.technical')), f.message) : null,
+    f.hint && !plainWarning(f) ? h('span', { class: 'muted' }, ` ${f.hint}`) : null)));
+}
+
+/** A finding the interface words itself (warning.<CODE>), with the scaffold's own text kept under Details. */
+function plainWarning(f) {
+  if (!f || !f.code) return null;
+  const key = `warning.${f.code}`;
+  const text = t(key, { page: f.page || '', panel: f.panel || '' });
+  return text === key ? null : text;
 }
 
 /**

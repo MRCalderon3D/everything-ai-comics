@@ -478,6 +478,58 @@ async function record() {
   } finally {
     await m.close();
   }
+
+  // --- guide mode, the drawing tool out of quota, a page drawn panel by panel ----------------------------------
+  const os = require('os');
+  const quotaFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'studio-record-quota-')), '.fake-quota');
+  const previousQuota = process.env.STUDIO_FAKE_QUOTA_FILE;
+  process.env.STUDIO_FAKE_QUOTA_FILE = quotaFile;
+  const g = await start();
+  homes.push(g.home);
+  try {
+    let r = await g.api('POST', '/api/projects', { title: 'Guided', description: 'A lighthouse keeper finds a bottle with a message.', pages: 2, guide: true });
+    cap('create-guided', { project: { id: r.body.project.id, '...': 'as for any project' }, job: r.body.job, guide: r.body.guide });
+    const id = r.body.project.id;
+    const P = `/api/projects/${id}`;
+    r = await g.api('POST', `${P}/conversation/guide`, { on: true });
+    cap('guide-on', r.body, { keys: { messages: { maxArray: 1 }, presets: { maxArray: 2 }, choices: { maxArray: 2 }, conversations: { maxArray: 1 } } });
+    r = await g.api('POST', `${P}/conversation/guide/choose`, { step: r.body.conversation.guide.step.sig, choice: 'preset-ligne-claire', screen: { key: 'style' } });
+    cap('guide-choose', r.body, { keys: { details: { maxArray: 1 }, tools: { maxArray: 1 } } });
+    await g.waitJob(id, r.body.cards[0].job);
+    r = await g.api('POST', `${P}/conversation/guide/choose`, { step: 'style.choose:choose', choice: 'preset-noir-ink' });
+    cap('guide-moved', r.body, { keys: { choices: { maxArray: 1 }, presets: { maxArray: 1 } } });
+
+    // The look, a character, two pages planned and approved.
+    const look = done(await g.runOp(id, 'style.look', {}), 'style.look');
+    await g.api('POST', `${P}/approve/asset`, { candidate: look.result.candidate_id });
+    const mara = done(await g.runOp(id, 'character.create', { name: 'Mara', description: 'A lighthouse keeper.' }), 'character.create');
+    await g.api('POST', `${P}/approve/asset`, { candidate: mara.result.sheet.candidate_id });
+    done(await g.runOp(id, 'pages.plan', { text: 'Mara finds the bottle. Mara reads the message.', pages: 2 }), 'pages.plan');
+    await g.api('POST', `${P}/approve/plan`, { pages: ['PG_001_001', 'PG_001_002'] });
+
+    // One drawing left: page 1 is drawn, page 2 meets the quota and the job pauses.
+    fs.writeFileSync(quotaFile, '1');
+    r = await g.api('POST', `${P}/ops`, { op: 'pages.generate', params: { issue: 'ISS_001' } });
+    let job = r.body.job;
+    for (;;) {
+      job = (await g.api('GET', `${P}/jobs/${job.id}`)).body.job;
+      if (!['queued', 'running'].includes(job.status)) break;
+      await new Promise((ok) => setTimeout(ok, 20));
+    }
+    cap('job-paused', { job: { id: job.id, op: job.op, status: job.status, paused: job.paused, error: job.error, steps: job.steps.slice(3, 5).map((st) => ({ id: st.id, status: st.status, note: st.note })) } });
+    fs.rmSync(quotaFile, { force: true });
+    r = await g.api('POST', `${P}/jobs/${job.id}/resume`, {});
+    cap('job-resume', { job: { id: r.body.job.id, status: r.body.job.status, paused: r.body.job.paused }, resumed: r.body.resumed.map((j) => ({ id: j.id, op: j.op, status: j.status })) });
+    done(await g.waitJob(id, job.id), 'resumed pages.generate');
+
+    // A page drawn panel by panel.
+    r = await g.api('POST', `${P}/pages/PG_001_002/mode`, { mode: 'per_panel' });
+    cap('page-mode', r.body);
+  } finally {
+    await g.close();
+    if (previousQuota === undefined) delete process.env.STUDIO_FAKE_QUOTA_FILE;
+    else process.env.STUDIO_FAKE_QUOTA_FILE = previousQuota;
+  }
   return homes;
 }
 
